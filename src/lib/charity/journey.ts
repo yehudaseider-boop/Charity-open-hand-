@@ -256,6 +256,28 @@ export function exampleFor(starter: readonly JourneyStep[], position: number): J
   return starter[position] ?? null;
 }
 
+/**
+ * A campaign's journey follows the campaign's dates (23/11/2026, Yehuda: "A"): only a gift started while the campaign
+ * ran brings someone onto it, so nobody new joins once it has ended, but donors already on it get the rest of their
+ * emails. Judged by when the gift was started, not paid, so a last-minute gift confirmed after the end still counts.
+ */
+export type CampaignDates = { startsAt: string; endsAt: string | null };
+
+export function startedInCampaign(gift: { created_at?: string | null; paid_at?: string | null }, c: CampaignDates): boolean {
+  const at = gift.created_at ?? gift.paid_at;
+  if (!at) return false;
+  const t = new Date(at).getTime();
+  return t >= new Date(c.startsAt).getTime() && (!c.endsAt || t <= new Date(c.endsAt).getTime());
+}
+
+/** What the Journeys page says about a campaign's dates, with dates as dd/mm/yyyy. */
+export function campaignJourneyWords(c: CampaignDates & { status: string }, now: Date, formatDate: (iso: string) => string): string {
+  const ended = c.status === "ended" || (c.endsAt !== null && new Date(c.endsAt).getTime() < now.getTime());
+  if (ended) return "This campaign has ended, so nobody new will join. Donors already on the journey still get the rest of their emails.";
+  const until = c.endsAt ? `to ${formatDate(c.endsAt)}` : "until you end it";
+  return `It runs with the campaign, from ${formatDate(c.startsAt)} ${until}. Nobody new joins after the campaign ends; donors already on it still get the rest of their emails.`;
+}
+
 /** The starter for a kind of journey. */
 export function starterSteps(kind: JourneyKind, campaignTitle?: string | null): JourneyStep[] {
   if (kind === "winback") return WINBACK_STARTER_STEPS;

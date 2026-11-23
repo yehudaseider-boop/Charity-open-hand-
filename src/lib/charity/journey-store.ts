@@ -28,6 +28,8 @@ import {
   nextWeekStart,
   planExisting,
   planWinback,
+  startedInCampaign,
+  type CampaignDates,
   type ExistingSkip,
   type JourneyStep,
 } from "./journey";
@@ -490,11 +492,22 @@ async function enrolNewDonors(live: Live[], now: Date, deadline: number): Promis
   for (const j of live.filter((x) => x.kind !== "winback")) {
     if (room <= 0 || Date.now() >= deadline) break;
     const since = new Date(Math.max(j.switchedOnAt.getTime(), now.getTime() - 35 * 86_400_000)).toISOString();
+    // A campaign's journey: only gifts started while the campaign ran (its dates; 23/11/2026). A campaign that can't be
+    // read is skipped this run and tried again tomorrow.
+    let dates: CampaignDates | null = null;
+    if (j.kind === "campaign" && j.campaignId) {
+      const { data: c, error: ce } = await db().from("campaigns").select("starts_at, ends_at").eq("id", j.campaignId).eq("charity_id", j.charityId).maybeSingle();
+      if (ce || !c) {
+        if (ce) console.error("[journeys] could not read a campaign's dates", ce.message);
+        continue;
+      }
+      dates = { startsAt: c.starts_at as string, endsAt: (c.ends_at as string | null) ?? null };
+    }
     const first = new Map<string, Date>();
     for (let from = 0; from < 5000; from += 1000) {
       let q = db()
         .from("donations")
-        .select("donor_id, paid_at, amount_cents, refunded_cents")
+        .select("donor_id, paid_at, created_at, amount_cents, refunded_cents")
         .eq("charity_id", j.charityId)
         .eq("status", "paid")
         .neq("gateway", "recorded")
@@ -505,7 +518,11 @@ async function enrolNewDonors(live: Live[], now: Date, deadline: number): Promis
       const { data, error: e } = await q.order("paid_at").order("id").range(from, from + 999);
       if (e) throw e;
       // A gift refunded in full in part refunds is a refund, not a gift: it doesn't make a new donor.
-      for (const r of data ?? []) if (!nothingLeft(r) && !first.has(r.donor_id as string)) first.set(r.donor_id as string, new Date(r.paid_at as string));
+      for (const r of data ?? []) {
+        if (nothingLeft(r) || first.has(r.donor_id as string)) continue;
+        if (dates && !startedInCampaign(r as { created_at?: string; paid_at?: string }, dates)) continue;
+        first.set(r.donor_id as string, new Date(r.paid_at as string));
+      }
       if (!data || data.length < 1000) break;
     }
     if (!first.size) continue;

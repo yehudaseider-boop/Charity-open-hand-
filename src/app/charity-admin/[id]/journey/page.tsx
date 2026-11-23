@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/dash";
 import { DonePanel, formKey } from "@/components/done-panel";
 import { ActionForm } from "@/components/forms/action-form";
 import { requireViewer } from "@/lib/auth";
-import { enrolmentLabel, existingSkippedSentence, journeyCounts, journeyTitle, parseRefKey, journeyStartWords, partWay, refKey, sameRef, starterSteps, type JourneyRef } from "@/lib/charity/journey";
+import { enrolmentLabel, existingSkippedSentence, journeyCounts, journeyTitle, parseRefKey, journeyStartWords, campaignJourneyWords, partWay, refKey, sameRef, starterSteps, type JourneyRef } from "@/lib/charity/journey";
 import { enrolmentStates, journeyPeople, journeysV2, listJourneys, loadJourney, planExistingDonors } from "@/lib/charity/journey-store";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { can } from "@/lib/charity/permissions";
@@ -52,8 +52,8 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
   const wanted = [...new Set([...all.filter((j) => j.kind === "campaign" && j.campaignId).map((j) => j.campaignId!), ...(asked.kind === "campaign" ? [asked.campaignId] : [])])];
   const [recent, named] = v2
     ? await Promise.all([
-        admin.from("campaigns").select("id, title, status, ends_at").eq("charity_id", id).order("created_at", { ascending: false }).limit(50),
-        wanted.length ? admin.from("campaigns").select("id, title, status, ends_at").eq("charity_id", id).in("id", wanted) : Promise.resolve({ data: [], error: null }),
+        admin.from("campaigns").select("id, title, status, starts_at, ends_at").eq("charity_id", id).order("created_at", { ascending: false }).limit(50),
+        wanted.length ? admin.from("campaigns").select("id, title, status, starts_at, ends_at").eq("charity_id", id).in("id", wanted) : Promise.resolve({ data: [], error: null }),
       ])
     : [{ data: [], error: null }, { data: [], error: null }];
   if (recent.error) throw recent.error;
@@ -61,7 +61,7 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
   const seen = new Set<string>();
   const campaigns = [...(recent.data ?? []), ...(named.data ?? [])]
     .filter((c) => !seen.has(c.id as string) && seen.add(c.id as string))
-    .map((c) => ({ id: c.id as string, title: c.title as string, status: c.status as string, endsAt: (c.ends_at as string | null) ?? null }));
+    .map((c) => ({ id: c.id as string, title: c.title as string, status: c.status as string, startsAt: c.starts_at as string, endsAt: (c.ends_at as string | null) ?? null }));
   const titleOf = (campaignId: string | null) => campaigns.find((c) => c.id === campaignId)?.title ?? null;
   // A campaign must be this charity's own.
   if (asked.kind === "campaign" && !campaigns.some((c) => c.id === asked.campaignId)) notFound();
@@ -69,6 +69,9 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
   const key = refKey(ref);
   const campaignTitle = ref.kind === "campaign" ? titleOf(ref.campaignId) : null;
   const name = journeyTitle(ref.kind, campaignTitle);
+  // A campaign's journey follows the campaign's dates (23/11/2026).
+  const campaign = ref.kind === "campaign" ? campaigns.find((c) => c.id === ref.campaignId) ?? null : null;
+  const datesWords = campaign ? campaignJourneyWords(campaign, new Date(), formatDate) : null;
 
   const journey = await loadJourney(id, ref);
   // A journey not made yet has nobody on it (before the migration, the charity's one journey is keyed by the charity).
@@ -155,6 +158,7 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
                 ? "Off. Nobody gets an email from it and nobody new joins. Everyone on it keeps their place."
                 : "Off. It hasn't been switched on yet."}
           </p>
+          {datesWords ? <p className="text-navy">{datesWords}</p> : null}
           {journey.updatedAt ? <p className="text-muted">Last changed {formatDateTime(journey.updatedAt)}.</p> : null}
           {owner ? (
             journey.enabled ? (

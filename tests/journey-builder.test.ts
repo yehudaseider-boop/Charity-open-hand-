@@ -5,7 +5,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { STARTER_STEPS, WINBACK_STARTER_STEPS, exampleFor, journeyStartWords, stepHints } from "@/lib/charity/journey";
+import { STARTER_STEPS, WINBACK_STARTER_STEPS, campaignJourneyWords, exampleFor, journeyStartWords, startedInCampaign, stepHints } from "@/lib/charity/journey";
+import { formatDate } from "@/lib/dates";
 import { JourneyEditor } from "@/app/charity-admin/[id]/journey/editor";
 
 const render = (saved: { subject: string; body: string; waitDays: number }[], extra: Record<string, unknown> = {}) =>
@@ -67,5 +68,27 @@ describe("the builder", () => {
     const html = render([step, step, step, step, step]);
     expect(html).toContain("5 emails is the most a journey has. Your journey ends here.");
     expect(html).not.toContain("Wait, then send another email");
+  });
+});
+
+describe("a campaign's journey and its dates (23/11/2026)", () => {
+  const c = { startsAt: "2026-11-02T00:00:00+02:00", endsAt: "2026-11-30T23:59:59+02:00" };
+  it("counts a gift by when it was started, and needs a time to judge by", () => {
+    expect(startedInCampaign({ created_at: "2026-11-01T23:00:00+02:00" }, c)).toBe(false);
+    expect(startedInCampaign({ created_at: "2026-11-30T23:59:00+02:00", paid_at: "2026-12-01T00:03:00+02:00" }, c)).toBe(true);
+    expect(startedInCampaign({ created_at: "2026-12-01T08:00:00+02:00" }, c)).toBe(false);
+    expect(startedInCampaign({ paid_at: "2026-11-10T08:00:00+02:00" }, c)).toBe(true);
+    expect(startedInCampaign({}, c)).toBe(false);
+    expect(startedInCampaign({ created_at: "2027-06-01T08:00:00+02:00" }, { startsAt: c.startsAt, endsAt: null })).toBe(true);
+  });
+  it("says when it runs, and plainly when the campaign has ended", () => {
+    const now = new Date("2026-11-15T10:00:00+02:00");
+    expect(campaignJourneyWords({ ...c, status: "active" }, now, formatDate)).toBe(
+      "It runs with the campaign, from 02/11/2026 to 30/11/2026. Nobody new joins after the campaign ends; donors already on it still get the rest of their emails.",
+    );
+    expect(campaignJourneyWords({ ...c, endsAt: null, status: "active" }, now, formatDate)).toMatch(/from 02\/11\/2026 until you end it\./);
+    const ended = "This campaign has ended, so nobody new will join. Donors already on the journey still get the rest of their emails.";
+    expect(campaignJourneyWords({ ...c, status: "ended" }, now, formatDate)).toBe(ended);
+    expect(campaignJourneyWords({ ...c, status: "active" }, new Date("2026-12-02T10:00:00+02:00"), formatDate)).toBe(ended);
   });
 });

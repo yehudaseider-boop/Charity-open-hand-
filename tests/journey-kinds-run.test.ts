@@ -96,7 +96,35 @@ beforeEach(() => {
     charity_journey_steps: [step(GEN), step(CAMP), step(WIN)],
     charity_journey_enrolments: [],
     donations: [],
+    // The campaign: running from 01/10/2026, no end date (23/11/2026: a campaign's journey follows its dates).
+    campaigns: [{ id: K, charity_id: C, starts_at: "2026-10-01T00:00:00Z", ends_at: null, status: "active" }],
   };
+});
+
+describe("a campaign's journey follows the campaign's dates (23/11/2026)", () => {
+  it("only a gift started while the campaign ran brings someone on; a last-minute gift confirmed after the end still counts", async () => {
+    tables.campaigns = [{ id: K, charity_id: C, starts_at: "2026-11-02T00:00:00Z", ends_at: "2026-11-06T21:59:59Z", status: "ended" }];
+    tables.donations.push(
+      { ...gift("before", "2026-11-03T08:00:00Z", K), created_at: "2026-11-01T12:00:00Z" }, // started before the campaign began
+      { ...gift("during", "2026-11-04T08:00:00Z", K), created_at: "2026-11-04T07:59:00Z" },
+      { ...gift("lastminute", "2026-11-06T22:05:00Z", K), created_at: "2026-11-06T21:58:00Z" }, // started at the end, paid just after
+      { ...gift("after", "2026-11-08T08:00:00Z", K), created_at: "2026-11-08T07:59:00Z" }, // started after it ended
+    );
+    await runJourneys(new Date("2026-11-10T06:00:00Z"), Date.now() + 10_000);
+    const on = tables.charity_journey_enrolments.filter((e) => e.journey_id === CAMP).map((e) => e.donor_id).sort();
+    expect(on).toEqual(["during", "lastminute"]);
+  });
+
+  it("a campaign that can't be found brings nobody on, and the other journeys still run", async () => {
+    tables.campaigns = [];
+    tables.donations.push(gift("new", "2026-11-05T08:00:00Z", K));
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    await runJourneys(new Date("2026-11-10T06:00:00Z"), Date.now() + 10_000);
+    err.mockRestore();
+    const on = (j: string) => tables.charity_journey_enrolments.filter((e) => e.journey_id === j).map((e) => e.donor_id);
+    expect(on(CAMP)).toEqual([]);
+    expect(on(GEN)).toEqual(["new"]);
+  });
 });
 
 describe("the daily run with campaign and win-back journeys", () => {
