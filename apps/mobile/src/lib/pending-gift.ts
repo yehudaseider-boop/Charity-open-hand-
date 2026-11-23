@@ -103,7 +103,7 @@ export function cleanPendingGifts(v: unknown, now = new Date()): Record<string, 
 
 /** What the server's answer does to a stored gift: settled (forget it) or still waiting (keep it). */
 export function settles(outcome: string): boolean {
-  return outcome === "paid" || outcome === "failed" || outcome === "not_found" || outcome === "reversed";
+  return outcome === "paid" || outcome === "failed" || outcome === "not_found" || outcome === "reversed" || outcome === "expired";
 }
 
 /**

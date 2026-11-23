@@ -19,7 +19,10 @@ vi.mock("@/lib/donations/confirm", () => ({
     return "paid";
   },
 }));
-vi.mock("@/lib/donations/confirmation-access", () => ({ confirmationTokenMatches: async (_r: string, t: string) => t === "a".repeat(43) }));
+// "a…" is the gift's own live link, "e…" its own link past its 30 days; anything else is no link at all.
+vi.mock("@/lib/donations/confirmation-access", () => ({
+  confirmationAccess: async (_r: string, t: string) => (t === "a".repeat(43) ? "valid" : t === "e".repeat(43) ? "expired" : "none"),
+}));
 let limitBroken = false;
 vi.mock("@/lib/rate-limit", () => ({
   ipKeys: (ip: string) => (ip && ip !== "unknown" ? [`ip:${ip}`] : []),
@@ -70,6 +73,21 @@ describe("app ready check", () => {
 describe("app payment status", () => {
   it("needs the donor's credential and never checks without it", async () => {
     expect((await status(req({ reference: REF, token: "b".repeat(43) }))).status).toBe(404);
+    expect(confirmed).toBe(0);
+  });
+  it("tells the holder of the gift's own expired link that it has expired, with nothing about the gift, and never checks", async () => {
+    const res = await status(req({ reference: REF, token: "e".repeat(43) }));
+    expect(res.status).toBe(410);
+    expect(await res.json()).toEqual({ ok: false, expired: true, message: "This gift's check link has expired." });
+    expect(confirmed).toBe(0);
+  });
+  it("anyone without the gift's own link still gets the same plain 'not found' (a wrong link, a malformed one, none)", async () => {
+    for (const token of ["b".repeat(43), "e".repeat(42), ""]) {
+      const res = await status(req({ reference: REF, token }));
+      if (res.status === 400) continue;
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ ok: false, message: "Donation not found." });
+    }
     expect(confirmed).toBe(0);
   });
   it("returns the outcome only", async () => {

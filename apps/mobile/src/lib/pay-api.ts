@@ -280,7 +280,11 @@ export async function requestS18aWaiting(site: string, token: string, post: Post
   return new Set(r.waiting as string[]);
 }
 
-export type PaymentOutcome = "paid" | "failed" | "pending" | "review" | "not_found" | "reversed";
+/**
+ * "expired" (23/11/2026): the gift's check link is past its 30 days (the website's rule), so our server won't say
+ * anything more about it. Only the phone that holds the link hears that; anyone else still gets "not found".
+ */
+export type PaymentOutcome = "paid" | "failed" | "pending" | "review" | "not_found" | "reversed" | "expired";
 
 /**
  * Whether a payment went through, asked after the payment page closes. "unknown" means our server gave no
@@ -288,7 +292,8 @@ export type PaymentOutcome = "paid" | "failed" | "pending" | "review" | "not_fou
  * come back from a declined payment.
  */
 export async function paymentStatus(site: string, reference: string, token: string, post: Post = fetchPost): Promise<PaymentOutcome | "unknown"> {
-  const r = await call<{ ok: boolean; outcome?: string }>(post, api(site, "status"), { reference, token });
+  const r = await call<{ ok: boolean; outcome?: string; expired?: boolean }>(post, api(site, "status"), { reference, token });
+  if (!r.ok && r.expired === true) return "expired";
   const o = r.ok ? r.outcome : undefined;
   return o === "paid" || o === "failed" || o === "pending" || o === "review" || o === "not_found" || o === "reversed" ? o : "unknown";
 }
@@ -297,13 +302,23 @@ export async function paymentStatus(site: string, reference: string, token: stri
  * What to tell the donor when a gift isn't confirmed as paid: what did and didn't happen, and the one
  * thing to do now. `savedCard`: charged to a kept card, so there was no payment page to "finish".
  */
-export function afterPaymentMessage(outcome: Exclude<PaymentOutcome, "paid">, savedCard = false, checkedAt?: Date): string {
+/**
+ * A gift whose check link has expired (after 30 days, for safety): what did and didn't happen, and where the gift is
+ * now. `signedIn`: the gift shows under Progress; signed out, the donor is told to sign in to see it there.
+ */
+export function expiredCheckMessage(signedIn: boolean): string {
+  const where = signedIn ? ", and the gift is under Progress." : ". Sign in with the email you gave with to see your gifts under Progress.";
+  return `This gift's check link has expired, for your safety, so the app can't check it any more. Nothing was changed. If the gift was paid, its confirmation is in your email${where}`;
+}
+
+export function afterPaymentMessage(outcome: Exclude<PaymentOutcome, "paid">, savedCard = false, checkedAt?: Date, signedIn = false): string {
   // Johannesburg time (UTC+2, no daylight saving).
   const jhb = checkedAt ? new Date(checkedAt.getTime() + 2 * 3_600_000) : null;
   const last = jhb ? ` Last checked at ${String(jhb.getUTCHours()).padStart(2, "0")}:${String(jhb.getUTCMinutes()).padStart(2, "0")}.` : "";
   // The same words as the website's return page: a "failed" payment may be a declined card or a payment page that
   // was closed (an old checkout is closed after 48 hours), so it never claims which (review 12/11/2026).
   if (outcome === "failed") return "This payment didn't go through, so nothing was charged. This usually means the card was declined or the payment page was closed. Your details are still here: hold to give to try again, or use another card.";
+  if (outcome === "expired") return expiredCheckMessage(signedIn);
   if (outcome === "reversed") return "This donation was refunded, so nothing is owed on it. Your details are still here if you'd like to give again.";
   if (outcome === "not_found") return "We couldn't find that payment, so nothing was charged. Your details are still here: hold to give to try again.";
   if (outcome === "review") return `Something about this payment needs a person to look at it. Please don't pay again. A person will look at it. ${helpLine()}${last}`;

@@ -9,7 +9,7 @@ import { refreshAfterGiving } from "@/lib/give-flow";
 import { haptic } from "@/lib/haptics";
 import { helpLine } from "@/lib/help";
 import { confirmThen } from "@/lib/open-site";
-import { paymentStatus } from "@/lib/pay-api";
+import { expiredCheckMessage, paymentStatus } from "@/lib/pay-api";
 import { settles, type PendingGift } from "@/lib/pending-gift";
 import { dropPendingGift, loadPendingGifts, onPendingGiftsChange } from "@/lib/pending-gift-store";
 import { SITE_URL } from "@/lib/website";
@@ -18,7 +18,7 @@ import { colors, fonts, radius } from "@/theme/tokens";
 type Shown =
   | { kind: "checking" }
   | { kind: "waiting"; outcome: "pending" | "review"; at?: Date }
-  | { kind: "done"; outcome: "paid" | "failed" | "not_found" | "reversed" };
+  | { kind: "done"; outcome: "paid" | "failed" | "not_found" | "reversed" | "expired" };
 
 /**
  * A gift we haven't heard the end of (see lib/pending-gift.ts), shown at the top of Progress. This is where the
@@ -47,7 +47,7 @@ export function PendingGifts() {
       if (settles(outcome)) {
         await dropPendingGift(owner, g.slug);
         setSettled((list) => [...list.filter((x) => x.slug !== g.slug), g]);
-        setShown((s) => ({ ...s, [g.slug]: { kind: "done", outcome: outcome as "paid" | "failed" | "not_found" | "reversed" } }));
+        setShown((s) => ({ ...s, [g.slug]: { kind: "done", outcome: outcome as "paid" | "failed" | "not_found" | "reversed" | "expired" } }));
         if (outcome === "paid") {
           haptic.success();
           // The gift arrives in the history, and the app's own "a donation arrived" thank-you shows.
@@ -103,6 +103,21 @@ export function PendingGifts() {
         const total = rand(g.summary.cents + g.summary.contributionCents);
         const sent = new Date(g.sentAt);
         const when = `${hhmm(sent)} on ${ddmmyyyy(jhbDay(sent))}`;
+        if (s.kind === "done" && s.outcome === "expired") {
+          // The check link is past its 30 days (23/11/2026): nothing more to ask, so it is forgotten on the phone and
+          // says where the gift is now. Signed out, one clear next step: sign in to see it.
+          return (
+            <View key={g.slug} style={[styles.card, styles.waiting]} accessibilityRole="alert" accessibilityLiveRegion="polite">
+              <Text style={styles.title}>We can&apos;t check this gift any more</Text>
+              <Text style={styles.body}>{`${total} to ${g.charityName}, started at ${when}. ${expiredCheckMessage(owner !== null)}`}</Text>
+              <View style={styles.actions}>
+                {owner === null ? <Button label="Sign in to see your gifts" onPress={() => { dismiss(g.slug); router.navigate("/account"); }} /> : null}
+                <TextLink label="Done" onPress={() => dismiss(g.slug)} />
+              </View>
+              <Text variant="label">{helpLine()}</Text>
+            </View>
+          );
+        }
         if (s.kind === "done") {
           const line =
             s.outcome === "paid"

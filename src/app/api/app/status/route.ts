@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { appGivingOpen, appStatusSchema } from "@/lib/donations/app-api";
 import { confirmPayment } from "@/lib/donations/confirm";
-import { confirmationTokenMatches } from "@/lib/donations/confirmation-access";
+import { confirmationAccess } from "@/lib/donations/confirmation-access";
 import { clientIp } from "@/lib/client-ip";
 import { hitRateLimit, ipKeys } from "@/lib/rate-limit";
 
@@ -27,7 +27,11 @@ export async function POST(request: NextRequest) {
   if (await hitRateLimit("app-status-ip", ipKeys(clientIp(request.headers)), 600, 10).catch(() => false)) {
     return NextResponse.json({ ok: false, message: "Please wait a moment, then check again." }, { status: 429 });
   }
-  if (!(await confirmationTokenMatches(reference, token))) return NextResponse.json({ ok: false, message: "Donation not found." }, { status: 404 });
+  const access = await confirmationAccess(reference, token);
+  // The right link past its 30 days (23/11/2026): only its holder hears that it has expired, so the app can say so and
+  // stop asking. Nothing about the gift is said. Anyone else (no link, a wrong one, an unknown gift) still gets "not found".
+  if (access === "expired") return NextResponse.json({ ok: false, expired: true, message: "This gift's check link has expired." }, { status: 410 });
+  if (access !== "valid") return NextResponse.json({ ok: false, message: "Donation not found." }, { status: 404 });
   // Per donation: donors behind one shared address (a school's or an office's Wi-Fi) must not block each other.
   // A check that fails counts as limited (never as a free pass to ask the payment provider).
   const limited = await hitRateLimit("return-check", [`ref:${reference}`], 40, 10).catch((e) => (console.error(e), true));

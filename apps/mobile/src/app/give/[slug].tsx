@@ -129,6 +129,7 @@ export default function Give() {
   // "Same as last time": the donor's own most recent gift to this charity, one tap away.
   const lastGift = slug ? lastGiftTo(history, slug) : null;
   const owner = account.status === "signed-in" ? account.userId : null;
+  const signedIn = account.status === "signed-in";
   const ownerKnown = !preview && account.status !== "loading" && account.status !== "agreeing";
   const goals = useStoredRecord<Goal[]>({ enabled: !preview && ownerKnown, waiting: !preview && !ownerKnown, owner, load: loadGoals, initial: preview ? sampleGoals : noGoals });
   const goal = goals.value[0] ?? null;
@@ -223,14 +224,15 @@ export default function Give() {
     }
   }
   // What happened, as a red error or a calm note while we wait; `help` adds how to reach a person.
-  const [message, setMessageState] = useState<{ text: string; tone: MessageTone | "info"; help?: boolean } | null>(null);
+  // `signIn`: the message also offers "Sign in to see your gifts" (a gift whose check link has expired, signed out).
+  const [message, setMessageState] = useState<{ text: string; tone: MessageTone | "info"; help?: boolean; signIn?: boolean } | null>(null);
   // iPhone VoiceOver often doesn't speak a live region that appears on its own, so each message (what went wrong, "checking
   // your payment", "declined") is also spoken. Android reads the live region itself.
   useEffect(() => {
     if (message && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(message.text);
   }, [message]);
-  const setMessage = (text: string | null, tone: MessageTone | "info" = "error", help = false) => {
-    setMessageState(text ? { text, tone, help } : null);
+  const setMessage = (text: string | null, tone: MessageTone | "info" = "error", help = false, signIn = false) => {
+    setMessageState(text ? { text, tone, help, signIn } : null);
     setMessageAtEnd(false);
   };
   // Whether the pinned message has more below what shows, so it can say "Scroll for more".
@@ -624,8 +626,8 @@ export default function Give() {
       setMessage(null);
       setDone(sentSummary(g.summary, false, g.reference));
     } else {
-      const o = outcome === "failed" || outcome === "not_found" || outcome === "reversed" || outcome === "review" ? outcome : "pending";
-      setMessage(`Your gift of ${waitingGiftLine(g)} ${afterPaymentMessage(o, g.charged, checkedAt)}`, afterPaymentTone(o), true);
+      const o = outcome === "failed" || outcome === "not_found" || outcome === "reversed" || outcome === "review" || outcome === "expired" ? outcome : "pending";
+      setMessage(`Your gift of ${waitingGiftLine(g)} ${afterPaymentMessage(o, g.charged, checkedAt, signedIn)}`, afterPaymentTone(o), true, o === "expired" && !signedIn);
     }
   }
 
@@ -937,7 +939,7 @@ export default function Give() {
       setUnsettled(waiting ? { reference: r.reference, token: r.token, charged: Boolean(r.charged), summary: sent, charityName: charity!.nameEn, sentAt: sentAtNow } : null);
       // Declined or not found: nothing to wait for. Still waiting: kept on the phone (above) until we hear.
       if (!waiting) void dropPendingGift(owner, charity!.slug);
-      setMessage(afterPaymentMessage(o, Boolean(r.charged), new Date()), afterPaymentTone(o), true);
+      setMessage(afterPaymentMessage(o, Boolean(r.charged), new Date(), signedIn), afterPaymentTone(o), true, o === "expired" && !signedIn);
       return;
     }
     // The success moment (buzz, tick and burst on the button) is only for a gift the provider confirmed as paid. A gift
@@ -982,7 +984,7 @@ export default function Give() {
         return;
       }
       const o = outcome === "unknown" ? "pending" : outcome;
-      setMessage(`Your gift of ${waitingGiftLine(unsettled)} ${afterPaymentMessage(o, unsettled.charged, new Date())}`, afterPaymentTone(o), true);
+      setMessage(`Your gift of ${waitingGiftLine(unsettled)} ${afterPaymentMessage(o, unsettled.charged, new Date(), signedIn)}`, afterPaymentTone(o), true, o === "expired" && !signedIn);
     } finally {
       busyRef.current = false;
     }
@@ -1463,6 +1465,7 @@ export default function Give() {
                 }}
               >
                 <Text style={{ fontSize: 16, lineHeight: 23, color: message.tone === "error" ? colors.danger : colors.ink }}>{message.text}</Text>
+                {message.signIn ? <TextLink label="Sign in to see your gifts" onPress={() => { setMessage(null); router.navigate("/account"); }} /> : null}
                 {message.help && !keyboardUp ? <Text variant="label" style={{ marginTop: 4 }}>{helpLine()}</Text> : null}
               </ScrollView>
               {messageContent > messageBox + 4 && !messageAtEnd ? (
