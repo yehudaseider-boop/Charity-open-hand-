@@ -167,6 +167,14 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
       const failed = Number(d.failed ?? 0);
       const remaining = Number(d.remaining ?? 0);
       const thisWeek = Number(d.thisWeek ?? 0);
+      // Of `failed`, those cut off before the email service answered: they may have gone, and are never sent again
+      // (review 23/11/2026). Older records have no `maybeSent` and read as before.
+      const maybeSent = Math.min(Number(d.maybeSent ?? 0), failed);
+      const surelyFailed = failed - maybeSent;
+      const mayHaveGone = maybeSent
+        ? ` We couldn't confirm ${plural(maybeSent, "email")}: the connection dropped before the email service answered, so ${maybeSent === 1 ? "it" : "they"} may have gone. ${maybeSent === 1 ? "It won't" : "They won't"} be sent again, so nobody gets it twice.`
+        : "";
+      const couldNot = surelyFailed ? ` ${plural(surelyFailed, "email")} could not be sent.` : "";
       // Those left out haven't had it yet: the thank-you stays open for them, and "Send the rest" reaches them once
       // their week has passed (from the Monday after, `from`).
       const when = d.from ? `from Monday ${String(d.from)}` : "from Monday";
@@ -176,14 +184,16 @@ export function describeDone(kind: ActionKind, d: Details, c: Context): Done {
       if (remaining) {
         return {
           // Only when the daily job really carries them on (`byItself`, worked out at the press, 21/11/2026); never a time.
-          what: `Your thank-you for ${String(d.month ?? "that month")} has gone to ${plural(sent, "donor")} so far. ${plural(remaining, "donor")} still to go: ${d.byItself === true ? "the rest keep going out by themselves each day, or press Send the rest" : "press Send the rest to send them"}, and nobody gets it twice.${leftOut}`,
+          what: `Your thank-you for ${String(d.month ?? "that month")} has gone to ${plural(sent, "donor")} so far. ${plural(remaining, "donor")} still to go: ${d.byItself === true ? "the rest keep going out by themselves each day, or press Send the rest" : "press Send the rest to send them"}, and nobody gets it twice.${mayHaveGone}${leftOut}`,
           next: { label: "Send the rest", href: `${c.base}/thank-donors#unfinished` },
         };
       }
       return {
         what: sent
-          ? `Your thank-you for ${String(d.month ?? "that month")} went to ${plural(sent, "donor")}.${failed ? ` ${plural(failed, "email")} could not be sent.` : ""}${leftOut}`
-          : `Your thank-you for ${String(d.month ?? "that month")} is saved. ${thisWeek ? "Nobody else could be emailed this week." : "Nobody was left to email."}${leftOut}`,
+          ? `Your thank-you for ${String(d.month ?? "that month")} went to ${plural(sent, "donor")}.${couldNot}${mayHaveGone}${leftOut}`
+          : failed
+            ? `Your thank-you for ${String(d.month ?? "that month")} is saved, but no email was confirmed as sent.${mayHaveGone}${couldNot}${leftOut}`
+            : `Your thank-you for ${String(d.month ?? "that month")} is saved. ${thisWeek ? "Nobody else could be emailed this week." : "Nobody was left to email."}${leftOut}`,
         next: thisWeek ? { label: `Send the rest ${when}`, href: `${c.base}/thank-donors#unfinished` } : { label: "See who gave", href: `${c.base}/donors` },
       };
     }

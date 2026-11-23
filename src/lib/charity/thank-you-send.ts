@@ -72,6 +72,8 @@ export type SendResult =
       failed: number;
       remaining: number;
       sentThisRun?: number;
+      /** Of `failed`: emails cut off before the email service answered, so they may have gone (never sent again). */
+      maybeSent?: number;
       /** Left out this run: they already had a message from the charity this week. The thank-you stays unfinished for them. */
       thisWeek?: number;
       /** When "Send the rest" can reach those left out (the next Monday, dd/mm/yyyy), when any were. */
@@ -102,8 +104,10 @@ export async function sendThankYou(args: { charityId: string; charityName: strin
   const r = await runThankYou({ ...args, thankYouId: claim.data.id as string });
   // Nothing went out to anyone: hand the month back, so the charity can try again.
   // Decided from what this run's emails actually did, not the saved statuses (a status that failed to save must
-  // never lead to everyone being emailed again).
-  if (r.ok && (r.sentThisRun ?? 0) === 0 && r.sent === 0 && r.failed > 0) {
+  // never lead to everyone being emailed again). Only when every email surely failed: one cut off ("sending") may
+  // have gone, and handing the month back would delete its claim and let a second press email that donor again
+  // (review 23/11/2026). Then the month is kept and the page says some may have gone.
+  if (r.ok && (r.sentThisRun ?? 0) === 0 && r.sent === 0 && r.failed > 0 && (r.maybeSent ?? 0) === 0) {
     await db.from("charity_thank_yous").delete().eq("id", claim.data.id);
     return { ok: false, message: "We couldn't send your thank-you just now. Nothing went out, so please try again in a few minutes." };
   }
@@ -206,7 +210,7 @@ async function runThankYou(args: { charityId: string; charityName: string; month
     .update({ recipient_count: counts.sent, ...(finished ? { finished_at: new Date().toISOString() } : {}) })
     .eq("id", args.thankYouId);
   await logAudit({ actorUserId: args.userId, action: "charity.thank_you_sent", entityType: "charity", entityId: args.charityId, details: { month: args.month, ...counts, remaining, thisWeek: leftOut.size, sentThisRun, ...(refused ? { refused: true } : {}), ...(args.auto ? { auto: true } : {}) } });
-  return { ok: true, sent: counts.sent, failed: counts.failed, remaining, sentThisRun, thisWeek: leftOut.size, ...(leftOut.size ? { from: formatDate(nextWeekStart(new Date())) } : {}), ...(refused ? { refused: true as const } : {}) };
+  return { ok: true, sent: counts.sent, failed: counts.failed, maybeSent: counts.maybeSent, remaining, sentThisRun, thisWeek: leftOut.size, ...(leftOut.size ? { from: formatDate(nextWeekStart(new Date())) } : {}), ...(refused ? { refused: true as const } : {}) };
 }
 
 /** Addresses (as hashes) already claimed for this thank-you, in pages. */
@@ -221,15 +225,21 @@ async function claimedHashes(thankYouId: string): Promise<Set<string>> {
   return out;
 }
 
-/** How far a thank-you got. A "sending" left by a stopped page may have gone, so it is never sent again: counted as failed. */
-async function thankYouCounts(thankYouId: string): Promise<{ sent: number; failed: number }> {
-  const c = { sent: 0, failed: 0 };
+/**
+ * How far a thank-you got. A "sending" left by a stopped page or a cut-off send may have gone, so it is never sent
+ * again: counted as failed (not confirmed), and also in `maybeSent`, so a month where some may have gone is never handed back.
+ */
+async function thankYouCounts(thankYouId: string): Promise<{ sent: number; failed: number; maybeSent: number }> {
+  const c = { sent: 0, failed: 0, maybeSent: 0 };
   for (let from = 0; ; from += 1000) {
     const { data, error } = await createAdminClient().from("charity_thank_you_recipients").select("status").eq("thank_you_id", thankYouId).order("email_hash").range(from, from + 999);
     if (error) throw error;
     for (const r of data ?? []) {
       if (r.status === "sent") c.sent++;
-      else c.failed++;
+      else {
+        c.failed++;
+        if (r.status === "sending") c.maybeSent++;
+      }
     }
     if (!data || data.length < 1000) break;
   }

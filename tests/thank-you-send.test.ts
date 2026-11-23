@@ -22,6 +22,8 @@ vi.mock("@/lib/charity/weekly-limit", () => ({
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
 /** Addresses whose send throws as a dropped connection would. */
 let dropFor = new Set<string>();
+/** Addresses the email service skips ("skipped": surely not sent). */
+let skipFor = new Set<string>();
 const { MaybeSent, Refused } = vi.hoisted(() => ({
   MaybeSent: class EmailMaybeSent extends Error {},
   Refused: class EmailError extends Error {
@@ -41,6 +43,7 @@ vi.mock("@/lib/email", () => ({
   getEmailTransport: () => ({
     send: async (m: { to: string; text: string }) => {
       if (dropFor.has(m.to)) throw new MaybeSent("fetch failed");
+      if (skipFor.has(m.to)) return "skipped";
       if (busyFor.has(m.to)) throw new Refused("Resend refused the email (429).", 429);
       return (sent.push(m), "sent");
     },
@@ -91,6 +94,11 @@ vi.mock("@/lib/supabase/admin", () => ({
       });
       b.then = (ok: (v: unknown) => unknown) => {
         if (deleting && table === "charity_thank_you_recipients") recipients.delete(filters.email_hash as string);
+        // Handing the month back deletes it, and its claims with it (on delete cascade).
+        if (deleting && table === "charity_thank_yous") {
+          month = null;
+          recipients = new Map();
+        }
         if (patch && table === "charity_thank_you_recipients") {
           if (statusSaveFails) return Promise.resolve({ error: { message: "down" } }).then(ok);
           recipients.set(filters.email_hash as string, patch.status as string);
@@ -118,6 +126,7 @@ beforeEach(() => {
   statusSaveFails = false;
   messaged = new Set();
   dropFor = new Set();
+  skipFor = new Set();
   weekChecks.length = 0;
   process.env.SITE_URL = "https://g.test";
 });
@@ -239,6 +248,29 @@ describe("sending a thank-you", () => {
     dropFor = new Set();
     expect(await continueThankYou({ charityId: "c1", charityName: "Meals Fund", month: "2026-10-01", userId: "u1" })).toEqual({ ok: false, message: "This thank-you has already reached everyone." });
     expect(sent.map((m) => m.to)).toEqual(["b@x.co"]);
+  });
+
+  it("every send cut off (may have gone): the month is kept, never handed back, so a second press can't email them again (review 23/11/2026)", async () => {
+    donations = [gift("a@x.co", "A"), gift("b@x.co", "B")];
+    dropFor = new Set(["a@x.co", "b@x.co"]);
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await sendThankYou(args);
+    err.mockRestore();
+    expect(r).toMatchObject({ ok: true, sent: 0, failed: 2, maybeSent: 2, sentThisRun: 0 });
+    expect(month).not.toBeNull();
+    expect(recipients.get(emailHash("a@x.co"))).toBe("sending");
+    expect(recipients.get(emailHash("b@x.co"))).toBe("sending");
+    dropFor = new Set();
+    expect(await sendThankYou(args)).toEqual({ ok: false, message: "You've already thanked the donors for that month." });
+    expect(sent).toHaveLength(0);
+  });
+
+  it("every send surely refused (none may have gone): the month is handed back so the charity can try again", async () => {
+    donations = [gift("a@x.co", "A")];
+    skipFor = new Set(["a@x.co"]);
+    const r = await sendThankYou(args);
+    expect(r).toEqual({ ok: false, message: "We couldn't send your thank-you just now. Nothing went out, so please try again in a few minutes." });
+    expect(month).toBeNull();
   });
 
   it("when everyone already had a message this week, nothing is sent and the month is handed back", async () => {
