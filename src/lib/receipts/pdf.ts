@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { chromium } from "playwright-core";
+import { chromium, type Browser } from "playwright-core";
 
 /** Embedded @font-face rules, so the PDF looks the same on any machine. */
 export function loadFontCss(): string {
@@ -42,17 +42,50 @@ async function chrome(): Promise<{ executablePath: string; args: string[] }> {
   throw new Error("Set CHROME_PATH to a Chrome or Chromium executable to make receipt PDFs.");
 }
 
-/** Print HTML to an A4 PDF with headless Chrome. */
-export async function htmlToPdf(html: string): Promise<Buffer> {
-  const browser = await chromium.launch(await chrome());
+async function printWith(browser: Browser, html: string): Promise<Buffer> {
+  // No scripts and no network: the receipt is plain escaped HTML with its fonts and logo inside it, so a field that
+  // ever slipped through unescaped could neither run nor reach anything (security review 18/11/2026).
+  const page = await browser.newPage({ javaScriptEnabled: false });
   try {
-    // No scripts and no network: the receipt is plain escaped HTML with its fonts and logo inside it, so a field that
-    // ever slipped through unescaped could neither run nor reach anything (security review 18/11/2026).
-    const page = await browser.newPage({ javaScriptEnabled: false });
     await page.route("**/*", (route) => (route.request().url().startsWith("data:") ? route.continue() : route.abort()));
     await page.setContent(html, { waitUntil: "load" });
     return await page.pdf({ format: "A4", printBackground: true, preferCSSPageSize: true });
   } finally {
+    await page.close().catch(() => undefined);
+  }
+}
+
+/** Print HTML to an A4 PDF with headless Chrome (one Chrome for this one PDF). */
+export async function htmlToPdf(html: string): Promise<Buffer> {
+  const browser = await chromium.launch(await chrome());
+  try {
+    return await printWith(browser, html);
+  } finally {
     await browser.close();
   }
+}
+
+/**
+ * One Chrome for a whole run of receipts (23/11/2026): launched on the first PDF, kept for the rest, and closed by
+ * `close()`. If Chrome fails on a receipt it is closed, so the next one starts a fresh Chrome.
+ */
+export function pdfPrinter() {
+  let browser: Browser | null = null;
+  const close = async () => {
+    const b = browser;
+    browser = null;
+    await b?.close().catch(() => undefined);
+  };
+  return {
+    async toPdf(html: string): Promise<Buffer> {
+      try {
+        browser ??= await chromium.launch(await chrome());
+        return await printWith(browser, html);
+      } catch (e) {
+        await close();
+        throw e;
+      }
+    },
+    close,
+  };
 }

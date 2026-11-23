@@ -245,7 +245,8 @@ export async function listUnfinishedRuns(): Promise<(ReceiptRun & { charity_name
     if (seen.has(key)) continue;
     seen.add(key);
     const [noPdf, toEmail] = await Promise.all([s.listIssuedWithoutPdf(r.tax_year, r.charity_id), s.listToEmail(r.tax_year, r.charity_id)]);
-    if (noPdf.length || toEmail.length) out.push(r);
+    // Approved receipts a sign-off ran out of time for are still to issue: Finish carries on with them.
+    if (noPdf.length || toEmail.length || (r.summary?.remaining ?? 0) > 0) out.push(r);
   }
   return out;
 }
@@ -253,7 +254,7 @@ export async function listUnfinishedRuns(): Promise<(ReceiptRun & { charity_name
 /** Whether a finished run still has PDFs or emails to do (a receipt not yet emailed counts). Pure. */
 export function runNeedsFinishing(summary: JobSummary | null): boolean {
   if (!summary) return false;
-  return summary.failed.length > 0 || summary.emailFailed > 0 || summary.pdfsMade < summary.issued || summary.emailed < summary.issued;
+  return (summary.remaining ?? 0) > 0 || summary.failed.length > 0 || summary.emailFailed > 0 || summary.pdfsMade < summary.issued || summary.emailed < summary.issued;
 }
 
 export type ApproveResult = { ok: true; run: ReceiptRun; approvedNow: string[] } | { ok: false; why: "nothing" | "changed" | "open" } | { ok: false; why: "charity_details"; missing: string[] };
@@ -379,6 +380,7 @@ export type SignOffResult =
   | { ok: false; why: "switched_off" | "gone" | "changed" | "error" | "charity_details"; message?: string };
 
 function job(runId: string) {
+  let printer: { toPdf(html: string): Promise<Buffer>; close(): Promise<void> } | null = null;
   const siteUrl = process.env.SITE_URL ?? "";
   return {
     // Receipt emails link to the site: without its address they would be broken, so nothing is emailed.
@@ -388,11 +390,21 @@ function job(runId: string) {
     render: async ({ details, reference }: { details: Parameters<typeof buildReceiptHtml>[0]["details"]; reference: string }) => {
       // Loaded only when a PDF is made, so pages that never make one don't load Chrome's driver.
       const pdf = await import("./pdf");
-      return pdf.htmlToPdf(buildReceiptHtml({ details, reference, fontCss: pdf.loadFontCss(), platformName: platformConfig.appName, logoHtml: pdf.loadLogoHtml() }));
+      // One Chrome for the whole run, launched on the first PDF (23/11/2026).
+      printer ??= pdf.pdfPrinter();
+      return printer.toPdf(buildReceiptHtml({ details, reference, fontCss: pdf.loadFontCss(), platformName: platformConfig.appName, logoHtml: pdf.loadLogoHtml() }));
+    },
+    /** Closes the run's Chrome, if one was started. */
+    close: async () => {
+      await printer?.close();
+      printer = null;
     },
     runId,
   };
 }
+
+/** A sign-off or Finish is one web request of at most 60 seconds (maxDuration on the page); the job stops 15 seconds short of it. */
+export const REQUEST_MS = 60_000;
 
 const today = (now: Date) => formatDate(now).split("/").reverse().join("-");
 
@@ -400,7 +412,7 @@ const today = (now: Date) => formatDate(now).split("/").reverse().join("-");
  * Givezy signs off: the list is checked again, then the receipts are issued, their PDFs made and
  * emailed. If the list changed since the charity approved it, nothing is issued and the run goes back.
  */
-export async function signOffRun(args: { runId: string; userId: string; now?: Date }): Promise<SignOffResult> {
+export async function signOffRun(args: { runId: string; userId: string; now?: Date; deadline?: number }): Promise<SignOffResult> {
   if (!receiptsEnabled()) return { ok: false, why: "switched_off" };
   const now = args.now ?? new Date();
   const db = createAdminClient();
@@ -438,6 +450,8 @@ export async function signOffRun(args: { runId: string; userId: string; now?: Da
       charityId: run.charity_id,
       mailer: j.mailer,
       render: j.render,
+      deadline: args.deadline ?? Date.now() + REQUEST_MS,
+      fingerprint: fingerprintPlan,
       // The list is checked again at the last moment, so a gift paid or refunded since the check above is
       // never issued without the charity's approval.
       checkPlan: (receipts) => {
@@ -462,6 +476,8 @@ export async function signOffRun(args: { runId: string; userId: string; now?: Da
       return { issued: 0, pdfsMade: 0 };
     });
     summary = { taxYear: run.tax_year, mode: "issue", planned: run.receipts_planned, ...made, emailed: 0, emailFailed: 0, skippedByReason: {}, needsAttention: [], checkIdentities: [], failed: [{ what: "the run", message: e instanceof Error ? e.message : String(e) }] };
+  } finally {
+    await j.close().catch(() => undefined);
   }
   const { error: doneError } = await db.from("receipt_runs").update({ status: "done", finished_at: new Date().toISOString(), summary }).eq("id", run.id);
   // Left as "issuing", the run shows as stuck on the admin page, where it can be marked stopped (see below).
@@ -521,7 +537,7 @@ export async function markRunStopped(args: { runId: string; userId: string; now?
 }
 
 /** Make any missing PDFs and send any unsent emails for a finished run. Never issues a new receipt. */
-export async function finishRun(args: { runId: string; userId: string; now?: Date }): Promise<SignOffResult> {
+export async function finishRun(args: { runId: string; userId: string; now?: Date; deadline?: number }): Promise<SignOffResult> {
   if (!receiptsEnabled()) return { ok: false, why: "switched_off" };
   const now = args.now ?? new Date();
   const db = createAdminClient();
@@ -530,17 +546,118 @@ export async function finishRun(args: { runId: string; userId: string; now?: Dat
   if (!run || run.status !== "done") return { ok: false, why: "gone" };
   const j = job(run.id);
   const before = run.summary as JobSummary | null;
-  const step = await runReceiptsJob({ store: store(), taxYear: run.tax_year, today: today(now), now, mode: "finish", charityId: run.charity_id, mailer: j.mailer, render: j.render });
-  // The issued count is the first run's; this pass adds PDFs and emails, and replaces what failed.
+  // A sign-off that ran out of time left approved receipts unissued (summary.remaining): this pass carries on with them
+  // in the same way, after checking the list is still exactly what was left (23/11/2026). Otherwise it only makes
+  // missing PDFs and sends unsent emails, and never issues a receipt.
+  const carryOn = Boolean(before?.remaining && before.remaining > 0 && before.remainingFingerprint);
+  let step: JobSummary;
+  try {
+    step = await runReceiptsJob({
+      store: store(), taxYear: run.tax_year, today: today(now), now, mode: carryOn ? "issue" : "finish", charityId: run.charity_id, mailer: j.mailer, render: j.render,
+      deadline: args.deadline ?? Date.now() + REQUEST_MS,
+      fingerprint: fingerprintPlan,
+      checkPlan: carryOn
+        ? (receipts) => {
+            if (fingerprintPlan(receipts) !== before!.remainingFingerprint) throw new PlanChanged();
+          }
+        : undefined,
+    });
+  } catch (e) {
+    if (!(e instanceof PlanChanged)) throw e;
+    // The list changed since the run stopped (a gift refunded or paid late, a decision changed): the rest is not issued.
+    const stopped: JobSummary = { ...before!, remaining: 0, remainingFingerprint: undefined, stoppedForTime: false, failed: [{ what: "the rest of the receipts", message: "The list changed after the run stopped, so the rest were not issued. Ask the charity to approve the new list." }] };
+    const { error: stopError } = await db.from("receipt_runs").update({ finished_at: new Date().toISOString(), summary: stopped }).eq("id", run.id);
+    if (stopError) console.error("[receipts] could not save the changed run", run.id, stopError.message);
+    return { ok: false, why: "changed" };
+  } finally {
+    await j.close().catch(() => undefined);
+  }
+  // The issued count is the first run's plus this pass's; this pass adds PDFs and emails, and replaces what failed.
   const summary: JobSummary = {
     ...(before ?? step),
     mode: "issue",
+    issued: (before?.issued ?? 0) + (carryOn ? step.issued : 0),
     pdfsMade: (before?.pdfsMade ?? 0) + step.pdfsMade,
     emailed: (before?.emailed ?? 0) + step.emailed,
     emailFailed: step.emailFailed,
     failed: step.failed,
+    remaining: carryOn ? (step.remaining ?? 0) : 0,
+    remainingFingerprint: carryOn ? step.remainingFingerprint : undefined,
+    stoppedForTime: step.stoppedForTime ?? false,
   };
-  await db.from("receipt_runs").update({ finished_at: new Date().toISOString(), summary }).eq("id", run.id);
-  await logAudit({ actorUserId: args.userId, action: "receipts.run_finished", entityType: "charity", entityId: run.charity_id, details: { runId: run.id, pdfs: step.pdfsMade, emailed: step.emailed } });
+  const { error: doneError } = await db.from("receipt_runs").update({ finished_at: new Date().toISOString(), summary }).eq("id", run.id);
+  if (doneError) {
+    console.error("[receipts] could not save what Finish did", run.id, doneError.message);
+    return { ok: false, why: "error", message: "Finish ran, but its result could not be saved, so this page may still show the old numbers. Nothing was lost and nothing is sent twice: open the page again and press Finish once more." };
+  }
+  await logAudit({ actorUserId: args.userId, action: "receipts.run_finished", entityType: "charity", entityId: run.charity_id, details: { runId: run.id, pdfs: step.pdfsMade, emailed: step.emailed, issued: carryOn ? step.issued : 0, remaining: summary.remaining } });
   return { ok: true, summary, emailed: Boolean(j.mailer) };
+}
+
+/** A receipt whose email may or may not have gone, waiting for a person (23/11/2026). */
+export type UnknownEmailReceipt = { receiptId: string; reference: string; charityName: string; donorName: string; why: string | null; flaggedAt: string };
+
+/** Issued receipts whose email was cut off mid-send or taken over after a stopped run: a run never sends these again by itself. */
+export async function listUnknownReceiptEmails(): Promise<UnknownEmailReceipt[]> {
+  const db = createAdminClient();
+  const { data, error } = await db.from("email_retries").select("ref_id, last_error, updated_at").eq("kind", "s18a_receipt").eq("status", "unknown").order("updated_at").limit(100);
+  // Before the email_retries migration there is nothing flagged.
+  if (error) {
+    if (error.code === "PGRST205" || error.code === "42P01") return [];
+    throw error;
+  }
+  if (!data?.length) return [];
+  const { data: receipts, error: receiptError } = await db
+    .from("s18a_receipts")
+    .select("id, reference:details->>receipt_reference, charity_name:details->charity->>legal_name_en, donor_name:details->donor->>name")
+    .in("id", data.map((d) => d.ref_id as string))
+    .eq("status", "issued")
+    .is("emailed_at", null);
+  if (receiptError) throw receiptError;
+  const byId = new Map((receipts ?? []).map((r) => [r.id as string, r]));
+  return data.flatMap((d) => {
+    const r = byId.get(d.ref_id as string);
+    if (!r) return [];
+    return [{ receiptId: r.id as string, reference: String(r.reference ?? ""), charityName: String(r.charity_name ?? ""), donorName: String(r.donor_name ?? ""), why: (d.last_error as string | null) ?? null, flaggedAt: d.updated_at as string }];
+  });
+}
+
+export type UnknownEmailResult = { ok: true } | { ok: false; why: "not_flagged" | "gone" };
+
+/**
+ * "It arrived": a person checked and the donor has the receipt. The receipt is marked emailed, and the flag is closed.
+ * Only for a receipt whose email was flagged "may have gone", and only while it is issued and not yet emailed.
+ */
+export async function markReceiptEmailArrived(args: { receiptId: string; userId: string; now?: Date }): Promise<UnknownEmailResult> {
+  const db = createAdminClient();
+  const now = (args.now ?? new Date()).toISOString();
+  const { data: flag, error: flagError } = await db.from("email_retries").select("id").eq("kind", "s18a_receipt").eq("ref_id", args.receiptId).eq("status", "unknown").maybeSingle();
+  if (flagError) throw flagError;
+  if (!flag) return { ok: false, why: "not_flagged" };
+  const { data, error } = await db.from("s18a_receipts").update({ emailed_at: now, email_claimed_at: null }).eq("id", args.receiptId).eq("status", "issued").is("emailed_at", null).select("id");
+  if (error) throw error;
+  if (!data?.length) return { ok: false, why: "gone" };
+  const { error: closeError } = await db.from("email_retries").update({ status: "sent", claimed_at: null, updated_at: now }).eq("id", flag.id as string);
+  if (closeError) console.error("[receipts] could not close the flag on a receipt email that arrived", args.receiptId, closeError.message);
+  await logAudit({ actorUserId: args.userId, action: "receipt.email_confirmed_arrived", entityType: "s18a_receipt", entityId: args.receiptId, details: {} });
+  return { ok: true };
+}
+
+/**
+ * "Send again": a person checked and the donor does not have it. The flag and the claim are cleared, so the next Finish
+ * (or the daily job) emails the receipt as usual. A second copy is possible only if the first turns up late.
+ */
+export async function allowReceiptEmailAgain(args: { receiptId: string; userId: string; now?: Date }): Promise<UnknownEmailResult> {
+  const db = createAdminClient();
+  const { data: flag, error: flagError } = await db.from("email_retries").select("id").eq("kind", "s18a_receipt").eq("ref_id", args.receiptId).eq("status", "unknown").maybeSingle();
+  if (flagError) throw flagError;
+  if (!flag) return { ok: false, why: "not_flagged" };
+  // The claim first: a flag cleared while the claim stays would be taken over again as "may have gone".
+  const { data, error } = await db.from("s18a_receipts").update({ email_claimed_at: null }).eq("id", args.receiptId).eq("status", "issued").is("emailed_at", null).select("id");
+  if (error) throw error;
+  if (!data?.length) return { ok: false, why: "gone" };
+  const { error: deleteError } = await db.from("email_retries").delete().eq("id", flag.id as string);
+  if (deleteError) throw deleteError;
+  await logAudit({ actorUserId: args.userId, action: "receipt.email_send_again_allowed", entityType: "s18a_receipt", entityId: args.receiptId, details: {} });
+  return { ok: true };
 }

@@ -12,7 +12,7 @@ function fakeDb(opts: { flagged: boolean }) {
   const claims: unknown[] = [];
   const from = (table: string) => {
     const q: Record<string, unknown> = {};
-    for (const m of ["select", "eq", "is", "or", "order", "range"]) q[m] = () => q;
+    for (const m of ["select", "eq", "is", "or", "lt", "order", "range"]) q[m] = () => q;
     q.update = (row: unknown) => (claims.push(row), q);
     q.limit = async () => ({ data: table === "email_retries" && opts.flagged ? [{ id: 1 }] : [], error: null });
     q.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data: table === "s18a_receipts" ? [{ id: "r1" }] : [], error: null }).then(ok);
@@ -49,7 +49,7 @@ function voidDb() {
     const filters: Record<string, unknown> = {};
     let patch: unknown = null;
     const q: Record<string, unknown> = {};
-    for (const m of ["select", "is", "or", "order", "range"]) q[m] = () => q;
+    for (const m of ["select", "is", "or", "lt", "order", "range"]) q[m] = () => q;
     q.eq = (c: string, v: unknown) => ((filters[c] = v), q);
     q.update = (p: unknown) => ((patch = p), q);
     q.limit = async () => ({ data: [], error: null });

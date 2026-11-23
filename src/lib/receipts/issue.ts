@@ -73,7 +73,29 @@ export type JobSummary = {
   checkIdentities: SeveralIdentities[];
   /** Steps that failed (one receipt, one PDF, ...). The rest of the run carried on; run the job again once fixed. */
   failed: { what: string; message: string }[];
+  /**
+   * Approved receipts the run had not got to when it ran out of time (23/11/2026): "Finish" carries on with them. Left out
+   * (older runs) means none. `remainingFingerprint` is the fingerprint of the list as it stood then (issued ones taken
+   * off), so the next pass issues exactly what was approved and nothing else.
+   */
+  remaining?: number;
+  remainingFingerprint?: string;
+  /** The run stopped to stay inside the request's time limit: PDFs or emails may be left too. */
+  stoppedForTime?: boolean;
 };
+
+/** A run stops starting new work this long before its deadline: one receipt (issue, PDF, email) must still fit. */
+export const TIME_SPARE_MS = 15_000;
+
+/**
+ * What to say when a run stopped to stay inside its time limit with approved receipts still to issue (23/11/2026). Empty
+ * when nothing is left. Finish carries on with exactly the list the charity approved.
+ */
+export function remainingText(s: Pick<JobSummary, "remaining">): string {
+  const n = s.remaining ?? 0;
+  if (n <= 0) return "";
+  return `${n} approved ${n === 1 ? "receipt is" : "receipts are"} still to issue: the run stopped to stay inside its time limit. Nothing was lost and nothing is issued twice. Press Finish again to carry on; repeat until none are left.`;
+}
 
 /**
  * Gifts the run left out for a person to look at, and donor records given more than one receipt (different ID or
@@ -109,6 +131,11 @@ export async function runReceiptsJob(args: {
    * Throwing stops the run with nothing issued (the approved list no longer matches what would be issued).
    */
   checkPlan?: (receipts: DecidedReceipt[]) => void;
+  /** When the request must be done by (ms since 1970). The run stops cleanly TIME_SPARE_MS before it. Left out: no limit. */
+  deadline?: number;
+  clock?: () => number;
+  /** The fingerprint of a list (runs.ts), saved with the run when it stops for time, so a later pass can check the rest. */
+  fingerprint?: (receipts: DecidedReceipt[]) => string;
 }): Promise<JobSummary> {
   const { store, taxYear, charityId } = args;
   const { start, end } = taxYearRange(taxYear);
@@ -150,9 +177,61 @@ export async function runReceiptsJob(args: {
   if (args.mode === "dry-run") return summary;
   if (args.mode === "issue") args.checkPlan?.(decided);
 
+  const clock = args.clock ?? Date.now;
+  const outOfTime = () => args.deadline !== undefined && clock() > args.deadline - TIME_SPARE_MS;
+  const stopForTime = () => {
+    summary.stoppedForTime = true;
+  };
+  const issuedKeys = new Set<string>();
+  const emailTried = new Set<string>();
+
+  // One receipt's email, claimed first so two runs never both send it. One failed email never stops the others; it is
+  // tried again on the next run.
+  const emailReceipt = async (r: IssuedReceipt & { email: string }) => {
+    if (!args.mailer) return;
+    emailTried.add(r.id);
+    // The claim is inside the try (review 23/11/2026): one receipt whose claim fails never stops the others' emails.
+    let claimed = false;
+    try {
+      claimed = await store.claimEmail(r);
+      if (!claimed) return;
+      const pdf = await store.readPdf(r);
+      const mail = buildReceiptEmail({ details: r.details, reference: r.reference, siteUrl: args.mailer.siteUrl, platformName: args.mailer.platformName });
+      const sent = await args.mailer.transport.send({
+        to: r.email,
+        ...mail,
+        attachments: [{ filename: `${r.reference}.pdf`, content: pdf, contentType: "application/pdf" }],
+      });
+      // Only a real send marks the receipt emailed: the console transport (local runs) and skipped
+      // addresses leave it for a later run with a real transport.
+      if (sent === "sent") {
+        // If this write fails the receipt is released and sent again next run: a second copy beats none.
+        await store.markEmailed(r);
+        summary.emailed += 1;
+      } else await store.releaseEmail(r);
+    } catch (e) {
+      // A send cut off at the time limit, or a dropped connection, may have gone (13/11/2026): the claim stays, so
+      // nothing sends it again by itself, and onEmailFailed flags it for a person. Only a refusal from the email
+      // service (sure not to have gone) frees it for the next run or the daily retry.
+      // A claim that failed holds nothing to free, and nothing was sent: it is tried again on the next run.
+      if (claimed && !wasCutOff(e)) await store.releaseEmail(r).catch(() => undefined);
+      summary.emailFailed += 1;
+      if (claimed) await args.mailer.onEmailFailed?.(r, e).catch(() => undefined);
+      console.error(`[receipts] could not email ${r.reference}: ${e instanceof Error ? e.message : e}`);
+    }
+  };
+
   const charityById = new Map(charities.map((c) => [c.id, c]));
+  const toIssue = args.mode === "issue" ? receipts : [];
   // One bad receipt never stops the others: its failure is recorded and the run carries on.
-  for (const r of args.mode === "issue" ? receipts : []) {
+  for (const [index, r] of toIssue.entries()) {
+    // Out of time: the rest stay approved and unissued, and "Finish" carries on with them (the list is checked again then).
+    if (outOfTime()) {
+      stopForTime();
+      summary.remaining = toIssue.length - index;
+      if (args.fingerprint) summary.remainingFingerprint = args.fingerprint(decided.filter((d) => !issuedKeys.has(d.key)));
+      break;
+    }
     const what = `receipt for donor ${r.donorId} (donations ${r.donationIds.join(", ")})`;
     try {
       const charity = charityById.get(r.charityId)!;
@@ -173,15 +252,25 @@ export async function runReceiptsJob(args: {
       if (missing.length) throw new Error(`Not issued: the receipt is missing ${missing.join(" and ")}`);
       const issued = await store.issue(r, charity, details);
       summary.issued += 1;
+      issuedKeys.add((r as DecidedReceipt).key);
       await store.savePdf(issued, await args.render({ details: issued.details, reference: issued.reference }));
       summary.pdfsMade += 1;
+      // Emailed right away, so a run cut off later still leaves every receipt it got to emailed.
+      if (args.mailer) {
+        const ready = await store.listToEmail(taxYear, charityId, issued.id);
+        for (const one of ready.filter((x) => x.id === issued.id)) await emailReceipt(one);
+      }
     } catch (e) {
       fail(what, e);
     }
   }
 
   // Receipts issued earlier whose PDF failed or was never made.
-  for (const missing of await store.listIssuedWithoutPdf(taxYear, charityId)) {
+  for (const missing of summary.stoppedForTime ? [] : await store.listIssuedWithoutPdf(taxYear, charityId)) {
+    if (outOfTime()) {
+      stopForTime();
+      break;
+    }
     try {
       await store.savePdf(missing, await args.render({ details: missing.details, reference: missing.reference }));
       summary.pdfsMade += 1;
@@ -192,37 +281,14 @@ export async function runReceiptsJob(args: {
 
   // Email every receipt that has a PDF and has not been emailed. One failed
   // email never stops the others; it is tried again on the next run.
-  if (args.mailer) {
+  if (args.mailer && !summary.stoppedForTime) {
     for (const r of await store.listToEmail(taxYear, charityId)) {
-      // The claim is inside the try (review 23/11/2026): one receipt whose claim fails never stops the others' emails.
-      let claimed = false;
-      try {
-        claimed = await store.claimEmail(r);
-        if (!claimed) continue;
-        const pdf = await store.readPdf(r);
-        const mail = buildReceiptEmail({ details: r.details, reference: r.reference, siteUrl: args.mailer.siteUrl, platformName: args.mailer.platformName });
-        const sent = await args.mailer.transport.send({
-          to: r.email,
-          ...mail,
-          attachments: [{ filename: `${r.reference}.pdf`, content: pdf, contentType: "application/pdf" }],
-        });
-        // Only a real send marks the receipt emailed: the console transport (local runs) and skipped
-        // addresses leave it for a later run with a real transport.
-        if (sent === "sent") {
-          // If this write fails the receipt is released and sent again next run: a second copy beats none.
-          await store.markEmailed(r);
-          summary.emailed += 1;
-        } else await store.releaseEmail(r);
-      } catch (e) {
-        // A send cut off at the time limit, or a dropped connection, may have gone (13/11/2026): the claim stays, so
-        // nothing sends it again by itself, and onEmailFailed flags it for a person. Only a refusal from the email
-        // service (sure not to have gone) frees it for the next run or the daily retry.
-        // A claim that failed holds nothing to free, and nothing was sent: it is tried again on the next run.
-        if (claimed && !wasCutOff(e)) await store.releaseEmail(r).catch(() => undefined);
-        summary.emailFailed += 1;
-        if (claimed) await args.mailer.onEmailFailed?.(r, e).catch(() => undefined);
-        console.error(`[receipts] could not email ${r.reference}: ${e instanceof Error ? e.message : e}`);
+      if (emailTried.has(r.id)) continue;
+      if (outOfTime()) {
+        stopForTime();
+        break;
       }
+      await emailReceipt(r);
     }
   }
   return summary;

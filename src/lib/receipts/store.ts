@@ -238,8 +238,6 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
         .limit(1);
       if (retryError) throw new Error(retryError.message);
       if (maybeSent?.length) return false;
-      // The claim is a lock for the minutes a send takes. One older than that was cut off mid-send: take it over.
-      const stale = new Date(Date.now() - EMAIL_CLAIM_MINUTES * 60_000).toISOString();
       // Only an issued receipt: one withdrawn since it was listed (a refund, or Withdraw in Admin) is left alone, as
       // guard_receipt_immutable refuses any change to a void row (review 23/11/2026). The same for the writes below.
       const { data, error } = await db
@@ -248,10 +246,32 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
         .eq("id", receipt.id)
         .eq("status", "issued")
         .is("emailed_at", null)
-        .or(`email_claimed_at.is.null,email_claimed_at.lt.${stale}`)
+        .is("email_claimed_at", null)
         .select("id");
       if (error) throw new Error(error.message);
-      return Boolean(data?.length);
+      if (data?.length) return true;
+      // The claim is a lock for the minutes a send takes. One older than that was cut off mid-send, so the email may have
+      // gone: it is never taken over and sent again by a run (23/11/2026). It is flagged for a person ("It arrived" or
+      // "Send again" on the receipts page), as a cut-off send is, and left alone.
+      const stale = new Date(Date.now() - EMAIL_CLAIM_MINUTES * 60_000).toISOString();
+      const { data: old, error: oldError } = await db
+        .from("s18a_receipts")
+        .select("id")
+        .eq("id", receipt.id)
+        .eq("status", "issued")
+        .is("emailed_at", null)
+        .lt("email_claimed_at", stale);
+      if (oldError) throw new Error(oldError.message);
+      if (old?.length) {
+        const now = new Date().toISOString();
+        const { error: flagError } = await db.from("email_retries").upsert(
+          { kind: "s18a_receipt", ref_id: receipt.id, payload: {}, tries: 1, status: "unknown", next_try_at: now, claimed_at: null, last_error: "A run that was sending this stopped part-way; it may have gone.", updated_at: now },
+          { onConflict: "kind,ref_id" },
+        );
+        // A table not there yet (before its migration) or a failed write must not stop the other receipts: it is flagged on the next run.
+        if (flagError) console.error(`[receipts] could not flag ${receipt.reference} as maybe sent: ${flagError.message}`);
+      }
+      return false;
     },
 
     async markEmailed(receipt) {

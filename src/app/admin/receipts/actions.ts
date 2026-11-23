@@ -6,7 +6,8 @@ import { logAudit } from "@/lib/audit";
 import { requirePlatformAdmin } from "@/lib/auth";
 import type { FormState } from "@/lib/form";
 import { formatRand } from "@/lib/money";
-import { cancelRun, finishRun, markRunStopped, signOffRun, type SignOffResult } from "@/lib/receipts/runs";
+import { remainingText } from "@/lib/receipts/issue";
+import { allowReceiptEmailAgain, cancelRun, finishRun, markReceiptEmailArrived, markRunStopped, signOffRun, type SignOffResult } from "@/lib/receipts/runs";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -64,8 +65,8 @@ function resultText(r: SignOffResult, what: "issued" | "finished"): FormState {
   ];
   const problems = s.failed.length + s.emailFailed;
   return {
-    ok: problems === 0,
-    message: `${parts.join(", ")}.${problems ? ` ${problems} ${problems === 1 ? "step" : "steps"} failed: ${s.failed.map((f) => f.message).slice(0, 3).join("; ")}${s.emailFailed ? `${s.failed.length ? "; " : ""}${s.emailFailed} emails` : ""}. Everything else is done. Use "Finish" to try those again.` : ""}`,
+    ok: problems === 0 && !(s.remaining && s.remaining > 0),
+    message: `${parts.join(", ")}.${remainingText(s) ? ` ${remainingText(s)}` : ""}${problems ? ` ${problems} ${problems === 1 ? "step" : "steps"} failed: ${s.failed.map((f) => f.message).slice(0, 3).join("; ")}${s.emailFailed ? `${s.failed.length ? "; " : ""}${s.emailFailed} emails` : ""}. Everything else is done. Use "Finish" to try those again.` : ""}`,
   };
 }
 
@@ -89,6 +90,28 @@ export async function finishReceipts(runId: string, _prev: FormState, _formData:
   revalidatePath("/admin/receipts");
   if (r.ok) redirect(`/admin/receipts?run=${runId}`);
   return resultText(r, "finished");
+}
+
+/**
+ * A receipt email that may or may not have gone (a send cut off, or a run that stopped while sending): a person checks
+ * with the donor, then says it arrived or that it can go again (23/11/2026). Givezy admins only, after the second step.
+ */
+export async function receiptEmailArrived(receiptId: string, _prev: FormState, _formData: FormData): Promise<FormState> {
+  const admin = await requirePlatformAdmin();
+  if (!isId(receiptId)) return { ok: false, message: "Receipt not found." };
+  const r = await markReceiptEmailArrived({ receiptId, userId: admin.userId });
+  revalidatePath("/admin/receipts");
+  if (!r.ok) return { ok: false, message: "This receipt is no longer waiting on a check (someone already settled it, or it was withdrawn). Nothing was changed." };
+  return { ok: true, message: "Recorded: the donor has this receipt. It is marked emailed and will not be sent again." };
+}
+
+export async function receiptEmailSendAgain(receiptId: string, _prev: FormState, _formData: FormData): Promise<FormState> {
+  const admin = await requirePlatformAdmin();
+  if (!isId(receiptId)) return { ok: false, message: "Receipt not found." };
+  const r = await allowReceiptEmailAgain({ receiptId, userId: admin.userId });
+  revalidatePath("/admin/receipts");
+  if (!r.ok) return { ok: false, message: "This receipt is no longer waiting on a check (someone already settled it, or it was withdrawn). Nothing was changed." };
+  return { ok: true, message: "Cleared. The receipt will be emailed again the next time Finish runs or the daily job does." };
 }
 
 /** Send a list back to the charity, with the reason it sees. */

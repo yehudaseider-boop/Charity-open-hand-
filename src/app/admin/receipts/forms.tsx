@@ -40,6 +40,30 @@ export function FinishForm({ action }: { action: (s: FormState, f: FormData) => 
   return <ActionForm action={action} submitLabel="Finish" pendingLabel="Finishing…" />;
 }
 
+export function EmailArrivedForm({ action }: { action: (s: FormState, f: FormData) => Promise<FormState> }) {
+  return (
+    <ActionForm
+      action={action}
+      submitLabel="It arrived"
+      pendingLabel="Saving…"
+      confirm="Has the donor confirmed they have this receipt? It will be marked emailed and never sent again."
+      confirmLabel="Yes, it arrived"
+    />
+  );
+}
+
+export function EmailSendAgainForm({ action }: { action: (s: FormState, f: FormData) => Promise<FormState> }) {
+  return (
+    <ActionForm
+      action={action}
+      submitLabel="Send again"
+      pendingLabel="Saving…"
+      confirm="Has the donor confirmed they did not get it? The receipt will be emailed again the next time Finish runs. If the first copy turns up late, they get two."
+      confirmLabel="Yes, send it again"
+    />
+  );
+}
+
 export function MarkStoppedForm({ action }: { action: (s: FormState, f: FormData) => Promise<FormState> }) {
   return (
     <ActionForm

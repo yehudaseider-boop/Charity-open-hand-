@@ -7,18 +7,19 @@ import { formatDate, formatDateTime, taxYearLabel, taxYearName } from "@/lib/dat
 import { formatRand } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { receiptsEnabled } from "@/config/receipts";
-import { leftOutText } from "@/lib/receipts/issue";
+import { leftOutText, remainingText } from "@/lib/receipts/issue";
 import { adminCharityMissingWords } from "@/lib/receipts/details";
-import { getRun, listUnfinishedRuns, listWaitingRuns, loadPlan, pendingAtYearEnd, runNeedsFinishing, STUCK_MINUTES } from "@/lib/receipts/runs";
-import { finishReceipts, markReceiptsStopped, sendBackReceipts, signOffReceipts, voidReceipt } from "./actions";
-import { FinishForm, MarkStoppedForm, SendBackForm, SignOffForm, VoidForm } from "./forms";
+import { getRun, listUnfinishedRuns, listUnknownReceiptEmails, listWaitingRuns, loadPlan, pendingAtYearEnd, runNeedsFinishing, STUCK_MINUTES } from "@/lib/receipts/runs";
+import { finishReceipts, markReceiptsStopped, receiptEmailArrived, receiptEmailSendAgain, sendBackReceipts, signOffReceipts, voidReceipt } from "./actions";
+import { EmailArrivedForm, EmailSendAgainForm, FinishForm, MarkStoppedForm, SendBackForm, SignOffForm, VoidForm } from "./forms";
 import { yearsWithReceipts } from "@/lib/receipts/year-list-store";
 import { Card } from "@/components/card";
 
 export const metadata: Metadata = { title: "Receipts" };
 
-// The sign-off issues, prints and emails every receipt in one go (its actions run under this page's limit).
-// 60 seconds is safe on any hosting plan; raise it (up to 300) once on a plan that allows it.
+// A sign-off or Finish issues, prints and emails receipts one at a time and stops cleanly 15 seconds before this limit
+// (REQUEST_MS in runs.ts); Finish carries on with what is left. 60 seconds is safe on any hosting plan; if it is raised
+// (up to 300), raise REQUEST_MS with it.
 export const maxDuration = 60;
 
 const tabs = ["issued", "void"] as const;
@@ -47,7 +48,7 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
   }
   const { data: receipts, error } = await query;
   if (error) throw error;
-  const [waiting, unfinished, years] = await Promise.all([listWaitingRuns(), listUnfinishedRuns(), yearsWithReceipts()]);
+  const [waiting, unfinished, years, unknownEmails] = await Promise.all([listWaitingRuns(), listUnfinishedRuns(), yearsWithReceipts(), listUnknownReceiptEmails()]);
   const pending = await Promise.all(waiting.map((w) => pendingAtYearEnd(w.charity_id, w.tax_year)));
   // Gifts held back because the donor hasn't added the s18A details yet (they are never receipted as they are).
   const plans = await Promise.all(waiting.map((w) => loadPlan(w.charity_id, w.tax_year).catch(() => null)));
@@ -127,12 +128,32 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
             <p className="font-medium">{u.charity_name}, {taxYearLabel(u.tax_year)}: not finished</p>
             <p>
               {u.summary?.issued ?? 0} issued, {u.summary?.pdfsMade ?? 0} PDFs made, {u.summary?.emailed ?? 0} emailed.
-              {u.summary?.failed[0] ? ` Some steps failed (${u.summary.failed[0].message}).` : " Not every receipt has been emailed yet."} Finish makes what is missing and sends what wasn&apos;t sent. It never issues a new receipt.
+              {u.summary?.failed[0] ? ` Some steps failed (${u.summary.failed[0].message}).` : (u.summary?.remaining ?? 0) > 0 ? "" : " Not every receipt has been emailed yet."}{" "}
+              {remainingText(u.summary ?? {})}{" "}
+              Finish makes what is missing and sends what wasn&apos;t sent. It only ever issues receipts the charity approved.
             </p>
             <FinishForm action={finishReceipts.bind(null, u.id)} />
           </div>
         ))}
       </section>
+      {unknownEmails.length ? (
+        <section className="space-y-3" aria-labelledby="unknown-emails">
+          <h2 id="unknown-emails" className="font-semibold">Receipt emails that may not have arrived</h2>
+          <p className="text-sm text-muted">
+            These sends were cut off or a run stopped while sending, so they may have gone. They are never sent again by themselves. Ask the donor, then choose.
+          </p>
+          {unknownEmails.map((u) => (
+            <div key={u.receiptId} className="space-y-2 rounded-card border border-border bg-warning-soft p-4 text-sm">
+              <p className="font-medium">{u.reference}, <bdi>{u.charityName}</bdi></p>
+              <p className="text-muted">Donor: <bdi>{u.donorName}</bdi>. Flagged {formatDate(u.flaggedAt)}{u.why ? `: ${u.why}` : ""}</p>
+              <div className="flex flex-wrap gap-4">
+                <EmailArrivedForm action={receiptEmailArrived.bind(null, u.receiptId)} />
+                <EmailSendAgainForm action={receiptEmailSendAgain.bind(null, u.receiptId)} />
+              </div>
+            </div>
+          ))}
+        </section>
+      ) : null}
       {years.length ? (
         <Card title="Yearly lists for SARS (draft)">
           <p className="mb-2 text-sm text-muted">
@@ -228,10 +249,11 @@ function RunDone({ run }: { run: NonNullable<Awaited<ReturnType<typeof getRun>>>
         <p>Details missing: {s.skippedByReason.details_missing} {s.skippedByReason.details_missing === 1 ? "gift was" : "gifts were"} held back, because the donor hasn&apos;t added the s18A details yet. No receipt was issued for {s.skippedByReason.details_missing === 1 ? "it" : "them"}.</p>
       ) : null}
       {leftOutText(s) ? <p>{leftOutText(s)}</p> : null}
+      {remainingText(s) ? <p className="font-medium">{remainingText(s)}</p> : null}
       {unfinished ? (
         <p>
           Not everything is done yet{s.emailed < s.issued && s.failed.length === 0 && s.emailFailed === 0 ? ": receipts are not emailed while email is not switched on (EMAIL_TRANSPORT) or SITE_URL is missing" : ""}.
-          It is listed below under &ldquo;not finished&rdquo;. Finish makes what is missing and sends what wasn&apos;t sent; it never issues a new receipt.
+          It is listed below under &ldquo;not finished&rdquo;. Finish makes what is missing and sends what wasn&apos;t sent; it only ever issues receipts the charity approved.
         </p>
       ) : (
         <p>All done. Each donor has their receipt by email, and the charity sees them on its receipts page.</p>
