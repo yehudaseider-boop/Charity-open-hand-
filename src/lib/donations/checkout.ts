@@ -8,14 +8,14 @@ import { getGateway, GatewayError, isGatewayDecline, isGatewayRefusal } from "@/
 import { savedAddress, savedIdNumber } from "./saved-id";
 import { savedCardsOpen } from "./app-api";
 import { loadSavedCardToken, requestCardSave } from "./saved-card";
-import { checkGivingAllowed, rememberGiftStart } from "./giving-guard";
+import { checkGivingAllowed, recordDecline, rememberGiftStart } from "./giving-guard";
 import { linkDonorsForSession } from "@/lib/donors/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { loadDonatableCharity } from "./charity";
 import { checkShownTotal, type Quote } from "./quote";
 import { issueConfirmationToken, reissueConfirmationToken } from "./confirmation-access";
-import { chargeDayOf } from "./schedule";
+import { chargeDayOf, savedCardDonationId } from "./schedule";
 import { cameFromOf } from "./source";
 import { optOutAtCheckout } from "@/lib/charity/appeals";
 import { checkDonorDetails, givingLabelOf, s18aDetailsLater, type CheckoutInput } from "./validation";
@@ -152,7 +152,10 @@ export async function startDonation(args: {
   if (savedToken && !(args.attemptId && isUuid(args.attemptId))) {
     return { ok: false, message: "Something went wrong, so nothing was charged. Please close this screen and try again." };
   }
-  const attemptId = savedToken && args.attemptId && isUuid(args.attemptId) ? args.attemptId : null;
+  // The donation's id is made here from the signed-in account and the app's id, never taken from the app as it is: an
+  // id the app chose could be one a monthly collection will use (review 23/11/2026). The same account asking again
+  // with the same attempt id still gets the same gift.
+  const attemptId = savedToken && args.useSavedCardOf && args.attemptId && isUuid(args.attemptId) ? savedCardDonationId(args.useSavedCardOf.userId, args.attemptId) : null;
   if (attemptId) {
     const { data: prior, error: priorError } = await db
       .from("donations")
@@ -204,6 +207,8 @@ export async function startDonation(args: {
         if (reached === "failed") {
           // The first try's charge did reach the provider and was declined: say so, as the first try would have.
           await db.from("donations").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", attemptId).eq("status", "pending");
+          // The first try stopped before it was counted: counted now, once (a failed gift is answered above from here on).
+          await recordDecline(attemptId);
           return { ok: false, savedCardDeclined: true, message: "Your saved card was declined. Please pay on the payment page with a different card." };
         }
       }
@@ -516,6 +521,9 @@ async function chargeSavedCard(a: {
       return { ok: false, offerPaymentPage: true, message: SAVED_CARD_REFUSED };
     }
     await db.from("donations").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", a.donationId).eq("status", "pending");
+    // Card-testing protection counts a declined saved card like any other declined card (review 23/11/2026: marked
+    // failed here, the payment check never saw it move from pending, so it was never counted). Never throws.
+    await recordDecline(a.donationId);
     return { ok: false, savedCardDeclined: true, message: "Your saved card was declined. Please pay on the payment page with a different card." };
   };
   try {
