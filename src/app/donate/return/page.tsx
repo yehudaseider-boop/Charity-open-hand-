@@ -29,6 +29,7 @@ import { currentFocus } from "@/lib/focus-server";
 import { loadS18aToComplete } from "@/lib/donations/s18a-complete";
 import { missingWords } from "@/lib/donations/s18a-details";
 import { S18aDetailsForm } from "@/components/s18a-details-form";
+import { botCheckSiteKey } from "@/lib/bot-check";
 
 /**
  * The longest this may run (13/11/2026): checking the payment with the provider can take up to 20 seconds, and the
@@ -318,7 +319,7 @@ function ExpiredLink({ reference, token, signedIn }: { reference: string; token:
       <p>
         For your safety, the link to a donation works for {days} days. <strong className="font-semibold text-navy">Nothing was changed</strong>: your donation and its s18A details are as they were.
       </p>
-      <FreshLinkForm reference={reference} token={token} />
+      <FreshLinkForm reference={reference} token={token} botCheckKey={botCheckSiteKey()} />
       <p className="mt-5 text-sm text-muted">
         {signedIn ? (
           <>This donation isn&apos;t on the account you&apos;re signed in to. Sign in with the email you gave with to see it there.</>

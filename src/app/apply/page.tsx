@@ -11,6 +11,8 @@ import { StartForm } from "./start-form";
 import { signInMessage } from "@/lib/sign-in";
 import { SafeForm } from "@/components/forms/safe-form";
 import { PendingButton } from "@/components/forms/pending-button";
+import { BotCheck } from "@/components/forms/bot-check";
+import { botCheckSiteKey } from "@/lib/bot-check";
 
 export const metadata: Metadata = { title: "List your charity" };
 
@@ -40,6 +42,8 @@ export default async function ApplyPage({ searchParams }: PageProps<"/apply">) {
   // message as on Sign in, here with both fields still filled in.
   const signInError = signInMessage(sp.error);
   const typedEmail = typeof sp.email === "string" ? sp.email.slice(0, 200) : "";
+  // The bot check on asking for the sign-in email (23/11/2026): null while it is off.
+  const botKey = viewer ? null : botCheckSiteKey();
   const back = (name: string) => `/apply?${new URLSearchParams({ ...(token ? { invite: token } : {}), ...(name ? { name } : {}) }).toString()}`;
 
   return (
@@ -105,6 +109,7 @@ export default async function ApplyPage({ searchParams }: PageProps<"/apply">) {
                 </div>
                 {signInError ? <p id="apply-error" role="alert" className="text-sm text-danger">{signInError}</p> : null}
                 <input type="hidden" name="next" value={back(startName)} />
+                {botKey ? <BotCheck siteKey={botKey} action="sign-in" kind="sign-in" button="Email me a code" guardForm /> : null}
                 <PendingButton pendingLabel="Sending…" className="pressable w-full rounded-control bg-coral px-6 py-3.5 font-bold text-navy">Email me a code</PendingButton>
                 <p className="text-sm text-muted">Already applied? <Link href={`/login?next=${encodeURIComponent("/charity-admin")}`} className="font-semibold text-brand underline">Sign in to carry on</Link>.</p>
               </SafeForm>

@@ -18,6 +18,8 @@ import { quoteFromTyped, type Quote } from "@/lib/donations/quote";
 import { CONTRIBUTION_EXPLAINER, NO_CONTRIBUTION_NOTE, contributionLabel, startingChoice, type ContributionChoice } from "@/lib/donations/contribution";
 import { LABEL_MAX } from "@/lib/donations/labels";
 import { registrationNumberProblem } from "@/lib/donations/validation";
+import { BotCheck, type BotCheckHandle } from "@/components/forms/bot-check";
+import { botCheckConfig } from "@/config/bot-check";
 
 type Props = {
   slug: string;
@@ -49,6 +51,8 @@ type Props = {
   cardChargeAvailable?: boolean;
   /** One agreement tick instead of the age tick and the Terms tick (platformConfig.checkout.singleAgreementTick). */
   singleAgreementTick?: boolean;
+  /** Cloudflare's bot check site key, when the check is on (23/11/2026). */
+  botCheckKey?: string | null;
 };
 
 const noSubscribe = () => () => {};
@@ -103,7 +107,7 @@ function offlineOrDown(e: unknown): { ok: false; message: string } {
 
 export function DonateFlow({
   slug, charityName, receiptsAvailable, s18aDetailsBy, minimumLabel, suggestedCents = [], contributionMinimumLabel, initialLabel, initialAmountCents, initialMonthly = false,
-  fromApp, campaign, account, source, impactUnit, cardChargeAvailable = false, singleAgreementTick = false,
+  fromApp, campaign, account, source, impactUnit, cardChargeAvailable = false, singleAgreementTick = false, botCheckKey = null,
 }: Props) {
   // The amount, the contribution and the card charge box decide the live total, worked out as the donor types.
   const [amountText, setAmountText] = useState(initialAmountCents ? centsToInput(initialAmountCents) : "");
@@ -146,6 +150,7 @@ export function DonateFlow({
   useEffect(() => {
     openedAt.current = Date.now();
   }, []);
+  const botCheck = useRef<BotCheckHandle>(null);
   const [state, dispatch, pending] = useActionState(
     async (prev: CheckoutState, fd: FormData): Promise<CheckoutState> => {
       const shown = fd.get("$shown");
@@ -154,6 +159,14 @@ export function DonateFlow({
       fd.delete("$shown");
       // How long the form has been open, for the server's quiet bot check (bots send the form the instant it opens).
       if (openedAt.current !== null) fd.set("form_open_ms", String(Math.max(0, Date.now() - openedAt.current)));
+      // The bot check (when on): almost always ready by now. If Cloudflare wants a tick or couldn't load, nothing is
+      // sent and the check says so by the button, with what was typed kept; the last answer's message is cleared.
+      if (botCheckKey) {
+        const human = await botCheck.current?.token();
+        if (!human?.ok) return { ...prev, message: undefined, redirectUrl: undefined };
+        fd.set(botCheckConfig.field, human.token);
+        botCheck.current?.used();
+      }
       try {
         const next = await submitDonation(slug, q.amountCents, q.contributionCents, q.cardChargeCents > 0, q.totalCents, fromApp, campaign?.id, prev, fd);
         if (next.quote) setServerQuote(next.quote);
@@ -616,6 +629,9 @@ export function DonateFlow({
 
         {/* Hidden from people; bots fill it in. */}
         <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />
+
+        {/* Cloudflare's bot check: nothing to see for most people; its tick box, if it wants one, shows here. */}
+        {botCheckKey ? <BotCheck siteKey={botCheckKey} action="give" kind="give" button="Give" handleRef={botCheck} /> : null}
 
         <button
           disabled={pending || !ready || Boolean(opening)}

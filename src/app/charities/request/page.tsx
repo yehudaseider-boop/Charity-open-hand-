@@ -4,6 +4,7 @@ import { Key } from "@/components/marketing";
 import { charityRequestsOpen } from "@/config/app-links";
 import { getViewer } from "@/lib/auth";
 import { CHARITY_REQUEST_LIMITS } from "@/lib/charity-requests";
+import { botCheckSiteKey } from "@/lib/bot-check";
 import { RequestForm } from "./request-form";
 
 export const metadata: Metadata = { title: "Ask us to add a charity" };
@@ -42,7 +43,7 @@ export default async function RequestCharityPage({ searchParams }: PageProps<"/c
             </p>
             {open ? (
               <div className="max-w-[36rem]">
-                <RequestForm defaultName={typed} defaultEmail={viewer?.email ?? ""} />
+                <RequestForm defaultName={typed} defaultEmail={viewer?.email ?? ""} botCheckKey={botCheckSiteKey()} />
               </div>
             ) : (
               <p role="status" className="max-w-[36rem] rounded-[1.25rem] bg-honey-soft p-5 text-[16px] font-semibold">

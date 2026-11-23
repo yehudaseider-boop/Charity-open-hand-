@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
+import { BotCheck, type BotCheckHandle } from "@/components/forms/bot-check";
+import { botCheckConfig } from "@/config/bot-check";
 import type { FreshLinkState } from "@/lib/donations/fresh-link";
 import { emailFreshLink } from "./actions";
 
@@ -9,8 +11,17 @@ import { emailFreshLink } from "./actions";
  * same words whatever happened (see lib/donations/fresh-link.ts). A lost connection is said plainly, with nothing
  * sent and the button still there.
  */
-export function FreshLinkForm({ reference, token }: { reference: string; token: string }) {
+export function FreshLinkForm({ reference, token, botCheckKey = null }: { reference: string; token: string; botCheckKey?: string | null }) {
+  const botCheck = useRef<BotCheckHandle>(null);
   const safeAction = async (prev: FreshLinkState, formData: FormData): Promise<FreshLinkState> => {
+    // The bot check (when on, 23/11/2026): if Cloudflare wants a tick or couldn't load, nothing is sent and the check
+    // says so by the button.
+    if (botCheckKey) {
+      const human = await botCheck.current?.token();
+      if (!human?.ok) return { ok: false };
+      formData.set(botCheckConfig.field, human.token);
+      botCheck.current?.used();
+    }
     try {
       return await emailFreshLink(prev, formData);
     } catch (e) {
@@ -43,6 +54,7 @@ export function FreshLinkForm({ reference, token }: { reference: string; token: 
       {state.message ? (
         <p role="alert" className="rounded-control bg-danger-soft p-3 text-sm text-danger">{state.message}</p>
       ) : null}
+      {botCheckKey ? <BotCheck siteKey={botCheckKey} action="fresh-link" kind="fresh-link" button="Email me a fresh link" handleRef={botCheck} /> : null}
       <button
         type="submit"
         disabled={pending}

@@ -18,6 +18,7 @@ import { savedIdLast4 } from "@/lib/donations/saved-id";
 import { sourceTag, withSource } from "@/lib/donations/source";
 import { cardChargeRates } from "@/lib/donations/card-charge";
 import { lateDetailsDeadlineForGiftOn } from "@/lib/donations/s18a-details";
+import { botCheckSiteKey } from "@/lib/bot-check";
 import { DonateFlow } from "./donate-flow";
 
 /**
@@ -99,6 +100,7 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
           source={sourceTag(sp.src)}
           cardChargeAvailable={cardChargeRates() !== null}
           singleAgreementTick={platformConfig.checkout.singleAgreementTick}
+          botCheckKey={botCheckSiteKey()}
         />
       ) : charity.givingPaused ? (
         <Card><p role="status" className="text-sm">{GIVING_PAUSED_MESSAGE}</p></Card>

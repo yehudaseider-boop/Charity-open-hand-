@@ -10,7 +10,18 @@
  *  - "static": scripts allow 'unsafe-inline', because a page built ahead of time has no request to take a nonce from.
  *    For public pages (home, charities list, FAQ, for donors, for charities, terms, privacy, a charity's own page).
  */
+// A relative path: next.config.ts reads this file too, outside the app's "@/" paths.
+import { botCheckConfig } from "../config/bot-check";
+
 export type CspPolicy = "nonce" | "static";
+
+/**
+ * Cloudflare's bot check (Turnstile, 23/11/2026): its script and its frame, on both policies. The nonce pages load
+ * the script with the nonce (and 'strict-dynamic' lets it run); the host is named too, for browsers without
+ * 'strict-dynamic', and on the static policy because moving from a public page to Sign in or Give without a full
+ * page load keeps the public page's policy. No connect-src is needed (Cloudflare's CSP guide, 23/11/2026).
+ */
+export const BOT_CHECK_ORIGIN = botCheckConfig.origin;
 
 /** Areas whose every page, and everything under it, gets the nonce policy (a path equal to it or starting "<it>/"). */
 export const NONCE_AREAS = [
@@ -68,16 +79,17 @@ export type CspInput = {
  */
 export function buildCsp(i: CspInput): string {
   const scripts = i.nonce
-    ? `script-src 'self' 'nonce-${i.nonce}' 'strict-dynamic'${i.dev ? " 'unsafe-eval'" : ""}`
-    : `script-src 'self' 'unsafe-inline'${i.dev ? " 'unsafe-eval'" : ""}`;
+    ? `script-src 'self' 'nonce-${i.nonce}' 'strict-dynamic' ${BOT_CHECK_ORIGIN}${i.dev ? " 'unsafe-eval'" : ""}`
+    : `script-src 'self' 'unsafe-inline' ${BOT_CHECK_ORIGIN}${i.dev ? " 'unsafe-eval'" : ""}`;
   return [
     "default-src 'self'",
     scripts,
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' blob: data:${i.supabaseOrigin ? ` ${i.supabaseOrigin}` : ""}`,
     "font-src 'self'",
-    // A charity's profile video plays in a frame, only after the visitor presses play: exactly these two players, nothing wider.
-    `frame-src ${i.videoFrameOrigins.join(" ")}`,
+    // A charity's profile video plays in a frame, only after the visitor presses play: exactly these two players, nothing wider,
+    // and Cloudflare's bot check, whose tick box (when it shows one) is a frame from its own address.
+    `frame-src ${[...i.videoFrameOrigins, BOT_CHECK_ORIGIN].join(" ")}`,
     `connect-src 'self'${i.dev ? " ws: wss:" : ""}`,
     "object-src 'none'",
     "base-uri 'self'",

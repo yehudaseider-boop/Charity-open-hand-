@@ -6,13 +6,24 @@ import { FormStateProvider } from "@/components/forms/action-form";
 import { TextArea, TextField } from "@/components/forms/fields";
 import { CHARITY_REQUEST_CONSENT, CHARITY_REQUEST_LIMITS as L, CHARITY_REQUEST_MESSAGES } from "@/lib/charity-requests";
 import { requestCharity, type RequestFormState } from "./actions";
+import { BotCheck, type BotCheckHandle } from "@/components/forms/bot-check";
+import { botCheckConfig } from "@/config/bot-check";
 
 /**
  * "Request a charity" (15/11/2026). Everything typed stays when something goes wrong; the answer is read out to
  * screen readers. The email box shows only once "Email me when it joins" is ticked.
  */
-export function RequestForm({ defaultName, defaultEmail }: { defaultName: string; defaultEmail: string }) {
+export function RequestForm({ defaultName, defaultEmail, botCheckKey = null }: { defaultName: string; defaultEmail: string; botCheckKey?: string | null }) {
+  const botCheck = useRef<BotCheckHandle>(null);
   const safe = async (prev: RequestFormState, data: FormData): Promise<RequestFormState> => {
+    // The bot check (when on, 23/11/2026): if Cloudflare wants a tick or couldn't load, nothing is sent and the check
+    // says so by the button; what was typed stays.
+    if (botCheckKey) {
+      const human = await botCheck.current?.token();
+      if (!human?.ok) return { ...prev, message: undefined };
+      data.set(botCheckConfig.field, human.token);
+      botCheck.current?.used();
+    }
     try {
       return await requestCharity(prev, data);
     } catch {
@@ -106,6 +117,7 @@ export function RequestForm({ defaultName, defaultEmail }: { defaultName: string
           <p id="request-consent" className="text-[14px] leading-relaxed text-muted">{CHARITY_REQUEST_CONSENT.text}</p>
         </div>
 
+        {botCheckKey ? <BotCheck siteKey={botCheckKey} action="charity-request" kind="charity-request" button="Send request" handleRef={botCheck} /> : null}
         <div className="flex flex-wrap items-center gap-3">
           <button type="submit" disabled={pending} className="pressable inline-flex min-h-14 items-center justify-center rounded-[1.125rem] bg-coral px-7 text-[17px] font-bold text-navy disabled:opacity-70">
             {pending ? "Sending…" : "Send request"}

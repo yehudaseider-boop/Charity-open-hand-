@@ -1,6 +1,7 @@
 import "server-only";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { hashedKey, ipKeys } from "@/lib/rate-limit";
+import { botCheckRefusedMessage, botCheckUnreachableMessage } from "@/lib/bot-check-words";
 
 /**
  * Sign-in on the website: the plain messages (the same on the Sign in page and on the apply page), the limit keys,
@@ -15,6 +16,9 @@ export const signInMessages: Record<string, string> = {
   code: "That code didn't work. Check it, or ask for a new email and use the newest code.",
   busy: "Too many sign-in emails have been asked for in the last hour, from this address or this connection. Please use the newest email you have, or try again in an hour.",
   tries: "That's too many wrong codes for now. Please wait an hour and try again, or ask for a new email and use the newest code.",
+  // The bot check (23/11/2026): no token or a refused one, and Cloudflare unreachable (sign-in waits rather than sends).
+  check: botCheckRefusedMessage("sign-in", "the button"),
+  "check-down": botCheckUnreachableMessage(),
 };
 
 export const signInMessage = (code: unknown): string | undefined => (typeof code === "string" && Object.hasOwn(signInMessages, code) ? signInMessages[code] : undefined);

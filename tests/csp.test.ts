@@ -49,8 +49,22 @@ describe("the policies", () => {
     expect(scripts).not.toContain("'unsafe-eval'");
   });
 
-  it("the static policy is the one the site had before", () => {
-    expect(directive(loose, "script-src")).toBe("script-src 'self' 'unsafe-inline'");
+  it("the static policy is the one the site had before, plus Cloudflare's bot check", () => {
+    expect(directive(loose, "script-src")).toBe("script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com");
+  });
+
+  it("both policies allow Cloudflare's bot check: its script and its frame, and nothing wider (23/11/2026)", () => {
+    for (const csp of [strict, loose]) {
+      expect(directive(csp, "script-src").split(" ")).toContain("https://challenges.cloudflare.com");
+      expect(directive(csp, "frame-src")).toBe("frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://challenges.cloudflare.com");
+      // Its guide asks for no connect-src of its own.
+      expect(directive(csp, "connect-src")).toBe("connect-src 'self'");
+      // Exactly that one address, in exactly those two places: no wildcard, nothing else of Cloudflare's.
+      expect(csp.match(/cloudflare/g)).toEqual(["cloudflare", "cloudflare"]);
+      expect(csp).not.toContain("*");
+    }
+    // The nonce policy still runs only nonce'd scripts (and those they add): the host is for browsers without 'strict-dynamic'.
+    expect(directive(strict, "script-src")).toBe(`script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://challenges.cloudflare.com`);
   });
 
   it("every other directive is the same in both", () => {

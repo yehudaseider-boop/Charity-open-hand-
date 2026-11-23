@@ -83,6 +83,18 @@ export function settingsCheck(env: Env): SettingCheck[] {
   const admin = env.ADMIN_NOTIFY_EMAIL ?? "";
   add("ADMIN_NOTIFY_EMAIL", email(admin) ? "ok" : "fix", email(admin) ? "Set." : admin ? "Doesn't look like an email address." : "Missing. Chargebacks, new applications and the daily \"needs a person\" email have nowhere to go.");
 
+  // Cloudflare's bot check on sign-in, giving and the request forms (23/11/2026): on only with both keys. The secret
+  // is shown as present or missing, nothing more.
+  const siteKey = (env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "").trim();
+  const botSecret = Boolean((env.TURNSTILE_SECRET_KEY ?? "").trim());
+  // Cloudflare's test keys start 1x, 2x or 3x and pass (or fail) everyone: fine on a developer's machine, never on a real site.
+  const testKey = /^[123]x0{20}/.test(siteKey);
+  if (!siteKey && !botSecret) add("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "later", "Off: no bot check on sign-in, giving and the request forms. Set this and TURNSTILE_SECRET_KEY to switch it on (docs/go-live-checklist.md).");
+  else if (!siteKey) add("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "fix", "Missing, so the bot check is off although its secret is set. Copy the site key from Cloudflare, Turnstile, Givezy.");
+  else if (testKey && site !== "test") add("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "fix", "This is one of Cloudflare's test keys, which let everyone through. Use the Givezy widget's own site key.");
+  else add("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "ok", botSecret ? "Set: the bot check is on." : "Set.");
+  if (siteKey || botSecret) add("TURNSTILE_SECRET_KEY", botSecret ? "ok" : "fix", botSecret ? "Set." : "Missing, so the bot check is off although its site key is set. Copy the secret key from Cloudflare, Turnstile, Givezy.");
+
   // Switches that stay off for launch
   // The daily job's check-in: optional, but without it nothing tells you the daily job stopped running.
   add("HEARTBEAT_DAILY_URL", env.HEARTBEAT_DAILY_URL?.startsWith("https://") ? "ok" : "later", env.HEARTBEAT_DAILY_URL?.startsWith("https://") ? "Set: the daily job checks in when it has run." : "Not set: nothing tells you if the daily job stops running. Add a heartbeat address from your monitoring service (docs/go-live-checklist.md).");

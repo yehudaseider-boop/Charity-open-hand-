@@ -11,6 +11,8 @@ import { looksLikeEmail, sentPageUrl, signInKeys } from "@/lib/sign-in";
 import { SIGN_IN_CODE } from "@/lib/sign-in-code";
 import { createClient } from "@/lib/supabase/server";
 import { linkDonorsToUser } from "@/lib/donors/link";
+import { verifyBotCheck } from "@/lib/bot-check";
+import { botCheckConfig } from "@/config/bot-check";
 
 const safeNext = (next: FormDataEntryValue | null) => safeNextPath(next);
 const guard = platformConfig.signInGuard;
@@ -42,10 +44,15 @@ export async function sendLoginLink(formData: FormData) {
   };
   if (email.length > 254 || !looksLikeEmail(email)) redirect(back("email"));
   const requestHeaders = await headers();
+  const ip = clientIp(requestHeaders);
+  // The bot check (23/11/2026), before anything is counted or sent: a bot without a token uses up nobody's limits.
+  // Fails closed: if Cloudflare can't be reached, no email is sent and the person is asked to try again in a minute.
+  const human = await verifyBotCheck({ token: formData.get(botCheckConfig.field), action: "sign-in", ip });
+  if (!human.ok) redirect(back(human.reason === "unreachable" ? "check-down" : "check"));
   // Counted per email on this connection, so a stranger asking for links to someone's email cannot stop that person
   // asking from their own phone; each email and each address also has a ceiling of its own (platformConfig.signInGuard).
   // If the check itself fails (a database hiccup), send them back with what they typed, not to an error page.
-  const keys = signInKeys(email, clientIp(requestHeaders));
+  const keys = signInKeys(email, ip);
   let limited: boolean;
   try {
     limited =

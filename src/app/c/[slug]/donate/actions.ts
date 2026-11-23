@@ -11,6 +11,9 @@ import { platformConfig } from "@/config/platform";
 import { SOURCE_PARAM } from "@/lib/donations/source";
 import { botCheck, PRESS_AGAIN_MESSAGE } from "@/lib/donations/giving-guard-rules";
 import { recordBlocked } from "@/lib/donations/giving-guard";
+import { verifyBotCheck } from "@/lib/bot-check";
+import { botCheckConfig } from "@/config/bot-check";
+import { botCheckRefusedMessage } from "@/lib/bot-check-words";
 
 export type CheckoutState = {
   ok: boolean;
@@ -49,6 +52,18 @@ export async function submitDonation(
     return { ok: false, message: PRESS_AGAIN_MESSAGE };
   }
 
+  // Cloudflare's bot check (23/11/2026), when it is on. A missing or refused token starts nothing; the browser has a
+  // fresh token ready for the next press. If Cloudflare can't be reached, the gift goes on (fails open, logged): a
+  // real donor is never turned away for that, and the limits, the checks above and the card checks still apply.
+  const h = await headers();
+  const ip = clientIp(h);
+  const human = await verifyBotCheck({ token: formData.get(botCheckConfig.field), action: "give", ip });
+  formData.delete(botCheckConfig.field);
+  if (!human.ok) {
+    await recordBlocked("bot");
+    return { ok: false, message: botCheckRefusedMessage("give", "Give", { contact: false }), failedToStart: true };
+  }
+
   // One agreement tick or two (platformConfig.checkout.singleAgreementTick): the same agreements are recorded either way.
   const single = platformConfig.checkout.singleAgreementTick;
   const raw = applyAgreementTick(formToObject(formData), single);
@@ -70,8 +85,6 @@ export async function submitDonation(
     return { ok: false, message: fixMessage(shown), fieldErrors: shown };
   }
 
-  const h = await headers();
-  const ip = clientIp(h);
   // Who is signed in, checked here on the server: the gift counts as theirs (and can later give "Use my ID ending
   // 1234") only when it is given with their own email. "Use my ID ending 1234" itself only when ticked.
   const viewer = await getViewer();

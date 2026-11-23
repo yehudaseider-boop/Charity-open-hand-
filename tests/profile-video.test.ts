@@ -144,11 +144,12 @@ describe("what is built from the stored site and id", () => {
 });
 
 describe("the Content-Security-Policy", () => {
-  it("lets frames load exactly the two video players: no wildcard, no scheme-wide rule, nothing else", async () => {
+  it("lets frames load exactly the two video players and Cloudflare's bot check: no wildcard, no scheme-wide rule, nothing else", async () => {
     const rules = await nextConfig.headers!();
     const csp = rules.flatMap((r) => r.headers).find((h) => h.key === "Content-Security-Policy")!.value;
     const directives = new Map(csp.split(";").map((d) => d.trim().split(/\s+/)).map(([name, ...values]) => [name, values]));
-    expect(directives.get("frame-src")).toEqual(["https://www.youtube-nocookie.com", "https://player.vimeo.com"]);
+    // The bot check's tick box is a frame from Cloudflare's own address (23/11/2026).
+    expect(directives.get("frame-src")).toEqual(["https://www.youtube-nocookie.com", "https://player.vimeo.com", "https://challenges.cloudflare.com"]);
     expect(csp.match(/frame-src/g)).toHaveLength(1);
     for (const v of directives.get("frame-src")!) expect(v).toMatch(/^https:\/\/[a-z0-9.-]+$/);
     // Our own pages still can't be framed by anyone, and nothing else got wider.

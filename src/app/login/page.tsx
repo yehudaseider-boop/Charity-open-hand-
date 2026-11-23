@@ -11,6 +11,8 @@ import { Illustration } from "@/components/illustration";
 import { Bubbles } from "@/components/marketing";
 import { sentProofMatches, signInMessage } from "@/lib/sign-in";
 import { ErrorMark } from "@/components/forms/fields";
+import { BotCheck } from "@/components/forms/bot-check";
+import { botCheckSiteKey } from "@/lib/bot-check";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -24,6 +26,8 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   // from the sign-in action): a link anyone makes with ?sent=1&email=… shows no address and no code box.
   const email = sent ? (sentProofMatches(typed, params.s) ? typed : "") : typed.slice(0, 200);
   const viewer = await getViewer();
+  // The bot check on asking for a sign-in email (23/11/2026): null while it is off.
+  const botKey = botCheckSiteKey();
 
   return (
     <div className="full-bleed relative overflow-x-clip pb-16">
@@ -98,6 +102,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             className="w-full rounded-control border-2 border-border bg-surface px-4 py-3 text-[17px] outline-none focus:border-brand focus:ring-4 focus:ring-brand-soft aria-invalid:border-danger"
           />
           {error ? <p id="email-error" role="alert" className="flex items-start gap-1.5 text-sm font-semibold text-danger"><ErrorMark /><span>{error}</span></p> : null}
+          {botKey ? <BotCheck siteKey={botKey} action="sign-in" kind="sign-in" button="Email me a sign-in code" guardForm /> : null}
           <PendingButton pendingLabel="Sending…" className="pressable w-full rounded-control bg-coral px-4 py-3.5 text-[17px] font-bold text-navy disabled:opacity-60">
             Email me a sign-in code
           </PendingButton>

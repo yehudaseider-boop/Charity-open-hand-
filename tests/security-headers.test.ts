@@ -27,6 +27,12 @@ describe("security headers", () => {
     expect(h.get("X-Content-Type-Options")).toBe("nosniff");
   });
 
+  it.each(["/", "/c/hillside-kitchen", "/charities"])("%s allows Cloudflare's bot check, for a move to Sign in or Give without a full load", async (path) => {
+    const csp = (await headersFor(path)).get("Content-Security-Policy");
+    expect(directive(csp, "script-src")).toContain("https://challenges.cloudflare.com");
+    expect(directive(csp, "frame-src")).toContain("https://challenges.cloudflare.com");
+  });
+
   it.each(["/app-preview", "/app-preview/", "/app-preview/index.html", "/app-preview/app/give/hillside"])("%s gets only the preview's headers", async (path) => {
     const h = await headersFor(path);
     expect(h.get("X-Frame-Options")).toBe("SAMEORIGIN");
