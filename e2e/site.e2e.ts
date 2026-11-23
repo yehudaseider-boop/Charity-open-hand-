@@ -20,7 +20,10 @@ afterAll(async () => {
 });
 
 async function open(path: string) {
-  const res = await page.goto(`${SITE}${path}`, { waitUntil: "networkidle" });
+  // The bot check (Cloudflare Turnstile, on /login and the give form since 23/11/2026) keeps talking to Cloudflare, so
+  // those pages never go quiet: wait for the page to load, then give the rest a few seconds to settle.
+  const res = await page.goto(`${SITE}${path}`, { waitUntil: "load" });
+  await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
   return { status: res?.status() ?? 0, text: await page.locator("body").innerText() };
 }
 
