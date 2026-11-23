@@ -58,7 +58,21 @@ export function retryTime(now: Date, failedAttempts: number): Date | null {
  * so a job that runs twice (or crashes half-way) can never create two charges for one attempt.
  */
 export function attemptDonationId(recurringId: string, period: Period, attempt: number): string {
-  const h = createHash("sha256").update(`monthly:${recurringId}:${period}:${attempt}`).digest("hex");
+  return hashedUuid(`monthly:${recurringId}:${period}:${attempt}`);
+}
+
+/**
+ * A saved-card gift's donation id, made on the server from the signed-in account and the app's attempt id (review
+ * 23/11/2026). The app never chooses a donation id itself, so it can't take one a monthly collection will use (those
+ * start "monthly:", these "saved-card:"), and the same account asking again with the same attempt id gets the same gift.
+ */
+export function savedCardDonationId(userId: string, attemptId: string): string {
+  return hashedUuid(`saved-card:${userId}:${attemptId.toLowerCase()}`);
+}
+
+/** The same text always gives the same UUID-shaped id. */
+function hashedUuid(text: string): string {
+  const h = createHash("sha256").update(text).digest("hex");
   // Shape as a version-4 UUID (the rest of the system expects UUID references).
   const variant = ((parseInt(h[16], 16) & 0x3) | 0x8).toString(16);
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-${variant}${h.slice(17, 20)}-${h.slice(20, 32)}`;

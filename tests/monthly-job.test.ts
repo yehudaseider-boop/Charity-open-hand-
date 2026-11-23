@@ -38,13 +38,16 @@ let stopsAtCharge = false;
 /** Amounts saved on an existing attempt (the store's record of it), by donation id. */
 const savedAmounts = new Map<string, { amountCents: number; contributionCents: number; cardChargeCents: number; totalCents: number }>();
 const dropped: string[] = [];
+/** The monthly donation a donation row belongs to, when not rec1 (null: a once-off gift), by donation id. */
+const owners = new Map<string, string | null>();
 const audits: { action: string; id: string; details: Record<string, unknown> }[] = [];
 
 function deps(now: Date = NOW): MonthlyDeps {
   const store: MonthlyStore = {
     due: async () => ({ rows: world.due, unreadable: world.unreadable }),
     claim: async (id) => (world.claimed.has(id) ? false : (world.claimed.add(id), true)),
-    attemptStatus: async (id) => (world.attempts.has(id) ? { status: world.attempts.get(id)!, createdAt: world.born, saved: savedAmounts.get(id) } : null),
+    attemptStatus: async (id) =>
+      world.attempts.has(id) ? { status: world.attempts.get(id)!, createdAt: world.born, recurringId: owners.has(id) ? owners.get(id)! : "rec1", saved: savedAmounts.get(id) } : null,
     dropUnsent: async (id) => {
       dropped.push(id);
       if (world.attempts.get(id) === "pending") world.attempts.delete(id);
@@ -91,6 +94,7 @@ beforeEach(() => {
   chargeRejected = false;
   stopsAtCharge = false;
   savedAmounts.clear();
+  owners.clear();
   dropped.length = 0;
   audits.length = 0;
   closeAsked.length = 0;
@@ -374,6 +378,87 @@ describe("the end of the month", () => {
     world.due = [row({ lastPaidPeriod: "2026-07", attemptPeriod: "2026-08", failedAttempts: 1, nextChargeAt: new Date("2026-08-16T06:00:00Z") })];
     await runMonthlyCharges(deps());
     expect(charges).toEqual([{ reference: attemptDonationId("rec1", "2026-11", 0), total: 20_000 }]);
+  });
+});
+
+describe("a retry held back for weeks (review 23/11/2026)", () => {
+  // Charge day 15: the 15/10 try was declined, the retry was due 16/10, and the charity stopped taking donations until 14/11.
+  const heldRetry = (o: Partial<DueMonthly> = {}) =>
+    row({ lastPaidPeriod: "2026-09", attemptPeriod: "2026-10", failedAttempts: 1, nextChargeAt: new Date("2026-10-16T06:00:00Z"), ...o });
+
+  it("before this month's charge day, never charges the skipped month: waits for the day", async () => {
+    world.due = [heldRetry()];
+    const s = await runMonthlyCharges(deps(new Date("2026-11-14T06:30:00Z")));
+    expect(charges).toEqual([]);
+    expect(world.rescheduled).toEqual([{ id: "rec1", next: chargeTime("2026-11", 15).toISOString() }]);
+    expect(s.waiting[0].reason).toMatch(/after a pause/);
+  });
+
+  it("on the charge day, collects this month as its first try, with no failed tries carried over", async () => {
+    confirmWith = () => "failed";
+    // As the waiting run above left it: next collection moved to 15/11, the October retry state still on the row.
+    world.due = [heldRetry({ nextChargeAt: chargeTime("2026-11", 15) })];
+    await runMonthlyCharges(deps());
+    expect(charges).toEqual([{ reference: attemptDonationId("rec1", "2026-11", 0), total: 20_000 }]);
+    expect(world.failures).toEqual([{ id: "rec1", period: "2026-11", n: 1, retryAt: "2026-11-16T06:00:00.000Z" }]);
+  });
+
+  it("held past this month's charge day: collects this month once, never October as well", async () => {
+    world.due = [heldRetry()];
+    await runMonthlyCharges(deps(new Date("2026-11-20T06:30:00Z")));
+    expect(charges).toEqual([{ reference: attemptDonationId("rec1", "2026-11", 0), total: 20_000 }]);
+    expect(world.paid[0]).toMatchObject({ period: "2026-11", next: chargeTime("2026-12", 15).toISOString() });
+  });
+
+  it("a retry on time still collects the month it is for", async () => {
+    world.due = [heldRetry()];
+    await runMonthlyCharges(deps(new Date("2026-10-16T06:30:00Z")));
+    expect(charges).toEqual([{ reference: attemptDonationId("rec1", "2026-10", 1), total: 20_000 }]);
+    expect(world.paid[0]).toMatchObject({ period: "2026-10" });
+  });
+
+  it("a retry a day or two late (within the grace) still collects the month it is for", async () => {
+    world.due = [heldRetry()];
+    await runMonthlyCharges(deps(new Date("2026-10-18T06:30:00Z")));
+    expect(charges).toEqual([{ reference: attemptDonationId("rec1", "2026-10", 1), total: 20_000 }]);
+  });
+
+  it("held back within its own month, it stays this month's retry (earlier tries still count)", async () => {
+    confirmWith = () => "failed";
+    world.due = [row({ chargeDay: 1, lastPaidPeriod: "2026-10", attemptPeriod: "2026-11", failedAttempts: 1, nextChargeAt: new Date("2026-11-02T06:00:00Z") })];
+    await runMonthlyCharges(deps());
+    expect(charges).toEqual([{ reference: attemptDonationId("rec1", "2026-11", 1), total: 20_000 }]);
+    expect(world.failures[0]).toMatchObject({ period: "2026-11", n: 2 });
+  });
+});
+
+describe("a collection id already used by another gift (review 23/11/2026)", () => {
+  it("this month's try: never charged, asked about or counted as paid; reported for a person", async () => {
+    const id = attemptDonationId("rec1", "2026-11", 0);
+    world.attempts.set(id, "paid");
+    owners.set(id, null); // someone's once-off gift
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const s = await runMonthlyCharges(deps());
+    expect(charges).toEqual([]);
+    expect(closeAsked).toEqual([]);
+    expect(world.paid).toEqual([]);
+    expect(world.failures).toEqual([]);
+    expect(s).toMatchObject({ paid: 0, failed: 0 });
+    expect(s.errors[0]).toMatchObject({ id: "rec1", message: expect.stringMatching(/already used by another gift, so nothing was charged/) });
+  });
+
+  it("an earlier try's id: never taken as this month paid or declined", async () => {
+    const earlier = attemptDonationId("rec1", "2026-11", 0);
+    world.attempts.set(earlier, "paid");
+    owners.set(earlier, "rec-other");
+    world.due = [row({ attemptPeriod: "2026-11", failedAttempts: 1 })];
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const asked: string[] = [];
+    confirmWith = (ref) => (asked.push(ref), "paid");
+    await runMonthlyCharges(deps());
+    expect(asked).not.toContain(earlier);
+    // The retry itself goes ahead as normal under its own id.
+    expect(charges).toEqual([{ reference: attemptDonationId("rec1", "2026-11", 1), total: 20_000 }]);
   });
 });
 

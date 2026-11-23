@@ -38,9 +38,10 @@ export interface MonthlyStore {
   claim(id: string, now: Date): Promise<boolean>;
   /**
    * A collection attempt's donation: its status, when it was created and the amounts saved on it when it was made
-   * (sent again with those, never today's figures), or null if it does not exist yet.
+   * (sent again with those, never today's figures), or null if it does not exist yet. `recurringId` is the monthly
+   * donation the row belongs to (null for a once-off gift): a row of another one under this id is an id clash.
    */
-  attemptStatus(donationId: string): Promise<{ status: string; createdAt: Date; saved?: { amountCents: number; contributionCents: number; cardChargeCents: number; totalCents: number } } | null>;
+  attemptStatus(donationId: string): Promise<{ status: string; createdAt: Date; recurringId: string | null; saved?: { amountCents: number; contributionCents: number; cardChargeCents: number; totalCents: number } } | null>;
   /** Is the monthly donation still active (not cancelled, paused or erased since it was read)? Checked just before a charge. */
   stillActive(id: string): Promise<boolean>;
   /** Create the (pending) donation for one attempt, copying the donor's details from their first donation. */
@@ -134,16 +135,30 @@ export function isRetry(r: Pick<DueMonthly, "attemptPeriod" | "lastPaidPeriod" |
 }
 
 /**
- * The month a due row is collecting for. A retry belongs to the month of the failed attempt, and a
+ * A retry that still belongs to the month of its failed attempt: due no more than a few days ago (the same grace as a
+ * first try) and before the next month's charge day. A retry held back longer (the charity not taking donations,
+ * giving paused, the job not running) is instead the current month's first try: it waits for this month's charge day,
+ * and the old month's failed tries are not carried over. (Code review 23/11/2026: a retry due 16/10 and held back to
+ * 14/11 charged October on 14/11 and November the next day.)
+ */
+export function isOnTimeRetry(r: Pick<DueMonthly, "attemptPeriod" | "lastPaidPeriod" | "failedAttempts" | "nextChargeAt" | "chargeDay">, now: Date): boolean {
+  if (!isRetry(r)) return false;
+  if (now.getTime() - r.nextChargeAt.getTime() > LATE_RUN_GRACE_MS) return false;
+  // Rescheduled to a later month's charge day (waiting after a hold): that month's first try, not the old retry.
+  return r.nextChargeAt.getTime() < chargeTime(addMonths(r.attemptPeriod!, 1), r.chargeDay).getTime();
+}
+
+/**
+ * The month a due row is collecting for. An on-time retry belongs to the month of the failed attempt, and a
  * first attempt to the month of its charge day, even when the run happens after midnight on the 1st.
- * Never more than one month back, and a first try only when the run is a few days late at most: a
- * donation that waited longer (a pause, the job not running) is collected for the current month, so a
+ * Never more than one month back, and only when the run is a few days late at most: a donation that
+ * waited longer (a pause, the job not running, a retry held back) is collected for the current month, so a
  * skipped month is never charged late. (Code review 20/11/2026: after a pause from 10/10 to 20/11 the
  * job charged October on 20/11 and November the next day.)
  */
-export function collectingPeriod(r: Pick<DueMonthly, "attemptPeriod" | "lastPaidPeriod" | "failedAttempts" | "nextChargeAt">, now: Date): Period {
+export function collectingPeriod(r: Pick<DueMonthly, "attemptPeriod" | "lastPaidPeriod" | "failedAttempts" | "nextChargeAt" | "chargeDay">, now: Date): Period {
   const current = periodOf(now);
-  if (isRetry(r)) {
+  if (isOnTimeRetry(r, now)) {
     const p = r.attemptPeriod!;
     return p >= addMonths(current, -1) && p <= current ? p : current;
   }
@@ -168,6 +183,12 @@ async function earlierAttemptsOutcome(
     const earlierId = attemptDonationId(id, period, n);
     const saved = await deps.store.attemptStatus(earlierId);
     if (saved === null) continue;
+    // Another gift under this id (an id clash): our attempt was never made under it, so it charged nothing. Never
+    // asked about at the provider, and never counted as paid or turned down (review 23/11/2026).
+    if (saved.recurringId !== id) {
+      console.error(`[monthly] ${earlierId} belongs to another gift, not monthly donation ${id}: left alone`);
+      continue;
+    }
     if (saved.status === "paid") return { kind: "paid" };
     let outcome: CollectionOutcome;
     try {
@@ -211,7 +232,7 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
       }
       // Back after a pause before this month's charge day: wait for the day, never charge early.
       const due = chargeTime(period, r.chargeDay);
-      if (!isRetry(r) && due.getTime() > now.getTime()) {
+      if (!isOnTimeRetry(r, now) && due.getTime() > now.getTime()) {
         await store.reschedule(r.id, due);
         summary.waiting.push({ id: r.id, reason: "back after a pause: collected on this month's charge day" });
         continue;
@@ -233,6 +254,12 @@ export async function runMonthlyCharges(deps: MonthlyDeps): Promise<MonthlySumma
       const attempt = r.attemptPeriod === period ? r.failedAttempts : 0;
       const donationId = attemptDonationId(r.id, period, attempt);
       const existing = await store.attemptStatus(donationId);
+      // Another gift holds this attempt's id (an id clash): it is not ours, so it is never charged, asked about at the
+      // provider, or counted as paid or declined. Reported for a person (review 23/11/2026).
+      if (existing !== null && existing.recurringId !== r.id) {
+        console.error(`[monthly] ${donationId} belongs to another gift, not monthly donation ${r.id}: nothing charged`);
+        throw new Error(`The collection id ${donationId} is already used by another gift, so nothing was charged. A person needs to look at it.`);
+      }
       // An attempt made on an earlier run is sent (again) with the amounts saved on it, never today's: a fee change
       // since must not charge a total that doesn't match its record (review 20/11/2026).
       const saved = existing?.saved;

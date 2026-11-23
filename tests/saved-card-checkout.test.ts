@@ -23,10 +23,16 @@ const requests: { donationId: string; userId: string }[] = [];
 let prior: Record<string, unknown> | null = null;
 /** Audit rows the earlier attempt left (why it failed). */
 let auditRows: { id: string }[] = [];
+/** Donation ids looked up by id (the earlier-attempt check). */
+const idLookups: string[] = [];
 
 function builder(table: string) {
   const b: Record<string, unknown> = {};
-  for (const m of ["select", "eq", "is", "limit", "lt", "gte", "in"]) b[m] = () => b;
+  for (const m of ["select", "is", "limit", "lt", "gte", "in"]) b[m] = () => b;
+  b.eq = (column: string, value: unknown) => {
+    if (table === "donations" && column === "id") idLookups.push(String(value));
+    return b;
+  };
   b.insert = (row: Record<string, unknown>) => (ops.push({ table, op: "insert", row }), b);
   b.update = (row: Record<string, unknown>) => (ops.push({ table, op: "update", row }), b);
   b.upsert = (row: Record<string, unknown>) => (ops.push({ table, op: "upsert", row }), b);
@@ -49,7 +55,13 @@ vi.mock("@/lib/rate-limit", () => ({
   ipKeys: (ip: string) => [`ip:${ip}`],
   hashedKey: (kind: string, value: string) => `${kind}#${value}`,
 }));
-vi.mock("@/lib/donors/link", () => ({ linkDonorsToUser: async () => {}, linkDonorsForSession: async () => 0 }));
+/** Gifts counted as a declined card (card-testing protection). */
+const declinesCounted: string[] = [];
+vi.mock("@/lib/donations/giving-guard", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/donations/giving-guard")>()),
+  recordDecline: async (donationId: string) => void declinesCounted.push(donationId),
+}));
+vi.mock("@/lib/donors/link",() => ({ linkDonorsToUser: async () => {}, linkDonorsForSession: async () => 0 }));
 let signedIn: { userId: string; email: string } | null = null;
 vi.mock("@/lib/app-auth", () => ({ appAccount: async () => signedIn }));
 vi.mock("@/lib/donations/saved-id", () => ({ savedIdNumber: async () => "8001015009087", savedIdLast4: async () => "9087" }));
@@ -91,6 +103,7 @@ vi.mock("@/lib/gateway", () => ({
 }));
 
 const { POST } = await import("@/app/api/app/checkout/route");
+const { attemptDonationId, savedCardDonationId } = await import("@/lib/donations/schedule");
 
 const details = { donor_type: "individual", email: "a@example.com", first_name: "Dana", last_name: "Levi", age_confirmed: true, popia_consent: true };
 const gift = { slug: "meals", giftCents: 10_000, contributionCents: 0, shownTotalCents: 10_000 };
@@ -108,6 +121,8 @@ beforeEach(() => {
   canSaveCards = true;
   prior = null;
   auditRows = [];
+  idLookups.length = 0;
+  declinesCounted.length = 0;
   limitsUsedUp = false;
   providerHas = "yes";
   verified.length = 0;
@@ -236,10 +251,13 @@ describe("paying with the saved card", () => {
 
   it("a card the provider declines ends the gift as failed, and says to use another card", async () => {
     chargeResult = async () => ({ status: "failed" });
-    const res = await call({ ...gift, useSavedCard: true, attemptId: crypto.randomUUID(), details });
+    const attemptId = crypto.randomUUID();
+    const res = await call({ ...gift, useSavedCard: true, attemptId, details });
     expect(res.status).toBe(409);
     expect((await res.json()).message).toMatch(/declined/);
     expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(true);
+    // Counted against the card-testing limits, like a card declined on the payment page (review 23/11/2026).
+    expect(declinesCounted).toEqual([savedCardDonationId("u1", attemptId)]);
   });
 
   it("a refusal that names the card (declined, expired) ends the gift as declined", async () => {
@@ -255,6 +273,7 @@ describe("paying with the saved card", () => {
     expect(body.message).toMatch(/declined/);
     expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(true);
     expect(ops.some((o) => o.table === "audit_log")).toBe(false);
+    expect(declinesCounted).toHaveLength(1);
   });
 
   it("any other refusal charged nothing and ends the gift, but never says the card was declined, and tells a person", async () => {
@@ -272,6 +291,8 @@ describe("paying with the saved card", () => {
     expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(true);
     const noted = ops.find((o) => o.table === "audit_log" && o.op === "insert");
     expect(noted?.row).toMatchObject({ action: "donation.saved_card_refused", details: { said: "Invalid split configuration" } });
+    // Not the card: never counted as a declined card.
+    expect(declinesCounted).toEqual([]);
   });
 
   it("a timeout or outage leaves the gift pending, because the charge may have gone through", async () => {
@@ -288,10 +309,31 @@ describe("paying with the saved card", () => {
 
 describe("asking twice about the same saved-card gift", () => {
   const attemptId = "6f1c2c1e-0d2a-4c4b-9a59-2b8d6d7c1a11";
-  it("uses the app's attempt id as the donation's reference", async () => {
+  /** The donation id the server makes from the signed-in account (u1) and the app's attempt id. */
+  const donationId = savedCardDonationId("u1", attemptId);
+  it("makes the donation's id from the account and the app's attempt id, never the app's id as it is (review 23/11/2026)", async () => {
     const res = await call({ ...gift, useSavedCard: true, attemptId, details });
-    expect(await res.json()).toMatchObject({ ok: true, charged: true, reference: attemptId });
-    expect(charges[0]).toMatchObject({ reference: attemptId });
+    expect(await res.json()).toMatchObject({ ok: true, charged: true, reference: donationId });
+    expect(donationId).not.toBe(attemptId);
+    expect(charges[0]).toMatchObject({ reference: donationId });
+    expect(ops.find((o) => o.table === "donations" && o.op === "insert")?.row).toMatchObject({ id: donationId });
+    // The earlier-attempt lookup asks for the server's id, so an app's id can never reach another gift's row.
+    expect(idLookups).toContain(donationId);
+    expect(idLookups).not.toContain(attemptId);
+  });
+
+  it("the same attempt id from another account is another gift; from the same account, the same gift", async () => {
+    expect(savedCardDonationId("u2", attemptId)).not.toBe(donationId);
+    expect(savedCardDonationId("u1", attemptId.toUpperCase())).toBe(donationId);
+  });
+
+  it("an app that sends a monthly collection's id as its attempt id never gets that id (review 23/11/2026)", async () => {
+    const monthlyId = attemptDonationId("rec-of-someone-else", "2026-12", 0);
+    const res = await call({ ...gift, useSavedCard: true, attemptId: monthlyId, details });
+    const body = await res.json();
+    expect(body.reference).not.toBe(monthlyId);
+    expect(idLookups).not.toContain(monthlyId);
+    expect(ops.some((o) => o.table === "donations" && o.op === "insert" && o.row?.id === monthlyId)).toBe(false);
   });
 
   const longAgo = new Date(Date.now() - 10 * 60_000).toISOString();
@@ -302,7 +344,7 @@ describe("asking twice about the same saved-card gift", () => {
     limitsUsedUp = true;
     const res = await call({ ...gift, useSavedCard: true, attemptId, details });
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ ok: true, charged: true, reference: attemptId });
+    expect(await res.json()).toMatchObject({ ok: true, charged: true, reference: donationId });
     expect(charges).toHaveLength(0);
   });
 
@@ -318,8 +360,8 @@ describe("asking twice about the same saved-card gift", () => {
   it("never charges again: the first answer comes back once the provider has the charge", async () => {
     prior = pendingPrior();
     const res = await call({ ...gift, useSavedCard: true, attemptId, details });
-    expect(await res.json()).toMatchObject({ ok: true, charged: true, reference: attemptId, token: "tok2" });
-    expect(verified).toEqual([attemptId]);
+    expect(await res.json()).toMatchObject({ ok: true, charged: true, reference: donationId, token: "tok2" });
+    expect(verified).toEqual([donationId]);
     expect(charges).toHaveLength(0);
     expect(ops.filter((o) => o.op === "insert")).toHaveLength(0);
   });
@@ -328,9 +370,9 @@ describe("asking twice about the same saved-card gift", () => {
     prior = pendingPrior();
     providerHas = "no";
     const res = await call({ ...gift, useSavedCard: true, attemptId, details: { ...details, giving_label: "Work giving" } });
-    expect(await res.json()).toMatchObject({ ok: true, charged: true, reference: attemptId, token: "tok2" });
+    expect(await res.json()).toMatchObject({ ok: true, charged: true, reference: donationId, token: "tok2" });
     expect(charges).toHaveLength(1);
-    expect(charges[0]).toMatchObject({ reference: attemptId, totalCents: 10_000, authorizationCode: "AUTH_SECRET" });
+    expect(charges[0]).toMatchObject({ reference: donationId, totalCents: 10_000, authorizationCode: "AUTH_SECRET" });
     // The donation and its details are already there: only the consent is added (the label is upserted).
     expect(ops.filter((o) => o.op === "insert").map((o) => o.table)).toEqual(["consents"]);
     expect(ops.filter((o) => o.op === "upsert").map((o) => [o.table, o.row?.label])).toEqual([["donation_giving_kinds", "Work giving"]]);
@@ -370,7 +412,7 @@ describe("asking twice about the same saved-card gift", () => {
       throw new Error("duplicate reference");
     };
     const res = await call({ ...gift, useSavedCard: true, attemptId, details });
-    expect(await res.json()).toMatchObject({ ok: true, charged: true, reference: attemptId });
+    expect(await res.json()).toMatchObject({ ok: true, charged: true, reference: donationId });
     expect(asked).toBe(1);
     expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(false);
   });
@@ -382,6 +424,7 @@ describe("asking twice about the same saved-card gift", () => {
     expect(await res.json()).toMatchObject({ ok: false, savedCardDeclined: true });
     expect(charges).toHaveLength(0);
     expect(ops.some((o) => o.table === "donations" && o.op === "update" && o.row?.status === "failed")).toBe(true);
+    expect(declinesCounted).toEqual([donationId]);
   });
 
   it("a first try that was paid and then refunded is never answered as a declined card (review 20/11/2026)", async () => {
@@ -422,13 +465,15 @@ describe("asking twice about the same saved-card gift", () => {
     };
     const res = await call({ ...gift, useSavedCard: true, attemptId, details });
     expect(await res.json()).toMatchObject({ ok: false, savedCardDeclined: true });
+    expect(declinesCounted).toEqual([donationId]);
   });
 
-  it("a declined first try stays declined", async () => {
+  it("a declined first try stays declined, and is not counted a second time", async () => {
     prior = { status: "failed", charity_id: "c1", total_charged_cents: 10_000, created_at: longAgo, donation_checkout_details: { email: "a@example.com", started_by_user: "u1" } };
     const res = await call({ ...gift, useSavedCard: true, attemptId, details });
     expect(await res.json()).toMatchObject({ ok: false, savedCardDeclined: true });
     expect(charges).toHaveLength(0);
+    expect(declinesCounted).toEqual([]);
   });
 
   it("an earlier try that failed for a reason other than the card is never answered as declined (review 18/11/2026)", async () => {
