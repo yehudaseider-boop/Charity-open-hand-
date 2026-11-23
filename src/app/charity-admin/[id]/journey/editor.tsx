@@ -203,8 +203,9 @@ export function JourneyEditor({
                 </div>
 
                 {/* The email. */}
-                <fieldset className="relative min-w-0 space-y-3 rounded-card border-2 border-border bg-surface p-4" onFocus={() => setShowing(i)}>
-                  <span aria-hidden="true" className="absolute -left-[2.2rem] top-4 size-4 rounded-full border-2 border-surface bg-coral" />
+                <div className="relative">
+                <span aria-hidden="true" className="absolute -left-[1.95rem] top-1 size-4 rounded-full border-2 border-surface bg-coral" />
+                <fieldset className="min-w-0 space-y-3 rounded-card border-2 border-border bg-surface p-4" onFocus={() => setShowing(i)}>
                   <legend className="px-1 font-display text-base font-bold text-indigo">
                     Send email {i + 1}
                     {days[i] !== null ? <span className="ml-2 font-sans text-sm font-normal text-muted">around day {days[i]}</span> : null}
@@ -277,6 +278,7 @@ export function JourneyEditor({
                   {d.before ? <p className="text-xs text-muted">Our example is in. Change it so it sounds like you, or undo it.</p> : null}
                   {canRemoveStep(i, drafts.length, onIt) ? null : <p className="text-xs text-muted">{middleStepWords(onIt)}</p>}
                 </fieldset>
+                </div>
               </li>
             );
           })}
@@ -290,7 +292,7 @@ export function JourneyEditor({
                 <>
                   <p className="text-muted">
                     {drafts.length === 0
-                      ? "Most charities start with a thank-you a day or two after someone gives."
+                      ? "A thank-you a day or two after someone gives is a good place to start."
                       : "Another email a few weeks later keeps them close: some news, a moment from your work, a way to help. Or stop here."}
                   </p>
                   <button type="button" onClick={add} className="pressable inline-flex min-h-11 items-center rounded-control bg-brand px-4 text-sm font-semibold text-brand-contrast">

@@ -247,8 +247,8 @@ export function journeyStartWords(kind: JourneyKind, campaignTitle?: string | nu
 /** The grey hints in an empty email: what the first email is usually for, and what later ones can be. */
 export function stepHints(position: number): { subject: string; body: string } {
   return position === 0
-    ? { subject: "For example: Thank you for your gift", body: "Say thank you in your own words: what their gift helps you do, and that you're glad to have them with you." }
-    : { subject: "For example: A little news from us", body: "Share some news, a moment from your work, or a way they can get involved. Write it the way you'd say it." };
+    ? { subject: "Thank you for your gift", body: "Say thank you in your own words: what their gift helps you do, and that you're glad to have them with you." }
+    : { subject: "A little news from us", body: "Share some news, a moment from your work, or a way they can get involved. Write it the way you'd say it." };
 }
 
 /** Our sample wording for an email in this place, or null when there is none for it (the button isn't shown then). */
