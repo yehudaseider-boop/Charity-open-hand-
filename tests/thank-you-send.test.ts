@@ -1,6 +1,6 @@
 /** Sending a charity's thank-you: once per address, never to erased or opted-out donors, once per month, and finishable. */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { emailHash } from "@/lib/charity/thank-you";
+import { emailHash } from "@/lib/email-fingerprint";
 
 vi.mock("server-only", () => ({}));
 const sent: { to: string; text: string; headers?: Record<string, string>; signal?: AbortSignal }[] = [];
@@ -14,10 +14,10 @@ const neqs: string[] = [];
 const tokens: Record<string, string>[] = [];
 /** Donors who already had a message from the charity this week, and what the check was asked. */
 let messaged = new Set<string>();
-const weekChecks: { donors: { donorId: string; hash: string }[]; except: unknown }[] = [];
+const weekChecks: { donors: { donorId: string; email: string }[]; except: unknown }[] = [];
 vi.mock("@/lib/charity/weekly-limit", () => ({
   WEEKLY_LIMIT: "Givezy sends each donor at most one message a week from your charity.",
-  messagedThisWeek: async (_c: string, donors: { donorId: string; hash: string }[], _now: Date, except: unknown) => (weekChecks.push({ donors, except }), new Set(donors.map((d) => d.donorId).filter((id) => messaged.has(id)))),
+  messagedThisWeek: async (_c: string, donors: { donorId: string; email: string }[], _now: Date, except: unknown) => (weekChecks.push({ donors, except }), new Set(donors.map((d) => d.donorId).filter((id) => messaged.has(id)))),
 }));
 vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
 /** Addresses whose send throws as a dropped connection would. */
@@ -213,7 +213,7 @@ describe("sending a thank-you", () => {
     expect(sent.map((m) => m.to)).toEqual(["david@x.co"]);
     // This thank-you's own claims never count against it.
     expect(weekChecks[0].except).toEqual({ thankYouId: "t1" });
-    expect(weekChecks[0].donors).toEqual([{ donorId: "d-sarah@x.co", hash: emailHash("sarah@x.co") }, { donorId: "d-david@x.co", hash: emailHash("david@x.co") }]);
+    expect(weekChecks[0].donors).toEqual([{ donorId: "d-sarah@x.co", email: "sarah@x.co" }, { donorId: "d-david@x.co", email: "david@x.co" }]);
   });
 
   it("those left out don't use up the month: it stays unfinished, and Send the rest reaches them once their week has passed", async () => {

@@ -58,23 +58,6 @@ export function newsKey(slugs: string[], max = NEWS_MAX_CHARITIES): string {
   return slugs.slice(0, max).join(",");
 }
 
-/**
- * The charities the donor asked for "No news or appeals from this charity", as `my_news_opt_outs()` returns them:
- * a plain list of ids, or rows of `{ my_news_opt_outs: id }`. Anything else is null, which means "not known", so
- * no news is shown at all rather than risk news from a charity they said no to.
- */
-export function optOutIds(data: unknown): Set<string> | null {
-  if (data === null || data === undefined) return new Set();
-  if (!Array.isArray(data)) return null;
-  const out = new Set<string>();
-  for (const v of data) {
-    const id = typeof v === "string" ? v : v && typeof v === "object" ? (v as Record<string, unknown>).my_news_opt_outs : undefined;
-    if (typeof id !== "string") return null;
-    out.add(id);
-  }
-  return out;
-}
-
 /** "Today", "Yesterday", or the Johannesburg date. */
 export function postedWhen(posted: Date, today: Date): string {
   const day = jhbDay(posted);

@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isErasedEmail } from "./dashboard";
-import { emailHash } from "./thank-you";
+import { emailHashesToMatch } from "@/lib/email-fingerprint";
 import type { StoryRows } from "./donor-story";
 
 /** Until a migration has run on a project there is no such table: that part of the story is simply empty. */
@@ -81,17 +81,20 @@ export async function loadDonorStory(charityId: string, donorId: string, notes: 
   // The monthly thank-you goes by address (kept only as a hash): this donor's own address and the addresses on their
   // gifts to this charity that went through. A failed or abandoned checkout may carry a mistyped or someone else's
   // address, so it never counts.
-  const hashes = new Set<string>();
+  const addresses = new Map<string, string>();
+  const add = (email: string) => addresses.set(email.trim().toLowerCase(), email);
   const own = (donorRow.data as { email?: string | null } | null)?.email;
-  if (own && !isErasedEmail(own)) hashes.add(emailHash(own));
+  if (own && !isErasedEmail(own)) add(own);
   for (const d of rows) {
     if (!COUNTED.includes(d.status)) continue;
     const raw = d.donation_checkout_details;
     const c = (Array.isArray(raw) ? raw[0] : raw) as { email: string | null; erased_at: string | null } | null;
-    if (c?.email && !c.erased_at && !isErasedEmail(c.email)) hashes.add(emailHash(c.email));
+    if (c?.email && !c.erased_at && !isErasedEmail(c.email)) add(c.email);
   }
+  // Looked up keyed and, until every row is converted, by the plain hash (24/11/2026): 50 addresses, 100 values.
+  const hashes = emailHashesToMatch([...addresses.values()].slice(0, 50));
   let monthThanks: StoryRows["monthThanks"] = [];
-  if (hashes.size) {
+  if (hashes.length) {
     const { data: months, error } = await db.from("charity_thank_yous").select("id, period_month").eq("charity_id", charityId).order("sent_at", { ascending: false }).limit(120);
     if (error) throw error;
     const byId = new Map((months ?? []).map((m) => [m.id as string, m.period_month as string]));
@@ -100,7 +103,7 @@ export async function loadDonorStory(charityId: string, donorId: string, notes: 
         .from("charity_thank_you_recipients")
         .select("thank_you_id, status, claimed_at")
         .in("thank_you_id", [...byId.keys()])
-        .in("email_hash", [...hashes].slice(0, 50))
+        .in("email_hash", hashes)
         .limit(LIMIT);
       if (e) throw e;
       // One donor with two addresses can be on the same month twice: show it once, the best outcome first.

@@ -20,5 +20,8 @@ export default defineConfig({
     globalSetup: ["tests/global-setup.ts"],
     // Database tests share the local Supabase and must not run in parallel.
     fileParallelism: false,
+    // Email fingerprints are keyed with a key derived from ENCRYPTION_KEY (24/11/2026), so every test that sends or
+    // checks an email needs one. Any 32 bytes will do; a test about a missing key stubs it empty itself.
+    env: { ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64") },
   },
 });

@@ -2,7 +2,8 @@
 import { describe, expect, it } from "vitest";
 import type { Gift, Recurring } from "../apps/mobile/src/data/giving";
 import type { CharityUpdate } from "../apps/mobile/src/data/sample";
-import { charitiesGivenTo, newsFeed, newsKey, optOutIds, postedWhen, relationLine, NEWS_LIMIT, NEWS_MAX_CHARITIES } from "../apps/mobile/src/lib/charity-news";
+import { charitiesGivenTo, newsFeed, newsKey, postedWhen, relationLine, NEWS_LIMIT, NEWS_MAX_CHARITIES } from "../apps/mobile/src/lib/charity-news";
+import { requestNewsOptOuts } from "../apps/mobile/src/lib/pay-api";
 
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day);
 const today = d(2026, 11, 8);
@@ -73,17 +74,22 @@ describe("which charities' news is asked for", () => {
 });
 
 describe("No news or appeals from this charity", () => {
-  it("reads the opted-out charities as a plain list or as rows", () => {
-    expect(optOutIds(["c1", "c2"])).toEqual(new Set(["c1", "c2"]));
-    expect(optOutIds([{ my_news_opt_outs: "c1" }, { my_news_opt_outs: "c2" }])).toEqual(new Set(["c1", "c2"]));
-    expect(optOutIds([])).toEqual(new Set());
-    expect(optOutIds(null)).toEqual(new Set());
+  // Asked of our server since 24/11/2026 (opt-outs are keyed fingerprints the database can't work out).
+  const reply = (json: unknown) => async (url: string, _body: unknown, token?: string | null) => {
+    expect(url).toBe("https://givezy.test/api/app/news-opt-outs");
+    expect(token).toBe("tok");
+    return { status: 200, json };
+  };
+
+  it("reads the opted-out charities from our server", async () => {
+    expect(await requestNewsOptOuts("https://givezy.test", "tok", reply({ ok: true, charityIds: ["c1", "c2"] }))).toEqual(new Set(["c1", "c2"]));
+    expect(await requestNewsOptOuts("https://givezy.test", "tok", reply({ ok: true, charityIds: [] }))).toEqual(new Set());
   });
 
-  it("treats anything odd as not known, so no news shows rather than news they said no to", () => {
-    expect(optOutIds({ my_news_opt_outs: "c1" })).toBeNull();
-    expect(optOutIds([{ other: "c1" }])).toBeNull();
-    expect(optOutIds([1, 2])).toBeNull();
-    expect(optOutIds("c1")).toBeNull();
+  it("treats anything odd, an error or no connection as not known, so no news shows rather than news they said no to", async () => {
+    expect(await requestNewsOptOuts("https://givezy.test", "tok", reply({ ok: false, message: "Please sign in again." }))).toBeNull();
+    expect(await requestNewsOptOuts("https://givezy.test", "tok", reply({ ok: true, charityIds: [1, 2] }))).toBeNull();
+    expect(await requestNewsOptOuts("https://givezy.test", "tok", reply({ ok: true }))).toBeNull();
+    expect(await requestNewsOptOuts("https://givezy.test", "tok", async () => Promise.reject(new Error("offline")))).toBeNull();
   });
 });

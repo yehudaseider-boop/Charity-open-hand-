@@ -5,7 +5,8 @@ import { getEmailTransport, isTemporaryRefusal } from "@/lib/email";
 import { oneClickStopUrl } from "@/lib/email/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isErasedEmail } from "./dashboard";
-import { emailHash, monthPeriod, oneDonorThankYouEmail, thankYouEmail, weekStart } from "./thank-you";
+import { monthPeriod, oneDonorThankYouEmail, thankYouEmail, weekStart } from "./thank-you";
+import { EMAIL_HASH_VERSION, emailHash, emailHashesToMatch, keyedFromStored, storedEmailHash } from "@/lib/email-fingerprint";
 import { WEEKLY_LIMIT, messagedThisWeek } from "./weekly-limit";
 import { JOB_SEND_TIMEOUT_MS, mayHaveSent } from "@/lib/email/retry-plan";
 import { isolate } from "@/lib/text";
@@ -55,13 +56,9 @@ export async function thankYouRecipients(charityId: string, month: string): Prom
   }
   const all = [...byEmail.values()];
   if (!all.length) return [];
-  const hashes = all.map((r) => emailHash(r.email));
-  const stopped = await stoppedThisCharity(charityId, hashes);
-  for (let i = 0; i < hashes.length; i += 200) {
-    const { data, error } = await db.from("thank_you_opt_outs").select("email_hash").in("email_hash", hashes.slice(i, i + 200));
-    if (error) throw error;
-    for (const r of data ?? []) stopped.add(r.email_hash as string);
-  }
+  const emails = all.map((r) => r.email);
+  const stopped = await stoppedThisCharity(charityId, emails);
+  for (const h of await stoppedEverywhere(emails)) stopped.add(h);
   return all.filter((r) => !stopped.has(emailHash(r.email)));
 }
 
@@ -146,7 +143,7 @@ async function runThankYou(args: { charityId: string; charityName: string; month
   // One message a week per donor from a charity (09/11/2026): anyone who already had one this week is left out of
   // this thank-you, and counted so the page can say so.
   const waiting = recipients.filter((r) => !claimed.has(emailHash(r.email)));
-  const recent = await messagedThisWeek(args.charityId, waiting.flatMap((r) => r.donorIds.map((donorId) => ({ donorId, hash: emailHash(r.email) }))), new Date(), { thankYouId: args.thankYouId });
+  const recent = await messagedThisWeek(args.charityId, waiting.flatMap((r) => r.donorIds.map((donorId) => ({ donorId, email: r.email }))), new Date(), { thankYouId: args.thankYouId });
   const leftOut = new Set(waiting.filter((r) => r.donorIds.some((id) => recent.has(id))).map((r) => emailHash(r.email)));
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
   let stoppedEarly = false;
@@ -160,7 +157,7 @@ async function runThankYou(args: { charityId: string; charityName: string; month
       break;
     }
     // Claim this address first. Someone else pressing at the same time gets nothing back and moves on.
-    const got = await db.from("charity_thank_you_recipients").upsert({ thank_you_id: args.thankYouId, email_hash: hash }, { onConflict: "thank_you_id,email_hash", ignoreDuplicates: true }).select("email_hash");
+    const got = await db.from("charity_thank_you_recipients").upsert({ thank_you_id: args.thankYouId, ...storedEmailHash(r.email) }, { onConflict: "thank_you_id,email_hash", ignoreDuplicates: true }).select("email_hash, email_hash_v");
     if (got.error) throw got.error;
     claimed.add(hash);
     if (!got.data?.length) continue;
@@ -169,7 +166,7 @@ async function runThankYou(args: { charityId: string; charityName: string; month
       if (markError) console.error("[thank-you] status not saved", markError.message);
     };
     const token = randomBytes(32).toString("base64url");
-    const saved = await db.from("email_stop_tokens").insert({ token_hash: sha(token), email_hash: hash });
+    const saved = await db.from("email_stop_tokens").insert({ token_hash: sha(token), ...storedEmailHash(r.email) });
     if (saved.error) {
       await mark("failed");
       continue;
@@ -213,13 +210,14 @@ async function runThankYou(args: { charityId: string; charityName: string; month
   return { ok: true, sent: counts.sent, failed: counts.failed, maybeSent: counts.maybeSent, remaining, sentThisRun, thisWeek: leftOut.size, ...(leftOut.size ? { from: formatDate(nextWeekStart(new Date())) } : {}), ...(refused ? { refused: true as const } : {}) };
 }
 
-/** Addresses (as hashes) already claimed for this thank-you, in pages. */
+/** Addresses (as keyed fingerprints) already claimed for this thank-you, in pages. */
 async function claimedHashes(thankYouId: string): Promise<Set<string>> {
   const out = new Set<string>();
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await createAdminClient().from("charity_thank_you_recipients").select("email_hash").eq("thank_you_id", thankYouId).order("email_hash").range(from, from + 999);
+    const { data, error } = await createAdminClient().from("charity_thank_you_recipients").select("email_hash, email_hash_v").eq("thank_you_id", thankYouId).order("email_hash").range(from, from + 999);
     if (error) throw error;
-    for (const r of data ?? []) out.add(r.email_hash as string);
+    // A claim made before 24/11/2026 (a plain hash) counts as the same address: nobody is emailed twice.
+    for (const r of data ?? []) out.add(keyedFromStored(r.email_hash as string, r.email_hash_v));
     if (!data || data.length < 1000) break;
   }
   return out;
@@ -292,17 +290,14 @@ export async function sendDonorThankYou(args: {
   const name = (individual ? [d.first_name, d.last_name].filter(Boolean).join(" ") : d.organisation_name) || "this donor";
   const greeting = individual ? d.first_name : d.contact_person?.split(/\s+/)[0] ?? null;
   const hash = emailHash(d.email);
-  const [{ data: stopped, error: stopError }, fromCharity] = await Promise.all([
-    db.from("thank_you_opt_outs").select("email_hash").eq("email_hash", hash).maybeSingle(),
-    stoppedThisCharity(args.charityId, [hash]),
-  ]);
-  if (stopError) throw stopError;
+  const [everywhere, fromCharity] = await Promise.all([stoppedEverywhere([d.email]), stoppedThisCharity(args.charityId, [d.email])]);
+  const stopped = everywhere.has(hash);
   if (fromCharity.has(hash)) return { ok: false, message: `${isolate(name)} asked not to get emails from you, so nothing was sent.` };
   // The name sits in a sentence on the page: isolated, so a right-to-left name doesn't reorder the words around it.
   if (stopped) return { ok: false, message: `${isolate(name)} asked not to get thank-you emails from charities, so nothing was sent.` };
   const thisWeek = `${isolate(name)} already had a message from you this week, so nothing was sent. ${WEEKLY_LIMIT} You can thank them from Monday.`;
   // A news email, appeal or the monthly thank-you this week counts too, not only a thank-you or reminder.
-  if ((await messagedThisWeek(args.charityId, [{ donorId: args.donorId, hash }])).has(args.donorId)) return { ok: false, message: thisWeek };
+  if ((await messagedThisWeek(args.charityId, [{ donorId: args.donorId, email: d.email }])).has(args.donorId)) return { ok: false, message: thisWeek };
 
   const claim = await db
     .from("charity_donor_thanks")
@@ -316,7 +311,7 @@ export async function sendDonorThankYou(args: {
   }
   const release = () => db.from("charity_donor_thanks").delete().eq("id", claim.data.id);
   const token = randomBytes(32).toString("base64url");
-  const saved = await db.from("email_stop_tokens").insert({ token_hash: sha(token), email_hash: hash });
+  const saved = await db.from("email_stop_tokens").insert({ token_hash: sha(token), ...storedEmailHash(d.email) });
   if (saved.error) {
     await release();
     return { ok: false, message: "We couldn't send your thank-you just now. Nothing went out, so please try again in a few minutes." };
@@ -369,16 +364,12 @@ export async function lastThanked(charityId: string, donorIds: string[]): Promis
  * never makes the request too long (review 16/11/2026).
  */
 export async function optedOut(emails: string[], charityId?: string): Promise<Set<string>> {
-  const byHash = new Map(emails.filter(Boolean).map((e) => [emailHash(e), e.trim().toLowerCase()]));
+  const list = emails.filter((e) => e && e.trim());
+  const byHash = new Map(list.map((e) => [emailHash(e), e.trim().toLowerCase()]));
   const out = new Set<string>();
   if (!byHash.size) return out;
-  const hashes = [...byHash.keys()];
-  const stopped = charityId ? await stoppedThisCharity(charityId, hashes) : new Set<string>();
-  for (let i = 0; i < hashes.length; i += 200) {
-    const { data, error } = await createAdminClient().from("thank_you_opt_outs").select("email_hash").in("email_hash", hashes.slice(i, i + 200));
-    if (error) throw error;
-    for (const r of data ?? []) stopped.add(r.email_hash as string);
-  }
+  const stopped = charityId ? await stoppedThisCharity(charityId, list) : new Set<string>();
+  for (const h of await stoppedEverywhere(list)) stopped.add(h);
   for (const h of stopped) {
     const e = byHash.get(h);
     if (e) out.add(e);
@@ -387,22 +378,34 @@ export async function optedOut(emails: string[], charityId?: string): Promise<Se
 }
 
 /**
- * Addresses (as hashes) that stopped every email from this charity: its stop link, or the charity noting it for them
- * (Yehuda, 16/11/2026: "To stop emails from {charity}" must stop its thank-yous too). The checkout tick
- * "No news or appeals" is not counted here: it promised news and appeals only. Confirmations and s18A receipts are
- * never stopped.
+ * Of these addresses, the ones (as keyed fingerprints) that stopped every email from this charity: its stop link, or
+ * the charity noting it for them (Yehuda, 16/11/2026: "To stop emails from {charity}" must stop its thank-yous too).
+ * The checkout tick "No news or appeals" is not counted here: it promised news and appeals only. Confirmations and
+ * s18A receipts are never stopped. 100 addresses a request: each is looked up by its keyed fingerprint and, until
+ * every row is converted, its plain hash (24/11/2026).
  */
-export async function stoppedThisCharity(charityId: string, hashes: string[]): Promise<Set<string>> {
+export async function stoppedThisCharity(charityId: string, emails: string[]): Promise<Set<string>> {
   const out = new Set<string>();
-  for (let i = 0; i < hashes.length; i += 200) {
+  for (let i = 0; i < emails.length; i += 100) {
     const { data, error } = await createAdminClient()
       .from("charity_email_opt_outs")
-      .select("email_hash")
+      .select("email_hash, email_hash_v")
       .eq("charity_id", charityId)
       .in("source", ["stop_link", "charity"])
-      .in("email_hash", hashes.slice(i, i + 200));
+      .in("email_hash", emailHashesToMatch(emails.slice(i, i + 100)));
     if (error) throw error;
-    for (const r of data ?? []) out.add(r.email_hash as string);
+    for (const r of data ?? []) out.add(keyedFromStored(r.email_hash as string, r.email_hash_v));
+  }
+  return out;
+}
+
+/** Of these addresses, the ones (as keyed fingerprints) that stopped thank-you emails from every charity. */
+async function stoppedEverywhere(emails: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  for (let i = 0; i < emails.length; i += 100) {
+    const { data, error } = await createAdminClient().from("thank_you_opt_outs").select("email_hash, email_hash_v").in("email_hash", emailHashesToMatch(emails.slice(i, i + 100)));
+    if (error) throw error;
+    for (const r of data ?? []) out.add(keyedFromStored(r.email_hash as string, r.email_hash_v));
   }
   return out;
 }
@@ -415,19 +418,23 @@ export async function stoppedThisCharity(charityId: string, hashes: string[]): P
 export async function thankYousStopped(token: string): Promise<boolean> {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return false;
   const db = createAdminClient();
-  const { data } = await db.from("email_stop_tokens").select("email_hash").eq("token_hash", sha(token)).maybeSingle();
+  const { data } = await db.from("email_stop_tokens").select("email_hash, email_hash_v").eq("token_hash", sha(token)).maybeSingle();
   if (!data) return false;
-  const { data: out, error } = await db.from("thank_you_opt_outs").select("email_hash").eq("email_hash", data.email_hash).maybeSingle();
+  // The link's address as stored then, and keyed: until converted, the saved opt-out may be either.
+  const values = [...new Set([data.email_hash as string, keyedFromStored(data.email_hash as string, data.email_hash_v)])];
+  const { data: out, error } = await db.from("thank_you_opt_outs").select("email_hash, email_hash_v").in("email_hash", values).limit(1);
   if (error) throw error;
-  return Boolean(out);
+  return Boolean(out?.length);
 }
 
 export async function stopThankYous(token: string): Promise<boolean> {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return false;
   const db = createAdminClient();
-  const { data } = await db.from("email_stop_tokens").select("email_hash").eq("token_hash", sha(token)).maybeSingle();
+  const { data } = await db.from("email_stop_tokens").select("email_hash, email_hash_v").eq("token_hash", sha(token)).maybeSingle();
   if (!data) return false;
-  const { error } = await db.from("thank_you_opt_outs").upsert({ email_hash: data.email_hash }, { onConflict: "email_hash", ignoreDuplicates: true });
+  // Saved keyed, even from a link sent before 24/11/2026: its plain hash is keyed here, as the converter would.
+  const keyed = keyedFromStored(data.email_hash as string, data.email_hash_v);
+  const { error } = await db.from("thank_you_opt_outs").upsert({ email_hash: keyed, email_hash_v: EMAIL_HASH_VERSION }, { onConflict: "email_hash", ignoreDuplicates: true });
   if (error) throw error;
   return true;
 }

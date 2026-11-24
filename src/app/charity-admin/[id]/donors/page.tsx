@@ -6,7 +6,6 @@ import { Badge } from "@/components/badge";
 import { DonePanel, formKey } from "@/components/done-panel";
 import { lastThanked, optedOut } from "@/lib/charity/thank-you-send";
 import { WEEKLY_LIMIT, messagedThisWeek } from "@/lib/charity/weekly-limit";
-import { emailHash } from "@/lib/charity/thank-you";
 import { thankOneDonor } from "./actions";
 import { ThankOneForm } from "./thank-form";
 import { DonorPeekLink } from "./donor-peek";
@@ -120,7 +119,7 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
         t("lastThanked", lastThanked(id, shownDonors.map((d) => d.donor_id))),
         t("optedOut", optedOut(emailed.map((d) => d.email), id)),
         // If this check fails the button still shows: sending checks again and says plainly if it's this week.
-        t("messagedThisWeek", messagedThisWeek(id, emailed.map((d) => ({ donorId: d.donor_id, hash: emailHash(d.email) })))).catch((e: unknown) => {
+        t("messagedThisWeek", messagedThisWeek(id, emailed.map((d) => ({ donorId: d.donor_id, email: d.email })))).catch((e: unknown) => {
           console.error("[donors] weekly check failed", e instanceof Error ? e.message : e);
           return new Set<string>();
         }),

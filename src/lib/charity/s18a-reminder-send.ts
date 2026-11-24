@@ -8,7 +8,8 @@ import { oneClickStopUrl } from "@/lib/email/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isErasedEmail } from "./dashboard";
 import { REMINDER_SKIPS, detailsUrl, mergeMissing, planReminders, s18aReminderEmail, type ReminderCandidate, type ReminderSkip } from "./s18a-reminder";
-import { emailHash, weekStart } from "./thank-you";
+import { weekStart } from "./thank-you";
+import { emailHash, emailHashesToMatch, keyedFromStored, storedEmailHash } from "@/lib/email-fingerprint";
 import { messagedThisWeek } from "./weekly-limit";
 import { recordAction } from "./charity-actions";
 import { readPages } from "./paged";
@@ -153,26 +154,27 @@ export async function contacts(charityId: string, donorIds: string[]): Promise<{
   return { found, erased, byDonor };
 }
 
-/** Addresses (as hashes) that turned off this charity's emails. */
 /**
- * With `forDetailsReminder`, the checkout tick "No news or appeals" is not counted: it promised news and appeals only,
+ * Of these addresses, the ones (as keyed fingerprints) that turned off this charity's emails. With
+ * `forDetailsReminder`, the checkout tick "No news or appeals" is not counted: it promised news and appeals only,
  * and the s18A-details reminder is about the donor's own receipt (19/11/2026). Journeys and appeals count every source.
+ * 100 addresses a read: each is looked up keyed and, until every row is converted, by its plain hash (24/11/2026).
  */
-export async function optedOutHashes(charityId: string, hashes: string[], opts: { forDetailsReminder?: boolean } = {}): Promise<Set<string>> {
+export async function optedOutHashes(charityId: string, emails: string[], opts: { forDetailsReminder?: boolean } = {}): Promise<Set<string>> {
   const out = new Set<string>();
-  for (let i = 0; i < hashes.length; i += 200) {
+  for (let i = 0; i < emails.length; i += 100) {
     // This charity's opt-outs and "no emails from charities" overall, as appeals check (stoppedEmails).
-    const chunk = hashes.slice(i, i + 200);
+    const chunk = emailHashesToMatch(emails.slice(i, i + 100));
     const [mine, any] = await Promise.all([
       (opts.forDetailsReminder
-        ? db().from("charity_email_opt_outs").select("email_hash").eq("charity_id", charityId).in("source", ["stop_link", "charity"])
-        : db().from("charity_email_opt_outs").select("email_hash").eq("charity_id", charityId)
+        ? db().from("charity_email_opt_outs").select("email_hash, email_hash_v").eq("charity_id", charityId).in("source", ["stop_link", "charity"])
+        : db().from("charity_email_opt_outs").select("email_hash, email_hash_v").eq("charity_id", charityId)
       ).in("email_hash", chunk),
-      db().from("thank_you_opt_outs").select("email_hash").in("email_hash", chunk),
+      db().from("thank_you_opt_outs").select("email_hash, email_hash_v").in("email_hash", chunk),
     ]);
     if (mine.error) throw mine.error;
     if (any.error) throw any.error;
-    for (const r of [...(mine.data ?? []), ...(any.data ?? [])]) out.add(r.email_hash as string);
+    for (const r of [...(mine.data ?? []), ...(any.data ?? [])]) out.add(keyedFromStored(r.email_hash as string, r.email_hash_v));
   }
   return out;
 }
@@ -217,9 +219,9 @@ export async function sendS18aReminders(args: {
   const [missing, who] = await Promise.all([loadS18aMissing(args.charityId, now, earliest), contacts(args.charityId, donorIds)]);
   const withEmail = donorIds.flatMap((id) => {
     const c = who.byDonor.get(id);
-    return c ? [{ donorId: id, hash: emailHash(c.email) }] : [];
+    return c ? [{ donorId: id, email: c.email }] : [];
   });
-  const [stopped, recent] = await Promise.all([optedOutHashes(args.charityId, withEmail.map((d) => d.hash), { forDetailsReminder: true }), messagedThisWeek(args.charityId, withEmail, now)]);
+  const [stopped, recent] = await Promise.all([optedOutHashes(args.charityId, withEmail.map((d) => d.email), { forDetailsReminder: true }), messagedThisWeek(args.charityId, withEmail, now)]);
   const candidates: (ReminderCandidate & { contact: Contact | null })[] = donorIds.map((id) => {
     const contact = who.byDonor.get(id) ?? null;
     return {
@@ -264,7 +266,7 @@ export async function sendS18aReminders(args: {
       }
       const release = () => db().from("charity_donor_thanks").delete().eq("id", claim.data.id);
       const token = randomBytes(32).toString("base64url");
-      const saved = await db().from("charity_email_stop_tokens").insert({ token_hash: sha(token), charity_id: args.charityId, email_hash: emailHash(c.contact!.email) });
+      const saved = await db().from("charity_email_stop_tokens").insert({ token_hash: sha(token), charity_id: args.charityId, ...storedEmailHash(c.contact!.email) });
       if (saved.error) {
         await release();
         failed++;

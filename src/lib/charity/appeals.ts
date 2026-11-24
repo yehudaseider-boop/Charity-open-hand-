@@ -12,7 +12,7 @@ import { donorMatches, isErasedEmail } from "./dashboard";
 import { loadDonors, type DonorRow } from "./dashboard-queries";
 import { lapsedDaysFor, listSegments, listTags, tagsByDonor } from "./donor-care";
 import { donorGroup, donorGroupsFor } from "./insights";
-import { emailHash } from "./thank-you";
+import { EMAIL_HASH_VERSION, emailHash, emailHashesToMatch, keyedFromStored, storedEmailHash } from "@/lib/email-fingerprint";
 import { messagedThisWeek } from "./weekly-limit";
 import { inboxKey, onePerAddress } from "./one-per-address";
 import { nothingLeft } from "@/lib/donations/what-is-left";
@@ -110,7 +110,7 @@ export async function pickAudience(charityId: string, audience: Audience, now = 
   const reachable = donors.filter((d) => gaveOnGivezy.has(d.donor_id));
   const stopped = await stoppedEmails(charityId, reachable.map((d) => d.email));
   const allowed = reachable.filter((d) => !stopped.has(d.email.trim().toLowerCase()));
-  const recent = await messagedThisWeek(charityId, allowed.map((d) => ({ donorId: d.donor_id, hash: emailHash(d.email) })), now);
+  const recent = await messagedThisWeek(charityId, allowed.map((d) => ({ donorId: d.donor_id, email: d.email })), now);
   // One email per inbox: someone who is two donors (themselves and their company) gets it once.
   const kept = onePerAddress(allowed.filter((d) => !recent.has(d.donor_id)), (d) => d.email);
   return { donors: kept, stopped: reachable.length - allowed.length, thisWeek: allowed.length - kept.length, recordedOnly: donors.length - reachable.length, label };
@@ -130,19 +130,20 @@ async function donorsWhoGaveOnGivezy(charityId: string): Promise<Set<string>> {
 
 /** Which of these addresses said no: to this charity's news and appeals, or to thank-yous from any charity. */
 async function stoppedEmails(charityId: string, emails: string[]): Promise<Set<string>> {
-  const byHash = new Map(emails.map((e) => [emailHash(e), e.trim().toLowerCase()]));
+  const list = emails.filter((e) => e && e.trim());
+  const byHash = new Map(list.map((e) => [emailHash(e), e.trim().toLowerCase()]));
   const out = new Set<string>();
-  const hashes = [...byHash.keys()];
-  for (let i = 0; i < hashes.length; i += 200) {
-    const chunk = hashes.slice(i, i + 200);
+  // 100 addresses a read: each is looked up keyed and, until every row is converted, by its plain hash (24/11/2026).
+  for (let i = 0; i < list.length; i += 100) {
+    const chunk = emailHashesToMatch(list.slice(i, i + 100));
     const [mine, any] = await Promise.all([
-      db().from("charity_email_opt_outs").select("email_hash").eq("charity_id", charityId).in("email_hash", chunk),
-      db().from("thank_you_opt_outs").select("email_hash").in("email_hash", chunk),
+      db().from("charity_email_opt_outs").select("email_hash, email_hash_v").eq("charity_id", charityId).in("email_hash", chunk),
+      db().from("thank_you_opt_outs").select("email_hash, email_hash_v").in("email_hash", chunk),
     ]);
     if (mine.error) throw mine.error;
     if (any.error) throw any.error;
     for (const r of [...(mine.data ?? []), ...(any.data ?? [])]) {
-      const e = byHash.get(r.email_hash as string);
+      const e = byHash.get(keyedFromStored(r.email_hash as string, r.email_hash_v));
       if (e) out.add(e);
     }
   }
@@ -319,7 +320,7 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
       args.charityId,
       ids.flatMap((id) => {
         const e = donorsById.get(id)?.email;
-        return e ? [{ donorId: id, hash: emailHash(e) }] : [];
+        return e ? [{ donorId: id, email: e }] : [];
       }),
       new Date(),
       { appealId: appeal.id as string },
@@ -340,7 +341,7 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
       }
       inbox.add(inboxKey(d.email));
       const token = randomBytes(32).toString("base64url");
-      const saved = await db().from("charity_email_stop_tokens").insert({ token_hash: sha(token), charity_id: args.charityId, email_hash: emailHash(d.email) });
+      const saved = await db().from("charity_email_stop_tokens").insert({ token_hash: sha(token), charity_id: args.charityId, ...storedEmailHash(d.email) });
       if (saved.error) {
         await mark("failed");
         continue;
@@ -420,7 +421,7 @@ export async function appealsThisMonth(charityId: string, now = new Date()): Pro
 
 /** "No news or appeals from this charity", from the checkout box. Kept as a hash of the address. */
 export async function optOutAtCheckout(charityId: string, email: string): Promise<void> {
-  const { error } = await db().from("charity_email_opt_outs").upsert({ charity_id: charityId, email_hash: emailHash(email), source: "checkout" }, { onConflict: "charity_id,email_hash", ignoreDuplicates: true });
+  const { error } = await db().from("charity_email_opt_outs").upsert({ charity_id: charityId, ...storedEmailHash(email), source: "checkout" }, { onConflict: "charity_id,email_hash", ignoreDuplicates: true });
   if (error) throw error;
 }
 
@@ -428,20 +429,24 @@ export async function optOutAtCheckout(charityId: string, email: string): Promis
 /** Has this stop link's email already stopped this charity's emails? Read only, for the stop page's "Done" (22/11/2026). */
 export async function appealsStopped(token: string): Promise<boolean> {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return false;
-  const { data } = await db().from("charity_email_stop_tokens").select("charity_id, email_hash").eq("token_hash", sha(token)).maybeSingle();
+  const { data } = await db().from("charity_email_stop_tokens").select("charity_id, email_hash, email_hash_v").eq("token_hash", sha(token)).maybeSingle();
   if (!data) return false;
-  const { data: out, error } = await db().from("charity_email_opt_outs").select("email_hash").eq("charity_id", data.charity_id).eq("email_hash", data.email_hash).maybeSingle();
+  // The link's address as stored then, and keyed: until converted, the saved opt-out may be either.
+  const values = [...new Set([data.email_hash as string, keyedFromStored(data.email_hash as string, data.email_hash_v)])];
+  const { data: out, error } = await db().from("charity_email_opt_outs").select("email_hash, email_hash_v").eq("charity_id", data.charity_id).in("email_hash", values).limit(1);
   if (error) throw error;
-  return Boolean(out);
+  return Boolean(out?.length);
 }
 
 export async function stopAppeals(token: string): Promise<{ charityName: string } | null> {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
-  const { data } = await db().from("charity_email_stop_tokens").select("charity_id, email_hash, charities(name_en)").eq("token_hash", sha(token)).maybeSingle();
+  const { data } = await db().from("charity_email_stop_tokens").select("charity_id, email_hash, email_hash_v, charities(name_en)").eq("token_hash", sha(token)).maybeSingle();
   if (!data) return null;
   // Not ignoreDuplicates: an earlier "no news" tick at checkout becomes a stop link, which also stops thank-yous
-  // (16/11/2026), as the stop page promises.
-  const { error } = await db().from("charity_email_opt_outs").upsert({ charity_id: data.charity_id, email_hash: data.email_hash, source: "stop_link" }, { onConflict: "charity_id,email_hash" });
+  // (16/11/2026), as the stop page promises. Saved keyed, even from a link sent before 24/11/2026 (its plain hash is
+  // keyed here, as the converter would). An earlier tick still at its plain hash is merged in by the converter.
+  const keyed = keyedFromStored(data.email_hash as string, data.email_hash_v);
+  const { error } = await db().from("charity_email_opt_outs").upsert({ charity_id: data.charity_id, email_hash: keyed, email_hash_v: EMAIL_HASH_VERSION, source: "stop_link" }, { onConflict: "charity_id,email_hash" });
   if (error) throw error;
   const c = data.charities as unknown as { name_en: string } | null;
   return { charityName: c?.name_en ?? "this charity" };
