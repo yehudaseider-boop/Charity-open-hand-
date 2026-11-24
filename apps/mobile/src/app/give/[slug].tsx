@@ -36,6 +36,7 @@ import { amountFromParam, lastGiftTo } from "@/lib/amount-steps";
 import { firstNameOf } from "@/lib/campaign-feed";
 import { useCharity } from "@/lib/directory";
 import { loadDetails, saveDetails, forgetDetails } from "@/lib/donor-details";
+import { rememberOffer, SIGN_IN_TO_REMEMBER, SIGN_IN_TO_REMEMBER_NOTE } from "@/lib/give-remember";
 import { jhbToday, rand } from "@/lib/format";
 import { counts, goalProgress, type Goal } from "@/lib/goals";
 import { loadGoals, saveGoals } from "@/lib/goals-store";
@@ -1245,7 +1246,14 @@ export default function Give() {
               <Field label="First name" value={first} onChangeText={setFirst} maxLength={80} autoComplete="given-name" textContentType="givenName" autoCapitalize="words" returnKeyType="next" error={err("first_name")} />
               <Field label="Surname" value={last} onChangeText={setLast} maxLength={80} autoComplete="family-name" textContentType="familyName" autoCapitalize="words" returnKeyType="next" error={err("last_name")} />
               <Field label="Email" value={email} onChangeText={setEmail} maxLength={254} keyboardType="email-address" autoCapitalize="none" autoComplete="email" textContentType="emailAddress" returnKeyType="next" error={err("email")} helper="Your confirmation is sent here." />
-              <SwitchRow label="Remember my details" description="So you don't type them next time." more="Your name and email are kept on this phone only, never your ID number. Switch off if others use this phone." value={remember} onChange={chooseRemember} />
+              {rememberOffer(account.status) === "sign-in" ? (
+                <View style={{ gap: 4 }}>
+                  <TextLink label={SIGN_IN_TO_REMEMBER} onPress={() => router.navigate("/account")} />
+                  <Text variant="label">{SIGN_IN_TO_REMEMBER_NOTE}</Text>
+                </View>
+              ) : (
+                <SwitchRow label="Remember my details" description="So you don't type them next time." more="Your name and email are kept on this phone only, never your ID number. Switch off if others use this phone." value={remember} onChange={chooseRemember} />
+              )}
             </View>
           ) : (
             <View style={styles.giver} onLayout={at("details")}>
