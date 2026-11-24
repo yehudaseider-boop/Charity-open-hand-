@@ -18,7 +18,7 @@ export function SiteHeader() {
         {/* min height, not a fixed one, and wrapping: at double text size the logo, Menu and Sign in sit on two lines instead of running off the screen (18/11/2026).
             Under 360px wide (a 320px phone) the gaps, the logo and the buttons' sides are a little smaller, so all three still fit on one line (22/11/2026). */}
         <div className="mx-auto flex min-h-16 max-w-[75rem] flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-1 max-[359px]:gap-x-2 sm:min-h-[4.5rem] sm:px-6">
-          <Link href="/" aria-label={`${platformConfig.appName} home`} className="-ml-1.5 shrink-0 rounded-lg p-1.5">
+          <Link href="/" prefetch={false} aria-label={`${platformConfig.appName} home`} className="-ml-1.5 shrink-0 rounded-lg p-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/logo-400.png" alt={platformConfig.appName} width={97} height={32} className="h-8 w-auto max-[359px]:h-7 sm:h-9" />
           </Link>
@@ -29,7 +29,7 @@ export function SiteHeader() {
       <header className="chrome-focus border-b border-border bg-surface print:hidden">
         <div className="mx-auto flex h-14 max-w-[75rem] items-center justify-between gap-3 px-4 sm:px-6">
           {/* The one quiet way out to the rest of Givezy (30/10/2026): the logo goes home, which ends the focus. */}
-          <Link href="/" aria-label={`${platformConfig.appName} home`} className="-ml-1.5 shrink-0 rounded-lg p-1.5">
+          <Link href="/" prefetch={false} aria-label={`${platformConfig.appName} home`} className="-ml-1.5 shrink-0 rounded-lg p-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/logo-400.png" alt={platformConfig.appName} width={97} height={32} className="h-7 w-auto" />
           </Link>

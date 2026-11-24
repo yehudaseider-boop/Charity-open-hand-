@@ -17,7 +17,7 @@ import { platformConfig } from "@/config/platform";
 import { quoteFromTyped, type Quote } from "@/lib/donations/quote";
 import { CONTRIBUTION_EXPLAINER, NO_CONTRIBUTION_NOTE, contributionLabel, startingChoice, type ContributionChoice } from "@/lib/donations/contribution";
 import { LABEL_MAX } from "@/lib/donations/labels";
-import { registrationNumberProblem } from "@/lib/donations/validation";
+import { registrationNumberProblem } from "@/lib/donations/s18a-rules";
 import { BotCheck, type BotCheckHandle } from "@/components/forms/bot-check";
 import { botCheckConfig } from "@/config/bot-check";
 

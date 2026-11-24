@@ -13,6 +13,7 @@ import { formToObject, type FormState } from "@/lib/form";
 import { isUuid } from "@/lib/ids";
 import { createClient } from "@/lib/supabase/server";
 import { refusal } from "@/lib/charity/team";
+import { revalidateCharitySlugs } from "@/lib/charity/public-cache";
 
 export async function startCampaign(charityId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
@@ -40,6 +41,7 @@ export async function startCampaign(charityId: string, _prev: FormState, formDat
   await logAudit({ actorUserId: viewer.userId, action: "charity.campaign_started", entityType: "charity", entityId: charityId });
   const done = await recordAction(charityId, viewer.userId, "campaign_started", { title: v.title }, { type: "delete", table: "campaigns", id: made.id as string });
   revalidatePath(`/charity-admin/${charityId}/campaigns`);
+  revalidateCharitySlugs(charity.slug); // a campaign starting shows on the charity's pages at once (24/11/2026)
   revalidatePath(`/c/${charity.slug}`);
   redirect(`/charity-admin/${charityId}/campaigns?done=${done}`);
 }
@@ -62,6 +64,7 @@ export async function endCampaign(charityId: string, campaignId: string): Promis
   await logAudit({ actorUserId: viewer.userId, action: "charity.campaign_ended", entityType: "charity", entityId: charityId });
   const done = await recordAction(charityId, viewer.userId, "campaign_ended", { title: data[0].title as string }, { type: "reopen_campaign", id: campaignId });
   revalidatePath(`/charity-admin/${charityId}/campaigns`);
+  revalidateCharitySlugs(charity.slug); // an ended campaign stops showing at once (24/11/2026)
   revalidatePath(`/c/${charity.slug}`);
   redirect(`/charity-admin/${charityId}/campaigns?done=${done}`);
 }

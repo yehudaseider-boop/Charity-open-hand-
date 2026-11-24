@@ -22,8 +22,14 @@ import { isUuid } from "@/lib/ids";
 import type { PostgrestError } from "@supabase/supabase-js";
 import { isMissingFunction } from "@/lib/charity/keeping-donors-queries";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { revalidateCharityPages } from "@/lib/charity/public-cache";
 
-function refresh(id: string, slug?: string) {
+/**
+ * After any change here: the admin pages, the lists, and the charity's own page and give page (their cache is
+ * refreshed at once, so a suspended charity stops showing straight away: src/lib/charity/public-cache.ts).
+ */
+async function refresh(id: string, slug?: string) {
+  await revalidateCharityPages(id, slug);
   revalidatePath(`/admin/charities/${id}`);
   revalidatePath("/admin/charities");
   revalidatePath("/charities");
@@ -113,7 +119,7 @@ export async function approveCharity(id: string, _prev: FormState, formData: For
     },
   });
   const emailed = contactEmail ? await notifyCharity(approvedEmail(contactEmail, charity.name_en, id, confirmS18a && confirmMandate ? "ready" : confirmS18a ? "mandate" : "none")) : false;
-  refresh(id, charity.slug);
+  await refresh(id, charity.slug);
   // If the bank details changed while approving, nothing was stamped: connecting then says to check them first.
   return {
     ok: true,
@@ -143,7 +149,7 @@ export async function rejectCharity(id: string, _prev: FormState, formData: Form
   if (!data?.length) return { ok: false, message: "Someone else changed this charity just now. Reload the page to see where it stands." };
   await logAudit({ actorUserId: admin.userId, action: "charity.rejected", entityType: "charity", entityId: id, details: { reason } });
   const emailed = priv?.contact_email ? await notifyCharity(sentBackEmail(priv.contact_email, charity.name_en, id, reason)) : false;
-  refresh(id);
+  await refresh(id);
   return {
     ok: true,
     message: !priv?.contact_email
@@ -171,7 +177,7 @@ export async function suspendCharity(id: string, _prev: FormState, formData: For
   if (!data?.length) return { ok: false, message: "Someone else changed this charity just now. Reload the page to see where it stands." };
   await logAudit({ actorUserId: admin.userId, action: "charity.suspended", entityType: "charity", entityId: id, details: { reason } });
   const emailed = priv?.contact_email ? await notifyCharity(suspendedEmail(priv.contact_email, charity.name_en, id, reason)) : false;
-  refresh(id, charity.slug);
+  await refresh(id, charity.slug);
   return {
     ok: true,
     message: `Suspended. The charity is hidden and can't receive donations.${!priv?.contact_email ? "" : emailed ? " Its contact has been emailed the reason." : " We couldn't email its contact, so please let them know the reason."}`,
@@ -192,7 +198,7 @@ export async function reinstateCharity(id: string, _prev: FormState): Promise<Fo
   if (!data?.length) return { ok: false, message: "Someone else changed this charity just now. Reload the page to see where it stands." };
   await logAudit({ actorUserId: admin.userId, action: "charity.reinstated", entityType: "charity", entityId: id });
   const emailed = priv?.contact_email ? await notifyCharity(reinstatedEmail(priv.contact_email, charity.name_en, id, Boolean(charity.gateway_subaccount_ref))) : false;
-  refresh(id, charity.slug);
+  await refresh(id, charity.slug);
   return { ok: true, message: priv?.contact_email && !emailed ? `Reinstated. ${NOT_EMAILED}` : "Reinstated." };
 }
 
@@ -211,7 +217,7 @@ export async function revokeS18a(id: string, _prev: FormState, formData: FormDat
     .eq("id", id);
   if (error) return failed(error);
   await logAudit({ actorUserId: admin.userId, action: "charity.s18a_revoked", entityType: "charity", entityId: id, details: { reason } });
-  refresh(id, charity.slug);
+  await refresh(id, charity.slug);
   return { ok: true, message: "s18A status removed. No new receipts will be issued, and gifts paid from now on never get one, even if s18A is confirmed again." };
 }
 
@@ -254,7 +260,7 @@ export async function addCharityAdmin(id: string, _prev: FormState, formData: Fo
   if (error) return failed(error);
   // The person's id, not their address: the audit log is append-only and outlives an erasure.
   await logAudit({ actorUserId: admin.userId, action: "charity.admin_added", entityType: "charity", entityId: id, details: { user_id: profile.id } });
-  refresh(id);
+  await refresh(id);
   return { ok: true, message: `${email} can now sign in and manage this charity.` };
 }
 
@@ -311,7 +317,7 @@ export async function connectToGateway(id: string, _prev: FormState): Promise<Fo
     throw e;
   }
   const emailed = contact?.contact_email ? await notifyCharity(connectedEmail(contact.contact_email, charity.name_en, id)) : false;
-  refresh(id, charity.slug);
+  await refresh(id, charity.slug);
   return {
     ok: true,
     message: emailed
@@ -378,7 +384,7 @@ export async function changeBankDetails(id: string, _prev: FormState, formData: 
       console.error("[admin] bank change email not sent", e);
     }
   }
-  refresh(id, charity.slug);
+  await refresh(id, charity.slug);
   return {
     ok: true,
     message: wasConnected
@@ -406,7 +412,7 @@ export async function removeCharityAdmin(id: string, userId: string, _prev: Form
   }
   await logAudit({ actorUserId: admin.userId, action: "charity.admin_removed", entityType: "charity", entityId: id, details: { user_id: userId, by: "platform" } });
   const emailed = profile?.email && charity ? await notifyCharity(adminRemovedEmail(profile.email as string, charity.name_en)) : false;
-  refresh(id);
+  await refresh(id);
   return { ok: true, message: `${profile?.email ?? "That person"} can no longer manage this charity.${profile?.email && !emailed ? " We couldn't email them, so please let them know." : ""}` };
 }
 
@@ -436,7 +442,7 @@ export async function makeCharityOwner(id: string, userId: string, _prev: FormSt
     const told = email && charity ? await notifyCharity(ownerChangedEmail(email, charity.name_en, person === userId)) : false;
     if (!told) notTold.push(email ?? (person === userId ? "the new owner" : "the previous owner"));
   }
-  refresh(id);
+  await refresh(id);
   const emailWords = !notTold.length
     ? oldOwners.length ? " Both have been emailed." : " They've been emailed."
     : ` We couldn't email ${notTold.join(" or ")}, so please let ${notTold.length === 1 ? "them" : "them both"} know.`;
@@ -472,7 +478,7 @@ export async function resetSecondStep(id: string, userId: string, _prev: FormSta
   const { data: profile } = await db.from("profiles").select("email").eq("id", userId).maybeSingle();
   await logAudit({ actorUserId: admin.userId, action: "charity.admin_second_step_reset", entityType: "charity", entityId: id, details: { user_id: userId, checked: how.slice(0, 500) } });
   const emailed = profile?.email ? await notifyCharity(secondStepResetEmail(profile.email as string)) : false;
-  refresh(id);
+  await refresh(id);
   return {
     ok: true,
     message: emailed
@@ -519,7 +525,7 @@ export async function adminUploadDocument(id: string, _prev: FormState, formData
     return failed(error);
   }
   await logAudit({ actorUserId: admin.userId, action: "charity.document_added", entityType: "charity", entityId: id, details: { document_type: type } });
-  refresh(id);
+  await refresh(id);
   return { ok: true, message: "Uploaded." };
 }
 
@@ -544,7 +550,7 @@ export async function setUpReceipts(id: string, _prev: FormState, formData: Form
     const { error } = await createAdminClient().from("charities").update({ s18a_reference: reference }).eq("id", id);
     if (error) return failed(error);
     await logAudit({ actorUserId: admin.userId, action: "charity.receipts_set_up", entityType: "charity", entityId: id, details: { s18a_reference: reference, reference_only: true } });
-    refresh(id, charity.slug);
+    await refresh(id, charity.slug);
     return { ok: true, message: "Saved the s18A reference number. Receipts were already set up, so the charity wasn't emailed." };
   }
   if (!confirmS18a && !confirmMandate) return { ok: false, message: "Tick what you have confirmed." };
@@ -575,7 +581,7 @@ export async function setUpReceipts(id: string, _prev: FormState, formData: Form
   });
   const ready = (confirmS18a || charity.is_s18a) && (confirmMandate || Boolean(charity.mandate_signed_at));
   const emailed = ready && priv?.contact_email ? await notifyCharity(receiptsReadyEmail(priv.contact_email, charity.name_en, id)) : false;
-  refresh(id, charity.slug);
+  await refresh(id, charity.slug);
   return {
     ok: true,
     message: !ready

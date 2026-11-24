@@ -76,6 +76,20 @@ const nextConfig: NextConfig = {
     // The charity's preview of a receipt loads the receipt's fonts from here (09/11/2026).
     "/receipt-fonts/\\[file\\]": ["./src/lib/receipts/fonts/BricolageGrotesque-Bold.ttf", "./node_modules/@fontsource/dm-sans/files/dm-sans-latin-{400,500,600}-normal.woff2"],
   },
+  images: {
+    // Charity pictures from our public storage go through the image service on the live site (src/components/
+    // charity-image.tsx, 24/11/2026): only that one folder, only over https. 90 keeps them sharp (75 is the default).
+    remotePatterns: (() => {
+      try {
+        const u = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "");
+        if (u.protocol !== "https:") return [];
+        return [{ protocol: "https" as const, hostname: u.hostname, port: u.port, pathname: "/storage/v1/object/public/charity-public/**" }];
+      } catch {
+        return [];
+      }
+    })(),
+    qualities: [75, 90],
+  },
   experimental: {
     // Server actions accept 1 MB by default, but charity photos and documents may be up to 4 MB
     // (MAX_UPLOAD_BYTES in src/lib/charity/validation.ts). Leave room for the rest of the form.

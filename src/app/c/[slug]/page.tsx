@@ -4,17 +4,18 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { Badge } from "@/components/badge";
+import { CharityImage } from "@/components/charity-image";
 import { CampaignProgress } from "@/components/campaign-progress";
 import { CharityBadges } from "@/components/charity-badges";
 import { Info } from "@/components/info";
 import { canIssue18a } from "@/lib/charities";
-import { loadDonatableCharity } from "@/lib/donations/charity";
+import { donatableFrom } from "@/lib/donations/charity";
+import { loadListedCharity, loadPublicFocusToday, loadPublicOpenCampaigns, loadPublicStories } from "@/lib/charity/public-cache";
+import { videoFrom } from "@/lib/charity/video";
 import { sourceTag, withSource } from "@/lib/donations/source";
 import { initials } from "@/lib/charity/initials";
-import { loadStories, publicImageUrl } from "@/lib/charity/queries";
-import { loadOpenCampaigns } from "@/lib/charity/campaign-queries";
+import { publicImageUrl } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
-import { createClient } from "@/lib/supabase/server";
 import { Splash } from "@/components/splash";
 import { Bubbles } from "@/components/marketing";
 import { StickyGive } from "@/components/sticky-give";
@@ -25,22 +26,11 @@ import { siteOrigin } from "@/lib/request-origin";
 import { charityData } from "@/lib/seo/structured-data";
 import { ProfileVideo } from "@/components/profile-video";
 import { focusCampaign, jhbToday } from "@/lib/charity/focus";
-import { loadPublicFocus, loadVideo } from "@/lib/charity/profile-extras";
 import { webLink } from "@/lib/charity/web-link";
 import { FocusCard } from "./focus-card";
 
-const loadCharity = cache(async (slug: string) => {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("charities")
-    .select(
-      "id, slug, name_en, legal_name_en, description_en, funds_use_en, impact_en, impact_unit_cents, impact_unit_one, impact_unit_many, website, logo_path, cover_path, npo_number, pbo_number, s18a_reference, suburb, city, is_verified, is_s18a, mandate_signed_at, charity_categories(categories(name_en))",
-    )
-    .eq("slug", slug)
-    .eq("status", "approved")
-    .maybeSingle();
-  return data;
-});
+// Cached for a short while per charity, and refreshed when it edits its page (src/lib/charity/public-cache.ts, 24/11/2026).
+const loadCharity = cache(loadListedCharity);
 
 export async function generateMetadata({ params }: PageProps<"/c/[slug]">): Promise<Metadata> {
   const charity = await loadCharity((await params).slug);
@@ -64,12 +54,16 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
   const logo = publicImageUrl(charity.logo_path);
   const cover = publicImageUrl(charity.cover_path);
   const receipts = canIssue18a(charity);
-  const [donatable, { photos, updates }, campaigns, { video }, focus] = await Promise.all([
-    loadDonatableCharity(charity.slug), loadStories(charity.id, 5), loadOpenCampaigns(charity.id),
-    // The charity's video and its own focus are bonuses: if either can't be read, the page shows without it.
-    loadVideo(charity.id), loadPublicFocus(charity.id, jhbToday()),
+  // The pause switch and the payment connection are worked out now, from the cached row; a campaign's last day and the
+  // focus's dates are checked now too, so neither waits for the cache to expire.
+  const donatable = donatableFrom(charity);
+  const [{ photos, updates }, campaigns, focus] = await Promise.all([
+    loadPublicStories(charity.slug, charity.id, 5), loadPublicOpenCampaigns(charity.slug, charity.id),
+    // The charity's own focus is a bonus: if it can't be read, the page shows without it.
+    loadPublicFocusToday(charity.slug, charity.id, jhbToday()),
   ]);
-  const accepting = donatable?.acceptingPayments ?? false;
+  const video = videoFrom(charity);
+  const accepting = donatable.acceptingPayments;
   const categories = charity.charity_categories
     .map((cc) => cc.categories as unknown as { name_en: string } | null)
     .filter((c): c is { name_en: string } => c !== null);
@@ -111,8 +105,7 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
       ) : null}
       <div className="mx-auto max-w-[75rem] px-4 pt-4 sm:px-6 sm:pt-6">
         {cover ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={cover} alt="" className="aspect-[16/9] w-full rounded-[2rem] object-cover sm:aspect-[3/1]" />
+          <CharityImage src={cover} alt="" width={1200} height={675} sizes="(min-width: 640px) 2400px, calc(100vw - 32px)" priority className="aspect-[16/9] w-full rounded-[2rem] object-cover sm:aspect-[3/1]" />
         ) : (
           // No cover photo yet: a blue colour block with bubbles and the logo's splash, whole, on the right.
           <div aria-hidden className="relative flex h-36 w-full items-center justify-end overflow-hidden rounded-[2rem] bg-brand pr-6 sm:h-52 sm:pr-14">
@@ -130,8 +123,7 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
         )}
         <header className="flex flex-wrap items-end gap-x-5 gap-y-3 px-4 sm:px-8">
           {logo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logo} alt="" className="relative z-10 -mt-12 h-24 w-24 shrink-0 rounded-[1.75rem] bg-surface object-cover shadow-[0_0_0_5px_var(--surface),0_12px_28px_rgba(9,37,119,0.14)] sm:-mt-16 sm:h-32 sm:w-32" />
+            <CharityImage src={logo} alt="" width={128} height={128} sizes="(min-width: 640px) 128px, 96px" priority className="relative z-10 -mt-12 h-24 w-24 shrink-0 rounded-[1.75rem] bg-surface object-cover shadow-[0_0_0_5px_var(--surface),0_12px_28px_rgba(9,37,119,0.14)] sm:-mt-16 sm:h-32 sm:w-32" />
           ) : (
             <div aria-hidden className="relative z-10 -mt-12 flex h-24 w-24 shrink-0 items-center justify-center rounded-[1.75rem] bg-peach font-display text-3xl font-bold text-brand shadow-[0_0_0_5px_var(--surface),0_12px_28px_rgba(9,37,119,0.14)] sm:-mt-16 sm:h-32 sm:w-32 sm:text-4xl">
               {monogram}
@@ -174,7 +166,7 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
               </Link>
             ) : (
               <p role="status" className="rounded-control bg-honey-soft p-4 text-center text-muted">
-                {donatable?.givingPaused ? GIVING_PAUSED_MESSAGE : <>Online giving to <bdi>{charity.name_en}</bdi> opens soon.</>}
+                {donatable.givingPaused ? GIVING_PAUSED_MESSAGE : <>Online giving to <bdi>{charity.name_en}</bdi> opens soon.</>}
               </p>
             )}
             <ul className="space-y-2 text-sm">
@@ -230,8 +222,7 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
                       <span aria-hidden className={`absolute -left-7 top-6 h-4 w-4 rounded-full border-[3px] border-white ${i === 0 ? "bg-coral" : "bg-brand"}`} />
                       <p className="text-sm font-semibold text-muted">{formatDate(u.created_at)}</p>
                       <p className="whitespace-pre-line leading-relaxed">{u.body_en}</p>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      {photo ? <img src={photo} alt="" loading="lazy" className="aspect-[4/3] w-full rounded-control object-cover" /> : null}
+                      {photo ? <CharityImage src={photo} alt="" width={800} height={600} sizes="(min-width: 640px) 1280px, calc(100vw - 96px)" className="aspect-[4/3] w-full rounded-control object-cover" /> : null}
                       {u.video ? <ProfileVideo video={u.video} charityName={charity.name_en} /> : null}
                     </li>
                   );
@@ -246,8 +237,7 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
                 {photos.map((p) => (
                   <li key={p.id}>
                     <figure className="space-y-1">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={publicImageUrl(p.storage_path)!} alt={p.caption_en ?? ""} loading="lazy" className="aspect-square w-full rounded-control object-cover" />
+                      <CharityImage src={publicImageUrl(p.storage_path)!} alt={p.caption_en ?? ""} width={600} height={600} sizes="(min-width: 640px) 700px, 50vw" className="aspect-square w-full rounded-control object-cover" />
                       {p.caption_en ? <figcaption className="text-sm text-muted">{p.caption_en}</figcaption> : null}
                     </figure>
                   </li>

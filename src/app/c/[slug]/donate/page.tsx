@@ -5,10 +5,9 @@ import { notFound } from "next/navigation";
 import { CampaignProgress } from "@/components/campaign-progress";
 import { cache } from "react";
 import { Card } from "@/components/card";
-import { loadCampaigns, loadOpenCampaigns } from "@/lib/charity/campaign-queries";
+import { loadPublicAllCampaigns, loadPublicDonatable, loadPublicOpenCampaigns } from "@/lib/charity/public-cache";
 import { campaignFromLink } from "@/lib/charity/campaigns";
 import { platformConfig } from "@/config/platform";
-import { loadDonatableCharity } from "@/lib/donations/charity";
 import { cleanLabel } from "@/lib/donations/labels";
 import { formatRand } from "@/lib/money";
 import { readGiveLink } from "@/lib/donations/give-link";
@@ -27,15 +26,17 @@ import { DonateFlow } from "./donate-flow";
  */
 export const maxDuration = 30;
 
-// One lookup serves both the title and the page.
-const loadCharity = cache(loadDonatableCharity);
+// One lookup serves both the title and the page. The charity's public details are cached for a short while per charity
+// and refreshed when it edits them (src/lib/charity/public-cache.ts, 24/11/2026); who is looking, their saved ID and
+// everything about the gift itself are read fresh below, and checkout reads the charity live.
+const loadCharity = cache(loadPublicDonatable);
 
 /** A shared campaign link shows the campaign and its charity in WhatsApp's preview. */
 export async function generateMetadata({ params, searchParams }: PageProps<"/c/[slug]/donate">): Promise<Metadata> {
   const charity = await loadCharity((await params).slug);
   if (!charity) return { title: "Donate" };
   const sp = await searchParams;
-  const campaign = typeof sp.campaign === "string" ? (await loadOpenCampaigns(charity.id)).find((c) => c.id === sp.campaign) : undefined;
+  const campaign = typeof sp.campaign === "string" ? (await loadPublicOpenCampaigns(charity.slug, charity.id)).find((c) => c.id === sp.campaign) : undefined;
   const title = campaign ? `${campaign.title}: give to ${charity.name_en}` : `Give to ${charity.name_en}`;
   const description = campaign?.description?.slice(0, 200) ?? `Give to ${charity.name_en} on Givezy.`;
   return { title: `Give to ${charity.name_en}`, description, openGraph: { title, description, siteName: "Givezy", locale: "en_ZA", type: "website", images: [{ url: "/logo.png" }] } };
@@ -57,7 +58,7 @@ export default async function DonatePage({ params, searchParams }: PageProps<"/c
   // Giving to one of the charity's open campaigns (an ended or unknown one falls back to a normal gift, and says
   // which), and the donor's saved ID, also at the same time.
   const [campaigns, savedId] = await Promise.all([
-    typeof sp.campaign === "string" ? loadCampaigns(charity.id) : Promise.resolve([]),
+    typeof sp.campaign === "string" ? loadPublicAllCampaigns(charity.slug, charity.id) : Promise.resolve([]),
     viewer?.email && charity.receiptsAvailable ? savedIdLast4(viewer.userId) : Promise.resolve(null),
   ]);
   const fromLink = campaignFromLink(typeof sp.campaign === "string" ? sp.campaign : undefined, campaigns);

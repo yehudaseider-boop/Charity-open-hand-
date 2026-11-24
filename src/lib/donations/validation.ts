@@ -1,12 +1,14 @@
 import { z } from "zod";
 import { normaliseSaPhone, SA_PHONE } from "@/lib/phone";
 import { saIdDigits, saIdProblem } from "@/lib/sa-id";
-import { isValidCompanyRegistration, passesModulus10 } from "@/lib/sars-numbers";
+import { passesModulus10 } from "@/lib/sars-numbers";
 import { plainPunctuation } from "@/lib/plain-text";
 import { normaliseLineBreaks } from "@/lib/text";
+// Moved to s18a-rules.ts (24/11/2026) so the give form need not load zod just to run it; still exported from here.
+export { registrationNumberProblem };
 import { cleanDedicationName, parseDedication } from "./dedication";
 import { cleanLabel, LABEL_MAX } from "./labels";
-import { ADDRESS_MESSAGES, postalCodeProblem, SARS_LIMITS, sarsAddressProblems, sarsLengthProblem, sarsTextProblem, trustNumberProblem } from "./s18a-rules";
+import { ADDRESS_MESSAGES, postalCodeProblem, registrationNumberProblem, SARS_LIMITS, sarsAddressProblems, sarsLengthProblem, sarsTextProblem } from "./s18a-rules";
 
 /** An optional text field, with a plain message when it is too long. */
 const str = (max: number, what: string) => z.string().max(max, `Please keep ${what} to ${max} characters or fewer`).optional();
@@ -135,26 +137,6 @@ export function checkDonorDetails(v: CheckoutInput, receiptsAvailable: boolean):
   if (v.age_confirmed !== "on") e.age_confirmed = "You must be 18 or older to give";
   if (v.popia_consent !== "on") e.popia_consent = "Please agree so we can record your donation";
   return e;
-}
-
-/**
- * What is wrong with a company's or trust's registration number at checkout, or null. SARS reports a company by its
- * CIPC number (Appendix K) and a trust by its Master's number (decided 03/11/2026), at most 15 characters
- * (23/11/2026). The give form runs it again when the donor switches between "A company" and "A trust", so a
- * company's message never stays on a trust's number (tester, 23/11/2026).
- */
-export function registrationNumberProblem(
-  donorType: CheckoutInput["donor_type"],
-  value: string | null | undefined,
-  s18a: { want18a: boolean; detailsNow: boolean },
-  today: Date = new Date(),
-): string | null {
-  if (donorType === "individual") return null;
-  const reg = value?.trim() ?? "";
-  if (s18a.detailsNow && !reg) return "Needed for an s18A receipt";
-  if (s18a.want18a && reg && donorType === "company" && !isValidCompanyRegistration(reg, today)) return "Use the company's CIPC number, for example 2015/123456/07";
-  if (s18a.detailsNow && donorType === "trust") return trustNumberProblem(reg);
-  return null;
 }
 
 /**

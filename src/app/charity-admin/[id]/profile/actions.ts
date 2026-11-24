@@ -27,6 +27,7 @@ import { checkThankYouNote } from "@/lib/charity/thank-you-note";
 import { focusDay, focusStatus, jhbToday } from "@/lib/charity/focus";
 import { refusal } from "@/lib/charity/team";
 import { siteChanges } from "@/lib/charity/profile-changes";
+import { revalidateCharitySlugs } from "@/lib/charity/public-cache";
 
 /** An approved charity is public with a "Verified" badge: tell us when its name or pictures change, so we can look. */
 async function tellReviewer(charity: { id: string; status: string; name_en: string }, what: string) {
@@ -35,6 +36,8 @@ async function tellReviewer(charity: { id: string; status: string; name_en: stri
 }
 
 function revalidate(charityId: string, slug: string) {
+  // The charity's page and give page keep their public details for a short while: say they changed (24/11/2026).
+  revalidateCharitySlugs(slug);
   revalidatePath(`/charity-admin/${charityId}/profile`);
   revalidatePath(`/c/${slug}`);
   revalidatePath("/charities");

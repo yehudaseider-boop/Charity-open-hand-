@@ -16,6 +16,11 @@ import { ErrorMark } from "./fields";
  *  - handleRef (a form that sends from its own code, e.g. Give): the form asks `token()` before sending and calls
  *    `used()` once the token is on its way.
  * A token is used once: after each press the check gets a fresh one, so pressing again after a refusal just works.
+ *
+ * Cloudflare's script (28 KB) is loaded only when the form is about to be used (24/11/2026): when the person touches
+ * or focuses the form, when the check scrolls into view (if it was not already on screen), or at the latest when they press the
+ * button (the press then waits for the token, as before). The server's check is unchanged: it still requires and
+ * verifies the token, so a visitor who never triggers the load simply has no token and is refused there.
  */
 
 export type BotCheckToken = { ok: true; token: string } | { ok: false };
@@ -92,7 +97,10 @@ export function BotCheck({
   handleRef?: Ref<BotCheckHandle>;
   className?: string;
 }) {
+  const outer = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
+  // The script is not loaded until the form is about to be used (see the note above).
+  const [started, setStarted] = useState(false);
   const widget = useRef<string | null>(null);
   const tokenNow = useRef<string | null>(null);
   const statusNow = useRef<Status>("loading");
@@ -121,7 +129,40 @@ export function BotCheck({
     setWaiting(false);
   }, []);
 
+  // Start the check when the form is touched, focused, or comes within a screen of the view.
   useEffect(() => {
+    if (started) return;
+    const go = () => setStarted(true);
+    const form = outer.current?.closest("form") ?? null;
+    const events = ["focusin", "pointerdown", "keydown", "touchstart"] as const;
+    for (const e of events) form?.addEventListener(e, go, { once: true, passive: true });
+    let io: IntersectionObserver | null = null;
+    if (typeof IntersectionObserver === "undefined" || !outer.current) go();
+    else {
+      // Already on screen when the page opens (a short sign-in form): wait for a touch or a keypress instead, so the
+      // page's first seconds stay free of Cloudflare's script. Scrolled to later (the end of the long give form): start.
+      let first = true;
+      io = new IntersectionObserver(
+        (entries) => {
+          const near = entries.some((en) => en.isIntersecting);
+          if (first) {
+            first = false;
+            if (near) return;
+          }
+          if (near) go();
+        },
+        { rootMargin: "200px 0px" },
+      );
+      io.observe(outer.current);
+    }
+    return () => {
+      for (const e of events) form?.removeEventListener(e, go);
+      io?.disconnect();
+    };
+  }, [started]);
+
+  useEffect(() => {
+    if (!started) return;
     let gone = false;
     loadTurnstile()
       .then((ts) => {
@@ -181,11 +222,13 @@ export function BotCheck({
       widget.current = null;
       setToken(null);
     };
-  }, [siteKey, action, round, setStatus, setToken, settle]);
+  }, [started, siteKey, action, round, setStatus, setToken, settle]);
 
   const token = useCallback((): Promise<BotCheckToken> => {
     if (tokenNow.current) return Promise.resolve({ ok: true, token: tokenNow.current });
     if (statusNow.current !== "loading") return Promise.resolve({ ok: false });
+    // A press before anything started it (a keyboard-less, touch-less submit): start now and wait for the token.
+    setStarted(true);
     setWaiting(true);
     return new Promise<BotCheckToken>((resolve) => {
       const timer = window.setTimeout(() => {
@@ -248,7 +291,7 @@ export function BotCheck({
   };
 
   return (
-    <div className={className}>
+    <div ref={outer} className={className}>
       {guardForm ? <input ref={field} type="hidden" name={botCheckConfig.field} value={fieldValue} data-no-draft /> : null}
       {status === "interactive" ? <p className="mb-2 text-sm font-semibold text-navy">{botCheckInteractiveMessage(button)}</p> : null}
       {/* Cloudflare's box appears here only when it wants a tick; otherwise this takes no space. */}

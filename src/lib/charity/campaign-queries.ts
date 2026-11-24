@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/public";
 import { isRunning } from "./campaigns";
 
 export type CampaignRow = {
@@ -14,8 +15,8 @@ export type CampaignRow = {
 };
 
 /** A charity's campaigns with their running totals, read as the signed-in person (row-level security decides). */
-export async function loadCampaigns(charityId: string): Promise<CampaignRow[]> {
-  const supabase = await createClient();
+export async function loadCampaigns(charityId: string, client?: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createPublicClient>): Promise<CampaignRow[]> {
+  const supabase = client ?? (await createClient());
   const { data, error } = await supabase
     .from("campaigns")
     .select("id, title, description, target_cents, ends_at, status")
