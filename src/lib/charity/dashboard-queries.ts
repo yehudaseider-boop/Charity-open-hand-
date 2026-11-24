@@ -6,7 +6,7 @@ import { leftCents } from "@/lib/donations/what-is-left";
 import { platformConfig } from "@/config/platform";
 import { taxYearFor } from "@/lib/dates";
 import { annualReport, pickReportYear, reportFromSummary, reportYears, toReportSummary, type AnnualReport } from "./annual-report";
-import { isMissingFunction } from "./keeping-donors-queries";
+import { isMissingFunctionNamed } from "./keeping-donors-queries";
 
 /** Everything here is read as the signed-in person, so row-level security decides what comes back. */
 
@@ -180,7 +180,9 @@ export async function loadAnnualReport(charityId: string, askedYear: number, now
   const [answer, campaignTitles] = await Promise.all([
     supabase.rpc("charity_report_summary", {
       p_charity_id: charityId,
-      p_asked_year: Number.isInteger(askedYear) ? askedYear : null,
+      // Only a believable year (24/11/2026): ?year=99999999999 overflowed the database's integer (22003) and the page
+      // errored. Anything else asks for the latest year, as before.
+      p_asked_year: Number.isSafeInteger(askedYear) && askedYear >= 2000 && askedYear <= 2200 ? askedYear : null,
       p_current_year: taxYearFor(now),
       p_start_month: platformConfig.taxYear.startMonth,
       p_time_zone: platformConfig.timeZone,
@@ -191,7 +193,7 @@ export async function loadAnnualReport(charityId: string, askedYear: number, now
     const summary = toReportSummary(answer.data as Record<string, unknown>);
     return { years: summary.years, year: summary.taxYear, report: reportFromSummary(summary, campaignTitles, now) };
   }
-  if (answer.error && !isMissingFunction(answer.error)) throw new Error(answer.error.message);
+  if (answer.error && !isMissingFunctionNamed(answer.error, "charity_report_summary")) throw new Error(answer.error.message);
   if (!answer.error) throw new Error("The annual report came back empty.");
 
   const data = await loadReportData(charityId);

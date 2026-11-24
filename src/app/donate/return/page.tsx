@@ -174,7 +174,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
         {/* On a phone a long charity name squeezed the amount until "R1 250" broke over two lines, and "Dedication"
             broke mid-word (24/11/2026). Amounts and labels now never wrap; the long text beside them does. */}
         <dl className="space-y-1.5 rounded-control border-2 border-border p-4 text-[15px] tabular-nums">
-          <div className="flex justify-between gap-3"><dt className="min-w-0">Donation to <bdi>{charity.name_en}</bdi></dt><dd className="shrink-0 whitespace-nowrap font-semibold">{formatRand(d.amount_cents)}</dd></div>
+          <div className="flex justify-between gap-3"><dt className="min-w-0 [overflow-wrap:anywhere]">Donation to <bdi>{charity.name_en}</bdi></dt><dd className="shrink-0 whitespace-nowrap font-semibold">{formatRand(d.amount_cents)}</dd></div>
           {Number(d.contribution_cents) > 0 ? (
             <div className="flex justify-between gap-3"><dt className="min-w-0">Contribution to Givezy</dt><dd className="shrink-0 whitespace-nowrap">{formatRand(d.contribution_cents)}</dd></div>
           ) : null}

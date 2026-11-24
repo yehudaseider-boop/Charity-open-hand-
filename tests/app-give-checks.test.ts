@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { platformConfig } from "@/config/platform";
-import { buttonTextFit, CHOOSE_AN_AMOUNT, footerAmountLine, giftAmountError, giftTotalWords, givableTotal, loadingLine, STILL_CONNECTING, waitingGiftLine } from "../apps/mobile/src/lib/give-checks";
+import { buttonTextFit, CHOOSE_AN_AMOUNT, footerAmountLine, giftAmountError, giftTotalWords, givableTotal, loadingLine, STILL_CONNECTING, TYPE_AN_AMOUNT, waitingGiftLine } from "../apps/mobile/src/lib/give-checks";
 import { afterPaymentMade, leavePrompt, type LeaveState } from "../apps/mobile/src/lib/give-leave";
 import { nextFirstOfMonth, recurring, sampleContributionMaxCents } from "../apps/mobile/src/data/giving";
 import { nextChargeText } from "../apps/mobile/src/lib/live-giving";
@@ -25,6 +25,11 @@ describe("the gift amount", () => {
     expect(amountErr("")).toBe(CHOOSE_AN_AMOUNT);
     expect(amountErr("   ")).toBe(CHOOSE_AN_AMOUNT);
     expect(giftAmountError("", null, 0, null)).toBe("Choose an amount, or tap Other amount to type your own");
+  });
+  it("with the own-amount box open and empty, asks for an amount in Rand, not to tap Other amount", () => {
+    expect(giftAmountError("", null, MIN, MAX, true)).toBe("Type an amount in Rand");
+    expect(giftAmountError("  ", null, MIN, MAX, true)).toBe(TYPE_AN_AMOUNT);
+    expect(giftAmountError("0", 0, MIN, MAX, true)).toBe("The minimum donation is R30");
   });
   it("with no minimum, 0 still needs an amount", () => {
     expect(giftAmountError("0", 0, 0, null)).toMatch(/^Enter an amount in Rand/);

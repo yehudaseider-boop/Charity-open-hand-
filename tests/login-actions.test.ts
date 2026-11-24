@@ -189,6 +189,9 @@ describe("trying to break sign-in (24/11/2026)", () => {
     expect(events.filter((e) => e.bucket.startsWith("login-code"))).toEqual([]);
     expect(signInMessages["code-busy"]).toMatch(/couldn't check yours/);
     expect(signInMessages["code-down"]).toMatch(/Nothing is wrong with it/);
+    // The box comes back empty (the code is never put in the address), so the words ask for the code again.
+    expect(signInMessages["code-busy"]).toMatch(/type the newest code again/);
+    expect(signInMessages["code-down"]).toMatch(/type the same code again/);
   });
 
   it("an address Supabase won't send to asks to check the address, not to try again in a minute", async () => {

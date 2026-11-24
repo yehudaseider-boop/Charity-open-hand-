@@ -2,7 +2,6 @@ import "server-only";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { hashedKey, ipKeys } from "@/lib/rate-limit";
 import { botCheckRefusedMessage, botCheckUnreachableMessage } from "@/lib/bot-check-words";
-import { CODE_CHECK_BUSY, CODE_CHECK_DOWN } from "@/lib/sign-in-code";
 
 /**
  * Sign-in on the website: the plain messages (the same on the Sign in page and on the apply page), the limit keys,
@@ -22,9 +21,10 @@ export const signInMessages: Record<string, string> = {
   "check-down": botCheckUnreachableMessage(),
   // The limits can't be kept (no server key on the live or test site): sign-in refuses rather than run without limits.
   unavailable: "Sign-in isn't available just now, so no email was sent. Please try again in a few minutes, or contact us if it keeps happening.",
-  // Checking the code, when Supabase was busy or down rather than the code wrong (24/11/2026).
-  "code-busy": CODE_CHECK_BUSY,
-  "code-down": CODE_CHECK_DOWN,
+  // Checking the code, when Supabase was busy or down rather than the code wrong (24/11/2026). The code box comes back
+  // empty here (a code is never put in the address), so the website asks to type the same code again; the app keeps it.
+  "code-busy": "Too many codes have been checked in the last few minutes, so we couldn't check yours. Please wait a few minutes, then type the newest code again.",
+  "code-down": "We couldn't check your code just now. Nothing is wrong with it. Please type the same code again in a minute: it works for a short while.",
 };
 
 /**

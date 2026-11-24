@@ -63,6 +63,16 @@ export const SERVER_BUSY = "Givezy isn't answering properly just now. Please try
 /** What to say when there was no usable reply: the phone's connection, or our side, by whether an answer came at all. */
 export const noReplyMessage = (status: number | null): string => (status !== null && (status === 429 || status >= 500) ? SERVER_BUSY : NETWORK);
 
+/**
+ * A new-card gift that got no usable reply from our server (24/11/2026). Nothing was charged: the card only goes in on
+ * the payment provider's own page, which never opened. When our server answered but was busy or down, say so (its
+ * words) rather than "check your connection".
+ */
+export function newCardNoReplyMessage(message: string | undefined): string {
+  if (!message || message === NETWORK) return "We couldn't reach Givezy, so nothing was charged. Your details are still here. Check your connection and hold to give again.";
+  return `${message} Nothing was charged, and your details are still here.`;
+}
+
 async function call<T extends { ok: boolean; message?: string }>(post: Post, url: string, body: unknown, token?: string | null): Promise<T> {
   let status: number | null = null;
   try {
@@ -457,6 +467,14 @@ export async function reviewerSignIn(site: string, email: string, code: string, 
 }
 
 /**
+ * No connection or no answer, as opposed to a real "no" from the sign-in service. Supabase's AuthRetryableFetchError
+ * also stands for a 5xx answer (with that status), so only a missing status (0 or none) counts as no connection.
+ */
+export function isNetworkError(error: { name?: string; status?: number }): boolean {
+  return error.status === 0 || error.status === undefined;
+}
+
+/**
  * Signing in with a typed code (pure, so it can be tested): Supabase first; only a plain "wrong code" (not a lost
  * connection) asks the reviewer check, and its token is exchanged with Supabase. Anything else is the usual message.
  */
@@ -469,10 +487,11 @@ export async function signInWithCode(steps: {
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const { error } = await steps.verifyCode();
   if (!error) return { ok: true };
-  if (steps.isNetworkError(error)) return { ok: false, message: steps.offline };
-  // Supabase busy or down is not a wrong code (24/11/2026): the website's words, never "That code didn't work".
+  // Supabase busy or down is not a wrong code (24/11/2026): the website's words, never "That code didn't work". Checked
+  // before the connection, because Supabase answers 5xx with an AuthRetryableFetchError that carries the status.
   if (error.status === 429) return { ok: false, message: CODE_CHECK_BUSY };
   if (typeof error.status === "number" && error.status >= 500) return { ok: false, message: CODE_CHECK_DOWN };
+  if (steps.isNetworkError(error)) return { ok: false, message: steps.offline };
   const answer = await steps.reviewer();
   if (answer && "message" in answer) return { ok: false, message: answer.message };
   if (answer) {
