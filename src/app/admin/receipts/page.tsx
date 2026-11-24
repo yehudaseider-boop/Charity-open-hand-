@@ -9,10 +9,10 @@ import { createClient } from "@/lib/supabase/server";
 import { receiptsEnabled } from "@/config/receipts";
 import { leftOutText, remainingText } from "@/lib/receipts/issue";
 import { adminCharityMissingWords } from "@/lib/receipts/details";
-import { getRun, listUnfinishedRuns, listUnknownReceiptEmails, listWaitingRuns, loadPlan, pendingAtYearEnd, runNeedsFinishing, STUCK_MINUTES } from "@/lib/receipts/runs";
+import { adminReceiptsReads } from "@/lib/receipts/admin-reads";
+import { getRun, runNeedsFinishing, STUCK_MINUTES } from "@/lib/receipts/runs";
 import { finishReceipts, markReceiptsStopped, receiptEmailArrived, receiptEmailSendAgain, sendBackReceipts, signOffReceipts, voidReceipt } from "./actions";
 import { EmailArrivedForm, EmailSendAgainForm, FinishForm, MarkStoppedForm, SendBackForm, SignOffForm, VoidForm } from "./forms";
-import { yearsWithReceipts } from "@/lib/receipts/year-list-store";
 import { Card } from "@/components/card";
 
 export const metadata: Metadata = { title: "Receipts" };
@@ -27,7 +27,6 @@ const tabs = ["issued", "void"] as const;
 export default async function AdminReceiptsPage({ searchParams }: PageProps<"/admin/receipts">) {
   await requirePlatformAdmin();
   const { status: raw, q: rawQ, run: rawRun, receipt: rawReceipt } = await searchParams;
-  const justRan = typeof rawRun === "string" ? await getRun(rawRun) : null;
   const status = tabs.includes(raw as (typeof tabs)[number]) ? (raw as (typeof tabs)[number]) : "issued";
   // Search by receipt number, donor or charity name: letters, digits, spaces and dashes only (it goes into a filter).
   const q = typeof rawQ === "string" ? safeSearch(rawQ) : "";
@@ -46,12 +45,9 @@ export default async function AdminReceiptsPage({ searchParams }: PageProps<"/ad
       `details->>receipt_reference.ilike.${containsPattern(q)},details->donor->>name.ilike.${containsPattern(q)},details->charity->>legal_name_en.ilike.${containsPattern(q)}`,
     );
   }
-  const { data: receipts, error } = await query;
+  const { justRan, list, waiting, unfinished, years, unknownEmails, pending, plans } = await adminReceiptsReads({ runId: typeof rawRun === "string" ? rawRun : null, list: query });
+  const { data: receipts, error } = list;
   if (error) throw error;
-  const [waiting, unfinished, years, unknownEmails] = await Promise.all([listWaitingRuns(), listUnfinishedRuns(), yearsWithReceipts(), listUnknownReceiptEmails()]);
-  const pending = await Promise.all(waiting.map((w) => pendingAtYearEnd(w.charity_id, w.tax_year)));
-  // Gifts held back because the donor hasn't added the s18A details yet (they are never receipted as they are).
-  const plans = await Promise.all(waiting.map((w) => loadPlan(w.charity_id, w.tax_year).catch(() => null)));
   const detailsMissing = plans.map((p) => (p ? p.detailsMissing.length : null));
   // Receipts the charity declined (09/11/2026): left out of its list, and the donor asked to contact the charity.
   const declined = plans.map((p) => p?.counts.declined ?? 0);

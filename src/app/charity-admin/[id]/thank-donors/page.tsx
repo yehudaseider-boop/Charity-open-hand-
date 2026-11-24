@@ -8,8 +8,8 @@ import { loadCharityForManager } from "@/lib/charity/queries";
 import { can } from "@/lib/charity/permissions";
 import { viewerRole } from "@/lib/charity/team";
 import { monthLabel, recentMonths } from "@/lib/charity/thank-you";
-import { thankYouRecipients } from "@/lib/charity/thank-you-send";
-import { carryOnLine, carryOnState } from "@/lib/charity/carry-on-sends";
+import { thankDonorsCounts } from "@/lib/charity/thank-you-page";
+import { carryOnLine } from "@/lib/charity/carry-on-sends";
 import { WEEKLY_LIMIT } from "@/lib/charity/weekly-limit-rule";
 import { formatDate } from "@/lib/dates";
 import { nextWeekStart } from "@/lib/charity/journey";
@@ -46,24 +46,12 @@ export default async function ThankDonorsPage({ params, searchParams }: PageProp
     .limit(24);
   const sent = new Map((sentRows ?? []).map((r) => [r.period_month as string, r]));
   const months = recentMonths(new Date());
-  // A thank-you that stopped part way (it ran out of time) and how many donors it hasn't reached yet.
-  const unfinished = owner && charity.status === "approved"
-    ? await Promise.all(
-        (sentRows ?? []).filter((r) => !r.finished_at).map(async (r) => ({
-          month: r.period_month as string,
-          sent: Number(r.recipient_count ?? 0),
-          total: (await thankYouRecipients(id, r.period_month as string)).length,
-          // Whether the daily job really carries the rest on, by its own rules, and if not why (review 21/11/2026).
-          carryOn: await carryOnState(
-            { kind: "thank_you", id: r.id as string, charityId: id, startedBy: (r.sent_by as string | null) ?? null, startedAt: r.sent_at as string, month: String(r.period_month).slice(0, 10) },
-            { pageLive: charity.status === "approved" },
-          ),
-        })),
-      )
-    : [];
-  const open = owner && charity.status === "approved"
-    ? await Promise.all(months.filter((m) => !sent.has(m)).map(async (m) => ({ month: m, count: (await thankYouRecipients(id, m)).length })))
-    : [];
+  // A thank-you that stopped part way (it ran out of time) and how many donors it hasn't reached yet, and the open
+  // months' donor counts: read together, not one list after the other (24/11/2026).
+  const counted = owner && charity.status === "approved"
+    ? await thankDonorsCounts({ charityId: id, pageLive: true, sent: sentRows ?? [], openMonths: months.filter((m) => !sent.has(m)) })
+    : { unfinished: [], open: [] };
+  const { unfinished, open } = counted;
 
   return (
     <div className="space-y-5">

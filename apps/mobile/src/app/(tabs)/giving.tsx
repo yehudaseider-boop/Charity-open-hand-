@@ -1,7 +1,7 @@
 import { recurringChangeError } from "@/lib/recurring-error";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View, type ScrollViewInstance } from "react-native";
+import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { bigAmountSize, NARROW_SCREEN } from "@/lib/amount-size";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStatusCover } from "@/components/status-cover";
@@ -59,7 +59,7 @@ export default function Giving() {
   const state = preview ? demoState : givingLoadState({ status: account.status, hasLive: account.live !== null, loadError: account.loadError });
   const p = useLocalSearchParams<{ demo?: string; sheet?: string; section?: "year" | "monthly"; at?: string }>();
   // Opened from a Home row: scroll to that row's section once it is laid out. `at` makes each tap a new jump.
-  const scrollRef = useRef<ScrollViewInstance>(null);
+  const scrollRef = useRef<FlatList<{ label: string; rows: Gift[] }>>(null);
   const [bodyY, setBodyY] = useState<number | null>(null);
   const [sectionY, setSectionY] = useState<Partial<Record<"year" | "monthly", number>>>({});
   const jumped = useRef<string | null>(null);
@@ -99,7 +99,7 @@ export default function Giving() {
     const target = p.section ? sectionY[p.section] : undefined;
     if (!p.section || !p.at || jumped.current === p.at || !settled || bodyY === null || target === undefined) return;
     jumped.current = p.at;
-    scrollRef.current?.scrollTo({ y: Math.max(0, bodyY + target - insets.top - 16), animated: true });
+    scrollRef.current?.scrollToOffset({ offset: Math.max(0, bodyY + target - insets.top - 16), animated: true });
   }, [p.section, p.at, settled, bodyY, sectionY, insets.top]);
   const incomeReady = incomeRecord.status === "ready";
   const incomeProblem = incomeRecord.reason;
@@ -286,16 +286,62 @@ export default function Giving() {
     return null;
   };
 
+  // The last branch of the states below (not loading, not an error); the history is only for the preview and signed-in donors.
+  const showMain = state !== "loading" && state !== "error";
+  const showHistory = showMain && (preview || signedIn);
+  const historyGroups = showHistory ? groupByMonth(myGifts) : [];
+  const footerLabels = showMain && ((preview && myGifts.length > 0) || (signedIn && account.live));
+
   return (
     <View style={styles.screen}>
-      <ScrollView
+      <FlatList
         ref={scrollRef}
+        // Recycling list (24/11/2026): a long history draws only the months on screen. Everything above it is the list's header.
+        data={historyGroups}
+        keyExtractor={(g) => g.label}
+        renderItem={({ item: g, index: gi }) => (
+          <View style={styles.historyRow}>
+            <FadeUp index={gi < 4 ? gi : 0} style={{ gap: 6 }}>
+              <Text variant="label">{g.label}</Text>
+              <View style={styles.list}>
+                {g.rows.map((gift, i) => (
+                  <Pressable key={gift.id} onPress={() => setOpenGift(gift)} accessibilityRole="button" accessibilityLabel={`${gift.charityName}, ${rand(gift.cents)}, ${ddmmyyyy(gift.date)}`} style={[styles.row, i > 0 && styles.divider]}>
+                    <View style={[styles.dot, { backgroundColor: labelColour(gift.label) }]} />
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={{ fontSize: 17 }}>{gift.charityName}</Text>
+                      <Text variant="bodyMuted" style={{ fontSize: 16 }}>
+                        {metaLine([ddmmyyyy(gift.date), gift.label, gift.monthly && "Monthly", !gift.with18a && "No s18A receipt"])}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 17 }}>{rand(gift.cents)}</Text>
+                    <ChevronIcon />
+                  </Pressable>
+                ))}
+              </View>
+            </FadeUp>
+          </View>
+        )}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        windowSize={7}
         onScroll={status.onScroll}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         refreshControl={signedIn ? <RefreshControl refreshing={account.refreshing} onRefresh={account.refresh} /> : undefined}
-        contentContainerStyle={{ paddingBottom: 40, gap: space.block }}>
+        contentContainerStyle={{ paddingBottom: 40 }}
+        ListFooterComponent={
+          footerLabels ? (
+            <View style={{ paddingHorizontal: space.gutter, gap: space.block, marginTop: space.block }}>
+              {preview && myGifts.length ? <Text variant="label" style={{ textAlign: "center" }}>Sample data: the demo donor&apos;s giving</Text> : null}
+              {signedIn && account.live ? (
+                <Text variant="label" style={{ textAlign: "center" }}>Updated {ddmmyyyy(jhbDay(account.live.loadedAt))} at {hhmm(account.live.loadedAt)}. Pull down to refresh.</Text>
+              ) : null}
+            </View>
+          ) : undefined
+        }
+        ListHeaderComponent={
+          <View style={{ gap: space.block }}>
         <BlueHeader paddingTop={insets.top + 20}>
           <Text style={styles.headTitle} accessibilityRole="header">Progress</Text>
           {main && mainProgress && state === "ready" && goalsLoaded && !goalsProblem ? (
@@ -691,39 +737,16 @@ export default function Giving() {
               <Text variant="h2" style={styles.heading}>History</Text>
               {myGifts.length === 0 ? (
                 <EmptyState title="No donations yet" body="Donations you make appear here once the payment goes through, and count towards your goals." action={{ label: "Find a charity", onPress: () => router.push("/discover") }} />
-              ) : (
-                groupByMonth(myGifts).map((g, gi) => (
-                  <FadeUp key={g.label} index={gi} style={{ gap: 6 }}>
-                    <Text variant="label">{g.label}</Text>
-                    <View style={styles.list}>
-                      {g.rows.map((gift, i) => (
-                        <Pressable key={gift.id} onPress={() => setOpenGift(gift)} accessibilityRole="button" accessibilityLabel={`${gift.charityName}, ${rand(gift.cents)}, ${ddmmyyyy(gift.date)}`} style={[styles.row, i > 0 && styles.divider]}>
-                          <View style={[styles.dot, { backgroundColor: labelColour(gift.label) }]} />
-                          <View style={{ flex: 1, gap: 2 }}>
-                            <Text style={{ fontSize: 17 }}>{gift.charityName}</Text>
-                            <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-                              {metaLine([ddmmyyyy(gift.date), gift.label, gift.monthly && "Monthly", !gift.with18a && "No s18A receipt"])}
-                            </Text>
-                          </View>
-                          <Text style={{ fontSize: 17 }}>{rand(gift.cents)}</Text>
-                          <ChevronIcon />
-                        </Pressable>
-                      ))}
-                    </View>
-                  </FadeUp>
-                ))
-              )}
+              ) : null}
             </View>
             </>
-            ) : null}
-            {preview && myGifts.length ? <Text variant="label" style={{ textAlign: "center" }}>Sample data: the demo donor&apos;s giving</Text> : null}
-            {signedIn && account.live ? (
-              <Text variant="label" style={{ textAlign: "center" }}>Updated {ddmmyyyy(jhbDay(account.live.loadedAt))} at {hhmm(account.live.loadedAt)}. Pull down to refresh.</Text>
             ) : null}
           </>
         )}
         </View>
-      </ScrollView>
+          </View>
+        }
+      />
       {status.cover}
       <UndoToast message={undo} />
 
@@ -897,6 +920,7 @@ const noIncome: IncomeEntry[] = [];
 const newEntryId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const styles = StyleSheet.create({
+  historyRow: { paddingHorizontal: space.gutter, marginTop: 16 },
   screen: { flex: 1, backgroundColor: "transparent" },
   headTitle: { fontFamily: fonts.displayBold, fontSize: 32, lineHeight: 37, letterSpacing: -0.4, color: colors.onInk },
   headKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.lilac },
