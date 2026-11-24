@@ -153,10 +153,11 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
         {/* Giving comes first on a phone, and stays beside the story on a laptop. */}
         <div className="lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:self-start">
           <div className="relative isolate space-y-4 overflow-hidden rounded-[1.75rem] border-2 border-border bg-surface p-5 shadow-[0_24px_48px_rgba(23,73,181,0.08)] sm:p-6">
-            <span aria-hidden className="pointer-events-none absolute -right-10 -top-10 -z-10 h-28 w-28 rounded-full bg-honey-soft" />
+            <span aria-hidden className="pointer-events-none absolute -right-10 -top-10 -z-10 h-28 w-28 rounded-full bg-peach" />
             {charity.impact_en || unit ? (
-              <div className="rounded-control bg-[#fff4ec] p-4">
-                <p className="text-sm font-bold text-[#b4501a]">What your gift does</p>
+              // The same box as the thank-you page's "What your gift does", in the brand's own colours (24/11/2026).
+              <div className="rounded-control bg-honey-soft p-4">
+                <p className="text-sm font-semibold text-brand">What your gift does</p>
                 {charity.impact_en ? <p className="mt-1 font-display text-xl font-bold leading-snug text-navy">{charity.impact_en}</p> : null}
                 {unit ? (
                   <p className={charity.impact_en ? "mt-2 text-sm text-muted" : "mt-1 font-display text-xl font-bold leading-snug text-navy"}>
