@@ -238,3 +238,24 @@ describe("the cache is only for the pages, never for money", () => {
     }
   });
 });
+
+describe("review fixes 24/11/2026", () => {
+  it("a made-up address is refused before the cache or the database is touched", async () => {
+    for (const bad of ["", "Meals", "a b", "-x", "x-", "a--b", "../etc", "x".repeat(65), "meals/../x", "%00"]) {
+      expect(await cache.loadListedCharity(bad)).toBeNull();
+    }
+  });
+
+  it("the image service endpoint has no allowed address unless the service is switched on", async () => {
+    const mod = async (flag: string | undefined) => {
+      vi.resetModules();
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://abc.supabase.co");
+      if (flag === undefined) vi.stubEnv("CHARITY_IMAGE_SERVICE", ""); else vi.stubEnv("CHARITY_IMAGE_SERVICE", flag);
+      return (await import("../next.config")).default;
+    };
+    expect((await mod(undefined)).images?.remotePatterns).toEqual([]);
+    expect((await mod("no")).images?.remotePatterns).toEqual([]);
+    expect((await mod("yes")).images?.remotePatterns).toHaveLength(1);
+    vi.unstubAllEnvs();
+  });
+});

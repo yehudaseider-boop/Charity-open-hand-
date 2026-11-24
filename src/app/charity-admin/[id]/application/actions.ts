@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidateCharityPages } from "@/lib/charity/public-cache";
 import { revalidatePath } from "next/cache";
 import { checkCharityBank, savedAccountKey } from "@/lib/charity/bank-check";
 import { redirect } from "next/navigation";
@@ -84,6 +85,7 @@ export async function saveOrganisation(charityId: string, _prev: FormState, form
   if (fail) return fail;
   const done = await recordAction(charityId, viewer.userId, "organisation_saved", {}, { type: "restore", table: "charities", before, after });
   revalidatePath(`/charity-admin/${charityId}/application`);
+  await revalidateCharityPages(charityId); // names and numbers show on the charity's page (review 24/11/2026)
   redirect(back(charityId, "organisation", done));
 }
 
@@ -109,6 +111,7 @@ export async function saveAddress(charityId: string, _prev: FormState, formData:
   if (fail) return fail;
   const done = await recordAction(charityId, viewer.userId, "address_saved", {}, { type: "restore", table: "charities", before, after });
   revalidatePath(`/charity-admin/${charityId}/application`);
+  await revalidateCharityPages(charityId); // suburb and city show on the charity's page (review 24/11/2026)
   redirect(back(charityId, "address", done));
 }
 

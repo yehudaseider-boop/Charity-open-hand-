@@ -48,7 +48,11 @@ const PAGE_COLUMNS =
   "legal_name_en, description_en, funds_use_en, impact_en, website, logo_path, cover_path, npo_number, pbo_number, s18a_reference, suburb, city, video_provider, video_id, charity_categories(categories(name_en))";
 
 /** The listed (approved) charity at this address with everything both pages need, or null. One read, cached. */
+/** What a charity's address can be: nothing else is ever looked up or kept (review 24/11/2026: no entry per made-up address). */
+export const SLUG_SHAPE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 export function loadListedCharity(slug: string) {
+  if (slug.length > 64 || !SLUG_SHAPE.test(slug)) return Promise.resolve(null);
   return cachedRead(slug, "listed-charity", async (s: string) => {
     const { data, error } = await createAdminClient().from("charities").select(`${DONATABLE_COLUMNS}, ${PAGE_COLUMNS}`).eq("slug", s).eq("status", "approved").maybeSingle();
     // A read that failed must not become "no such charity" for a minute: throwing keeps it out of the cache.

@@ -80,6 +80,9 @@ const nextConfig: NextConfig = {
     // Charity pictures from our public storage go through the image service on the live site (src/components/
     // charity-image.tsx, 24/11/2026): only that one folder, only over https. 90 keeps them sharp (75 is the default).
     remotePatterns: (() => {
+      // Off unless CHARITY_IMAGE_SERVICE=yes: with no allowed address, Vercel's image endpoint refuses every request
+      // (and bills nothing), whatever a visitor asks for (review 24/11/2026).
+      if (process.env.CHARITY_IMAGE_SERVICE !== "yes") return [];
       try {
         const u = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "");
         if (u.protocol !== "https:") return [];

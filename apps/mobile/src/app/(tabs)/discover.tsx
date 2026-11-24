@@ -73,12 +73,17 @@ export default function Discover() {
   // Only say "the causes you chose, first" when at least one charity is in them.
   const sortedByCauses = !searching && cause === "all" && results.some((c) => picked.some((p) => inCause(c, p)));
   const noneYet = live && charities.length === 0;
-  const rest = results.filter((c) => c !== featured);
-  // Swipeable stories first (when not searching and there are enough to swipe through); the list carries on after them.
-  const deck = !searching && cause === "all" && rest.length >= 3 ? rest.slice(0, 8) : [];
-  const list = deck.length ? rest.slice(deck.length) : rest;
+  // Kept between renders unless the charities or the search change (review 24/11/2026), so the list isn't redrawn on every scroll tick.
+  const { deck, list, rest } = useMemo(() => {
+    const others = results.filter((c) => c !== featured);
+    // Swipeable stories first (when not searching and there are enough to swipe through); the list carries on after them.
+    const stories = !searching && cause === "all" && others.length >= 3 ? others.slice(0, 8) : [];
+    return { deck: stories, list: stories.length ? others.slice(stories.length) : others, rest: others };
+  }, [results, featured, searching, cause]);
   // The last branch of the states below: a list with at least one charity.
   const showList = state === "ready" && !noneYet && results.length > 0;
+  // The same array between renders unless the list changes, so the list isn't redrawn on every scroll tick (review 24/11/2026).
+  const shownList = useMemo(() => (showList ? list : []), [showList, list]);
 
   return (
     <>
@@ -86,7 +91,7 @@ export default function Discover() {
       <FlatList
         style={styles.screen}
         // Recycling list (24/11/2026): only the cards on screen (and a little either side) are drawn, so 500 charities cost no more than 20.
-        data={showList ? list : []}
+        data={shownList}
         keyExtractor={(c) => c.slug}
         renderItem={({ item, index }) => (
           <View style={styles.cardRow}>
