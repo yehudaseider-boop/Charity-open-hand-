@@ -114,7 +114,7 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
       {v2 ? (
         <Card title="Your journeys">
           <ul className="divide-y divide-border text-sm">
-            {[{ r: { kind: "general" } as JourneyRef, label: "Donor journey", hint: "Everyone's first gift" }, { r: { kind: "winback" } as JourneyRef, label: "Win-back journey", hint: "Donors you add from your lists" }]
+            {[{ r: { kind: "general" } as JourneyRef, label: "Welcome journey", hint: "Everyone's first gift" }, { r: { kind: "winback" } as JourneyRef, label: "Win-back journey", hint: "Donors you add from your lists" }]
               .concat(all.filter((j) => j.kind === "campaign").map((j) => ({ r: j.ref, label: `Journey for ${titleOf(j.campaignId) ?? "a campaign"}`, hint: "A first gift to this campaign" })))
               .map((x) => (
                 <li key={refKey(x.r)} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3 first:pt-0 last:pb-0">
@@ -188,8 +188,8 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
       <Card title="Your emails">
         <div className="space-y-3 text-sm">
           <p className="text-muted">
-            Up to five emails. The first goes 0 to 30 days after someone joins; each next one 7 to 180 days after the one before. Plain words in
-            your own voice, no web addresses. Givezy adds a button to your page and the stop link. Changes apply from each donor&apos;s next email.
+            Up to five short emails in your own words, no web addresses. Givezy adds the button to your page and the stop link. Changes apply from
+            each donor&apos;s next email.
           </p>
           <JourneyEditor
             key={formKey(sp, `journey-${key}`)}

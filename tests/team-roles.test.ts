@@ -122,7 +122,7 @@ describe("the activity, in plain words", () => {
     );
     expect(lines.map((l) => l.text)).toEqual([
       "Sam downloaded the SARS IT3(d) data file on 11/11/2026.",
-      "Lerato switched on the donor journey on 10/11/2026, then took it back.",
+      "Lerato switched on the welcome journey on 10/11/2026, then took it back.",
       "Lerato made sam@c.org a viewer (was an admin) on 09/11/2026.",
     ]);
   });

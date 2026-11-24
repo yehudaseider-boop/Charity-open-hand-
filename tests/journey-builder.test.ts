@@ -40,7 +40,7 @@ describe("the builder", () => {
     const html = render([]);
     expect(html).toContain("A donor gives for the first time");
     expect(html).toContain("What would you like to happen first?");
-    expect(html).toContain(">Send an email<");
+    expect(html).toContain(">Add the first email<");
     expect(html).not.toContain("Start from our suggested wording");
     expect(html).not.toContain(STARTER_STEPS[0].subject);
   });
@@ -50,7 +50,7 @@ describe("the builder", () => {
     expect(html).toContain("You add a donor to this journey");
     expect(html).toContain('value="Thanks from us"');
     expect(html).toContain("What would you like next?");
-    expect(html).toContain("Wait, then send another email");
+    expect(html).toContain("Add another email");
     expect(html).not.toContain("Show me an example");
     // The wait is part of the step, with its range.
     expect(html).toContain("Then wait");
@@ -67,7 +67,7 @@ describe("the builder", () => {
     const step = { subject: "Hello there", body: "A note from us to you.", waitDays: 7 };
     const html = render([step, step, step, step, step]);
     expect(html).toContain("5 emails is the most a journey has. Your journey ends here.");
-    expect(html).not.toContain("Wait, then send another email");
+    expect(html).not.toContain("Add another email");
   });
 });
 

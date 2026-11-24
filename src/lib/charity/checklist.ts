@@ -212,7 +212,7 @@ export function gettingStarted(f: StartFacts, base: string, may: StartCan): Star
   if (f.journeyOn !== null) {
     items.push({
       key: "journey",
-      label: "Switch on your donor journey",
+      label: "Switch on your welcome journey",
       why: "A few short emails you write, sent to new donors over the first weeks, so they hear from you again.",
       done: f.journeyOn,
       href: `${base}/journey`,

@@ -241,6 +241,7 @@ export function JourneyEditor({
                     <label htmlFor={`${id}-wait-${i}`} className="font-semibold">
                       {i === 0 ? "Then wait" : `After email ${i}, wait`}
                     </label>
+                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
                     <input
                       id={`${id}-wait-${i}`}
                       name={`wait_${i + 1}`}
@@ -253,6 +254,7 @@ export function JourneyEditor({
                       className="w-20 rounded-[0.875rem] border-2 border-border bg-surface px-3 py-2 text-center tabular-nums outline-none transition focus:border-brand focus:ring-4 focus:ring-brand-soft aria-invalid:border-danger"
                     />
                     <span className="font-semibold">days</span>
+                    </span>
                   </div>
                   <p id={`${id}-wait-${i}-hint`} className={`text-xs ${err(`wait_${i + 1}`) ? "font-semibold text-danger" : "text-muted"}`}>
                     {err(`wait_${i + 1}`) ?? `${range.min} to ${range.max} days${i === 0 ? " after they join" : ""}.`}
@@ -264,8 +266,8 @@ export function JourneyEditor({
                 <span aria-hidden="true" className="absolute -left-[1.95rem] top-1 size-4 rounded-full border-2 border-surface bg-coral" />
                 <fieldset className="min-w-0 space-y-3 rounded-card border-2 border-border bg-surface p-4" onFocus={() => setShowing(i)}>
                   <legend className="px-1 font-display text-base font-bold text-indigo">
-                    Send email {i + 1}
-                    {days[i] !== null ? <span className="ml-2 font-sans text-sm font-normal text-muted">around day {days[i]}</span> : null}
+                    <span className="whitespace-nowrap">Send email {i + 1}</span>
+                    {days[i] !== null ? <span className="block font-sans text-sm font-normal text-muted sm:ml-2 sm:inline">{days[i] === 0 ? "the day they join" : `around day ${days[i]}`}</span> : null}
                   </legend>
                   <div className="space-y-1">
                     <label htmlFor={`${id}-subject-${i}`} className="block text-sm font-semibold">Subject</label>
@@ -408,7 +410,7 @@ export function JourneyEditor({
                       : "Another email a few weeks later keeps them close: some news, a moment from your work, a way to help. Or stop here."}
                   </p>
                   <button type="button" onClick={add} className="pressable inline-flex min-h-11 items-center rounded-control bg-brand px-4 text-sm font-semibold text-brand-contrast">
-                    {drafts.length === 0 ? "Send an email" : "Wait, then send another email"}
+                    {drafts.length === 0 ? "Add the first email" : "Add another email"}
                   </button>
                 </>
               ) : (

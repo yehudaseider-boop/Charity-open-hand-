@@ -116,10 +116,10 @@ describe("the donor's story", () => {
     expect(story.map((e) => [e.what, e.status])).toEqual([
       ["s18A receipt 12 withdrawn", null],
       ["s18A receipt 12 for 2026/27 (R1 250)", "Issued and emailed"],
-      ["Donor journey email 2", "May not have arrived"],
-      ["Left your donor journey", "Because they turned off your emails"],
-      ["Donor journey email 1", "Sent"],
-      ["Joined your donor journey", null],
+      ["Left your welcome journey", "Because they turned off your emails"],
+      ["Welcome journey email 2", "May not have arrived"],
+      ["Welcome journey email 1", "Sent"],
+      ["Joined your welcome journey", null],
       ["s18A receipt for 2025/26 declined", "Not emailed yet"],
     ]);
   });
@@ -259,7 +259,7 @@ describe("loading a donor's story", () => {
       ["Left your win-back journey", "Because they gave again", `${base}/journey?j=winback`],
       ["Journey for Winter blankets email 1", "Sent", `${base}/journey?j=${encodeURIComponent("campaign:k1")}`],
       ["Joined the journey for Winter blankets", null, `${base}/journey?j=${encodeURIComponent("campaign:k1")}`],
-      ["Joined your donor journey", null, `${base}/journey`],
+      ["Joined your welcome journey", null, `${base}/journey`],
     ]);
   });
 

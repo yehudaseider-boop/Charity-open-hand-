@@ -49,7 +49,7 @@ describe("naming a journey in a link", () => {
 
 describe("a journey's name in a sentence", () => {
   it("says which journey, with the campaign's own name", () => {
-    expect(journeyName("general")).toBe("your donor journey");
+    expect(journeyName("general")).toBe("your welcome journey");
     expect(journeyName("winback")).toBe("your win-back journey");
     expect(journeyName("campaign", "  Winter   blankets ")).toBe("the journey for Winter blankets");
     expect(journeyName("campaign", "")).toBe("the journey for your campaign");
@@ -133,7 +133,7 @@ describe("what just happened, and the activity log", () => {
     expect(describeDone("journey_saved", camp, c).what).toBe("The journey for Winter blankets is saved: 2 emails. Donors on it get the new wording from their next email.");
     expect(describeDone("journey_saved", camp, c).next?.href).toBe(`/charity-admin/c1/journey?j=${encodeURIComponent(`campaign:${K}`)}#people`);
     expect(describeDone("journey_on", { steps: 2, jkey: "winback" }, c).what).toBe("Your win-back journey is on. Donors you add from your lists get 2 emails from you, never more than one message from you a week.");
-    expect(describeDone("journey_on", { steps: 3 }, c).what).toBe("Your donor journey is on. From now, each new donor joins on their first gift and gets 3 emails from you, never more than one message from you a week.");
+    expect(describeDone("journey_on", { steps: 3 }, c).what).toBe("Your welcome journey is on. From now, each new donor joins on their first gift and gets 3 emails from you, never more than one message from you a week.");
     expect(describeDone("journey_winback_added", { added: 3, firstEmail: "12/11/2026", jkey: "winback" }, c).next?.href).toBe("/charity-admin/c1/journey?j=winback#people");
     expect(describeUndone("journey_off", { jkey: "winback" })).toBe("Taken back. Your win-back journey is on again.");
     expect(describeUndone("journey_winback_added", { removed: 2, stayed: 1, jkey: "winback" })).toBe("Taken back. Removed 2 donors from your win-back journey; 1 had already had their first email and stays on.");
@@ -142,7 +142,7 @@ describe("what just happened, and the activity log", () => {
   it("reads plainly in the activity log", () => {
     expect(describeAction("journey_on", { jkey: "winback" })).toBe("switched on the win-back journey");
     expect(describeAction("journey_saved", { jkey: `campaign:${K}`, jtitle: "Winter blankets" })).toBe("saved the journey for Winter blankets");
-    expect(describeAction("journey_off", {})).toBe("switched off the donor journey");
+    expect(describeAction("journey_off", {})).toBe("switched off the welcome journey");
     expect(describeAction("journey_winback_added", {})).toBe("added donors to the win-back journey");
   });
 });

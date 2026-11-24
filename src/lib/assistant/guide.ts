@@ -97,7 +97,7 @@ What this means on each page:
 - Donors: "Say thank you" is replaced by "Messaged this week" until Monday.
 - Thank donors: anyone who already had a message this week is left out and the page tells you how many; press "Send the rest" from the Monday after.
 - Email donors: the check shows how many are left out because of this.
-- Donor journey: an email that meets a week with another message waits for the next week.
+- Journeys: an email that meets a week with another message waits for the next week.
 
 Email donors also has its own limit: nobody gets more than 4 emails from you in 30 days.
 
@@ -137,7 +137,7 @@ If your page isn't approved yet, the Overview shows where your application stand
 - "Add your logo and a cover photo" and "Tell donors what you do and where gifts go" (Public profile).
 - "Write your thank-you note" (Thank donors).
 - "Add your SARS details for s18A receipts" (only if you issue s18A receipts; the owner does this).
-- "Switch on your donor journey".
+- "Switch on your welcome journey".
 - "Post your first update".
 - "Give your team their own logins" (optional; the owner does this).
 
@@ -634,15 +634,15 @@ From Photos and updates, "Email this to your donors" starts an email from that u
   },
   {
     id: "donor-journey",
-    title: "Donor journey: welcome emails for new donors",
+    title: "Welcome journey: emails for new donors",
     path: "/charity-admin/[id]/journey",
     roles: "Everyone sees it; owner, admin and fundraiser write and switch it; adding existing donors is the owner's",
     body: `A few short emails from you, so a gift turns into a relationship. You write them once; Givezy sends each in your name with the donor's first name. Donors can stop them with one link.
 
-Journeys: the "Donor journey" (everyone's first gift), the "Win-back journey" (donors you add), and one per campaign ("Give a campaign its own journey").
+Journeys: the "Welcome journey" (everyone's first gift), the "Win-back journey" (donors you add), and one per campaign ("Give a campaign its own journey").
 
 To set one up (Donor journeys, then the "Journeys" tab):
-1. Under "Your emails", the journey starts where the donor joins and asks "What would you like to happen first?". Press "Send an email", choose how many days to wait, and write it; every box starts empty with a grey hint, and "Show me an example" fills in sample wording you can change. Each email can have one picture (optional, once pictures are switched on for journeys), with a few words saying what it shows. Then "What would you like next?" adds the next email. Up to five emails. For each, set the days: the first goes 0 to 30 days after someone joins, each next one 7 to 180 days after the one before. Plain words, no web addresses: Givezy adds a button to your page and the stop link. Use "Preview this email" to check it.
+1. Under "Your emails", the journey starts where the donor joins and asks "What would you like to happen first?". Press "Add the first email", choose how many days to wait, and write it; every box starts empty with a grey hint, and "Show me an example" fills in sample wording you can change. Each email can have one picture (optional, once pictures are switched on for journeys), with a few words saying what it shows. Then "What would you like next?" has "Add another email" for the next one. Up to five emails. For each, set the days: the first goes 0 to 30 days after someone joins, each next one 7 to 180 days after the one before. Plain words, no web addresses: Givezy adds a button to your page and the stop link. Use "Preview this email" to check it.
 2. Press "Save emails". Changes apply from each donor's next email.
 3. Under "On or off", press "Switch it on" (once your page is live).
 

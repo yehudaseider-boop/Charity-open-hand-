@@ -428,7 +428,7 @@ const KINDS = new Set<ActionKind>([
 function jKind(d: Details): "general" | "campaign" | "winback" {
   return parseRefKey(d.jkey)?.kind ?? "general";
 }
-/** "your donor journey", "your win-back journey", "the journey for Winter blankets". */
+/** "your welcome journey", "your win-back journey", "the journey for Winter blankets". */
 function jName(d: Details): string {
   return journeyName(jKind(d), d.jtitle ? String(d.jtitle) : null);
 }

@@ -161,7 +161,7 @@ export function buildDonorStory(rows: StoryRows, opts: { base: string; erased: b
     }
     for (const j of rows.journeys) {
       const name = journeyName(j.kind, j.campaignTitle);
-      const label = j.kind === "general" ? "Donor journey" : j.kind === "winback" ? "Win-back journey" : `Journey for ${(j.campaignTitle ?? "").trim() || "a campaign"}`;
+      const label = j.kind === "general" ? "Welcome journey" : j.kind === "winback" ? "Win-back journey" : `Journey for ${(j.campaignTitle ?? "").trim() || "a campaign"}`;
       const href = j.kind === "general" ? `${opts.base}/journey` : `${opts.base}/journey?j=${encodeURIComponent(j.kind === "winback" ? "winback" : `campaign:${j.campaignId}`)}`;
       if (j.enrolled_at) out.push({ at: j.enrolled_at, kind: "journey", what: `Joined ${name}`, status: null, tone: "neutral", href });
       for (const s of j.sends) {

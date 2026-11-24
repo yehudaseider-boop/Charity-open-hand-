@@ -215,7 +215,7 @@ describe("the dashboard's record of journey actions", () => {
       expect(describeDone(kind, { steps: 3, added: 2, firstEmail: "12/11/2026" }, c).what).not.toMatch(/[!—]/);
       expect(describeUndone(kind, {})).toMatch(/^Taken back\./);
     }
-    expect(describeDone("journey_saved", { steps: 3, on: false }, c).what).toBe("Your donor journey is saved: 3 emails. It's off, so nothing is sent until you switch it on.");
+    expect(describeDone("journey_saved", { steps: 3, on: false }, c).what).toBe("Your welcome journey is saved: 3 emails. It's off, so nothing is sent until you switch it on.");
   });
 });
 
@@ -248,8 +248,8 @@ describe("an email that doesn't go (review 10/11/2026)", () => {
   });
 
   it("taking back added donors says exactly what happened", () => {
-    expect(describeUndone("journey_existing_added", { added: 10, removed: 7, stayed: 3 })).toBe("Taken back. Removed 7 donors from your donor journey; 3 had already had their first email and stay on.");
-    expect(describeUndone("journey_existing_added", { added: 2, removed: 2, stayed: 0 })).toBe("Taken back. Removed 2 donors from your donor journey. Nobody was emailed.");
+    expect(describeUndone("journey_existing_added", { added: 10, removed: 7, stayed: 3 })).toBe("Taken back. Removed 7 donors from your welcome journey; 3 had already had their first email and stay on.");
+    expect(describeUndone("journey_existing_added", { added: 2, removed: 2, stayed: 0 })).toBe("Taken back. Removed 2 donors from your welcome journey. Nobody was emailed.");
   });
 });
 

@@ -222,11 +222,11 @@ export function sameRef(a: JourneyRef, b: JourneyRef): boolean {
   return refKey(a) === refKey(b);
 }
 
-/** "your donor journey", "your win-back journey", "the journey for Winter blankets". */
+/** "your welcome journey", "your win-back journey", "the journey for Winter blankets". */
 export function journeyName(kind: JourneyKind, campaignTitle?: string | null): string {
   if (kind === "winback") return "your win-back journey";
   if (kind === "campaign") return `the journey for ${(campaignTitle ?? "").replace(/\s+/g, " ").trim() || "your campaign"}`;
-  return "your donor journey";
+  return "your welcome journey";
 }
 
 /** The same, starting a sentence. */
