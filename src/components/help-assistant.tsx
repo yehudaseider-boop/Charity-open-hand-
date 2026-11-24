@@ -290,16 +290,18 @@ export function HelpAssistant({
             {turns.length === 0 ? (
               <div className="space-y-4">
                 <div className="rounded-[1.25rem] bg-surface p-4 shadow-sm">
-                  <p className="font-semibold">Hi, I&apos;m Givy. Ask me about your charity&apos;s donations, what&apos;s left to set up, or how to do something in your dashboard.</p>
+                  <p className="font-semibold">
+                    Hi, I&apos;m Givy. Ask me about your charity&apos;s donations{names ? ", your donors by name" : ""}, what&apos;s left to set up, or how to do something in your dashboard.
+                  </p>
                   <p className="mt-1.5 text-[14px] text-muted">
                     I see what you see on your dashboard, and I&apos;ll link you to the right page. I can&apos;t change, send or approve anything
-                    {drafts ? ", but I can prepare a thank-you to your donors for you to check and send." : "."}
+                    {drafts ? `, but I can prepare a thank-you to your donors${names ? ", or to one donor by name," : ""} for you to check and send.` : "."}
                   </p>
                 </div>
                 <div>
                   <p className="mb-2 text-[13px] font-semibold text-muted">Try asking</p>
                   <ul className="flex flex-wrap gap-2">
-                    {startingSuggestions(live, drafts).map((s) => (
+                    {startingSuggestions(live, drafts, names || demo).map((s) => (
                       <li key={s}>
                         <button type="button" onClick={() => ask(s, turns)} className="min-h-10 rounded-full border-2 border-border bg-surface px-3.5 py-1.5 text-left text-[14px] font-semibold text-brand hover:border-brand">
                           {s}

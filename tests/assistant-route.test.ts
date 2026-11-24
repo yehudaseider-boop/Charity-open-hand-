@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
   looked: [] as string[],
   refuseBucket: "",
   forgotten: [] as string[],
+  donors: [] as unknown[],
 }));
 
 vi.mock("server-only", () => ({}));
@@ -25,7 +26,8 @@ const fakeSource = () => ({
   totals: async () => { state.looked.push("totals"); return { label: "This month (November 2026)", gifts: 3, raisedCents: 125_000, donors: 2, s18aRequestedCents: 0, refunded: 0, refundedCents: 0, chargedBack: 0, pending: 0, failed: 0 }; },
   byMonth: async () => [], monthly: async () => ({ running: 0, perMonthCents: 0, retrying: 0, paused: 0, ended: 0, nextCharges: [] }),
   setup: async () => ({ status: "Approved", application: null, gettingStarted: [] }), receipts: async () => [],
-  recentGifts: async () => [], donors: async () => { state.looked.push("donors"); return []; },
+  recentGifts: async () => [], donors: async () => { state.looked.push("donors"); return state.donors; },
+  donorContact: async (donorId: string) => { state.looked.push(`contact:${donorId}`); return { email: "moshe@x.co", phone: "082 123 4567" }; },
 });
 vi.mock("@/lib/assistant/live-source", () => ({ liveSource: fakeSource }));
 vi.mock("@/lib/assistant/demo-source", () => ({ demoSource: fakeSource }));
@@ -101,6 +103,8 @@ beforeEach(() => {
   vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
   vi.stubEnv("ASSISTANT_DEMO", "");
   vi.stubEnv("ASSISTANT_DONOR_DATA", "");
+  vi.stubEnv("ASSISTANT_CONTACT_DATA", "");
+  state.donors = [];
   Object.assign(state, {
     viewer: { userId: "u1" }, role: "admin", limited: false, streamText: ["Open ", "[Team](dash:/team)."], streamFails: false, stopReason: "end_turn",
     lastParams: null, allParams: [], secondStep: true, ipKnown: true, limitOptions: [], toolRounds: [], looked: [], refuseBucket: "", forgotten: [],
@@ -347,5 +351,72 @@ describe("the help assistant's server", () => {
     const text = await (await ask(question)).text();
     expect(text.length).toBeGreaterThan(0);
     expect(text).toMatch(/Please try again|can't help/);
+  });
+});
+
+describe("names and contact details on the server (24/11/2026)", () => {
+  const MOSHE = { name: "Moshe Katz", id: "aaaaaaaa-0000-0000-0000-000000000001", gifts: 2, totalCents: 60_000, firstGift: "01/10/2026", lastGift: "01/11/2026", monthly: true };
+  const names = () => (state.lastParams!.tools as { name: string }[]).map((t) => t.name);
+  const results = () => JSON.stringify(state.allParams[1].messages);
+
+  it("with names off, offers no name or contact tool and refuses them without reading donors", async () => {
+    vi.stubEnv("ASSISTANT_CONTACT_DATA", "yes");
+    state.role = "owner";
+    state.toolRounds = [[
+      { id: "t1", name: "donor_giving", input: { name: "Moshe", last_gift: "" } },
+      { id: "t2", name: "donor_contact", input: { name: "Moshe", last_gift: "" } },
+      { id: "t3", name: "donor_list", input: { list: "stopped_monthly" } },
+    ]];
+    await (await ask(question)).text();
+    for (const t of ["donor_giving", "donor_list", "donor_contact", "prepare_thank_you_to_donor", "find_donor"]) expect(names()).not.toContain(t);
+    expect(results()).toMatch(/Donors' details aren't available/);
+    expect(results()).toMatch(/Contact details can't be looked up here/);
+    expect(state.looked).toEqual([]);
+  });
+
+  it("with names on and contact off, offers the name tools but never contact details", async () => {
+    vi.stubEnv("ASSISTANT_DONOR_DATA", "yes");
+    state.role = "owner";
+    state.donors = [MOSHE];
+    state.toolRounds = [[{ id: "t1", name: "donor_contact", input: { name: "Moshe", last_gift: "" } }]];
+    await (await ask(question)).text();
+    expect(names()).toEqual(expect.arrayContaining(["donor_giving", "donor_list", "prepare_thank_you_to_donor"]));
+    expect(names()).not.toContain("donor_contact");
+    expect(results()).not.toMatch(/moshe@x\.co/);
+    expect(state.looked.filter((l) => l.startsWith("contact"))).toEqual([]);
+  });
+
+  it("with both switches on, gives contact details only to roles that see them, one donor per answer", async () => {
+    vi.stubEnv("ASSISTANT_DONOR_DATA", "yes");
+    vi.stubEnv("ASSISTANT_CONTACT_DATA", "yes");
+    state.donors = [MOSHE];
+    state.role = "viewer";
+    state.toolRounds = [[{ id: "t1", name: "donor_contact", input: { name: "Moshe", last_gift: "" } }]];
+    await (await ask(question)).text();
+    expect(names()).not.toContain("donor_contact");
+    expect(results()).not.toMatch(/moshe@x\.co/);
+    expect((state.allParams[0].system as { text: string }[])[1].text).toMatch(/can't see donors' contact details/);
+
+    state.role = "finance";
+    state.allParams = [];
+    state.looked = [];
+    state.toolRounds = [[
+      { id: "t1", name: "donor_contact", input: { name: "Moshe", last_gift: "" } },
+      { id: "t2", name: "donor_contact", input: { name: "Moshe Katz", last_gift: "" } },
+    ]];
+    await (await ask(question)).text();
+    expect(names()).toContain("donor_contact");
+    expect(results()).toMatch(/moshe@x\.co/);
+    expect(results()).toMatch(/One donor's contact details per answer/);
+    expect(state.looked.filter((l) => l.startsWith("contact"))).toHaveLength(1);
+  });
+
+  it("never offers contact details on the public demo", async () => {
+    vi.stubEnv("ASSISTANT_DEMO", "yes");
+    vi.stubEnv("ASSISTANT_DONOR_DATA", "yes");
+    vi.stubEnv("ASSISTANT_CONTACT_DATA", "yes");
+    await (await ask({ ...question, charityId: undefined, demo: true })).text();
+    expect(names()).not.toContain("donor_contact");
+    expect(names()).toContain("donor_giving");
   });
 });

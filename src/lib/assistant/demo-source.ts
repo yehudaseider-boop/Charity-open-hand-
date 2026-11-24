@@ -4,6 +4,7 @@ import { demoData } from "@/app/demo/dashboard/data";
 import { monthlySummary } from "@/lib/charity/dashboard";
 import { formatDate, taxYearFor, taxYearLabel, taxYearRange } from "@/lib/dates";
 import { monthName } from "./live-source";
+import { monthlyStates, newFlags } from "./donor-states";
 import { linkTarget } from "./prompt";
 import type { HelperSource, PeriodKey } from "./tools";
 
@@ -105,9 +106,54 @@ export function demoSource(now: Date = new Date()): HelperSource {
         if (g.recurringId) d.monthly = true;
         by.set(g.donorId, d);
       }
+      const states = monthlyStates(
+        data.gifts.map((g) => ({ donor_id: g.donorId, recurring_id: g.recurringId })),
+        data.monthly,
+      );
+      const flags = newFlags(now);
       return [...by.entries()]
         .sort((a, b) => b[1].totalCents - a[1].totalCents || b[1].last.localeCompare(a[1].last))
-        .map(([id, d]) => ({ name: nameOf(id), gifts: d.gifts, totalCents: d.totalCents, firstGift: formatDate(d.first), lastGift: formatDate(d.last), monthly: d.monthly }));
+        .map(([id, d]) => {
+          const s = states.get(id);
+          return {
+            name: nameOf(id),
+            gifts: d.gifts,
+            totalCents: d.totalCents,
+            firstGift: formatDate(d.first),
+            lastGift: formatDate(d.last),
+            monthly: d.monthly,
+            id,
+            monthlyState: s?.state ?? "none",
+            monthlyCents: s?.perMonthCents ?? 0,
+            stopped: s?.stopped ?? null,
+            newIn: flags(d.first),
+            firstAt: d.first,
+            s18aAsked: paid.some((g) => g.donorId === id && g.wants18a),
+          };
+        });
+    },
+
+    async donorGifts(donorId) {
+      const ty = taxYearFor(now);
+      const { start, end } = taxYearRange(ty);
+      return {
+        taxYear: taxYearLabel(ty),
+        gifts: data.gifts
+          .filter((g) => g.donorId === donorId)
+          .sort((a, b) => b.paidAt.localeCompare(a.paidAt))
+          .map((g) => ({
+            date: formatDate(g.paidAt),
+            amountCents: g.amountCents,
+            status: g.status === "charged_back" ? "charged back" : g.status,
+            monthly: Boolean(g.recurringId),
+            thisTaxYear: saDay(g.paidAt) >= start && saDay(g.paidAt) <= end,
+          })),
+      };
+    },
+
+    // The demo's donors have every s18A detail in; contact details are never looked up on the demo.
+    async s18aMissing() {
+      return new Map<string, string[]>();
     },
   };
 }

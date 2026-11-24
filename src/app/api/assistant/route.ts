@@ -1,14 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { assistantConfig, assistantDemoOn, assistantDonorDataOn, assistantOn } from "@/config/assistant";
+import { assistantConfig, assistantContactDataOn, assistantDemoOn, assistantDonorDataOn, assistantOn } from "@/config/assistant";
 import { legalConfig } from "@/config/legal";
 import { demoSource } from "@/lib/assistant/demo-source";
 import { liveSource } from "@/lib/assistant/live-source";
 import { askerContext, stableInstructions } from "@/lib/assistant/prompt";
 import { checkQuestion, pagePath, type AssistantRequest } from "@/lib/assistant/request";
 import { nextMark } from "@/lib/assistant/suggestions";
-import { checkToolCall, runPrepare, runTool, toolDefinitions, type HelperSource, type ThankYouPreparer } from "@/lib/assistant/tools";
+import { ONE_CONTACT_PER_ANSWER, checkToolCall, runPrepare, runTool, toolDefinitions, type HelperSource, type ThankYouPreparer } from "@/lib/assistant/tools";
 import { livePreparer } from "@/lib/assistant/drafts";
-import { thanksMark, type GivyAudience } from "@/lib/assistant/thank-you-draft";
+import { thanksMark, type DraftAudience } from "@/lib/assistant/thank-you-draft";
 import { can } from "@/lib/charity/permissions";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getViewer } from "@/lib/auth";
@@ -24,7 +24,9 @@ import { fromThisSite } from "@/lib/same-site";
  * plain text. To answer, the model may call read-only tools (src/lib/assistant/tools.ts) that read the charity's own
  * figures as the person asking, so it never sees more than their dashboard shows them; nothing is changed. Since
  * 24/11/2026 it may also prepare a thank-you (prepare_thank_you, for roles that may email donors): a draft is kept and
- * the answer ends with a button to the Email donors page, where the person checks it and presses Send. Givy never sends. The
+ * the answer ends with a button to the Email donors page, where the person checks it and presses Send. Givy never sends.
+ * With donors' names on, it also answers about donors by name and can prepare a thank-you to one named donor; with the
+ * separate contact switch on too, one named donor's email and phone for roles that see them (24/11/2026). The
  * question, and what the tools return, go to Anthropic to be answered; neither is stored by us. Only counts (tokens
  * used, lookups made) are logged, never the question, the figures or the answer.
  */
@@ -86,7 +88,7 @@ export async function POST(req: Request) {
     if (can(role, "message")) {
       const status = async () =>
         ((await createAdminClient().from("charities").select("status").eq("id", charityId!).maybeSingle()).data?.status as string | undefined) ?? null;
-      preparer = livePreparer({ charityId: charityId!, userId: viewer.userId, role, status });
+      preparer = livePreparer({ charityId: charityId!, userId: viewer.userId, role, status, withNames: assistantDonorDataOn() });
     }
   }
 
@@ -108,11 +110,15 @@ export async function POST(req: Request) {
   const donorData = demo || assistantDonorDataOn();
   const contact = { whatsApp: legalConfig.supportWhatsApp, email: legalConfig.supportEmail };
   const canDraft = preparer !== null;
-  const tools = toolDefinitions(donorData, canDraft);
+  // One named donor's email and phone (24/11/2026): its own switch, which needs the names switch too, never on the
+  // demo, and only for a role that sees contact details on the Donors page.
+  const contactOn = !demo && assistantContactDataOn();
+  const canContact = contactOn && donorData && role !== "demo" && can(role, "contact");
+  const tools = toolDefinitions(donorData, canDraft, canContact);
   const system: Anthropic.Beta.BetaTextBlockParam[] = [
     // The tools, rules and whole guide: identical for everyone with the same switches, so cached for an hour.
-    { type: "text", text: stableInstructions(contact, donorData), cache_control: { type: "ephemeral", ttl: "1h" } },
-    { type: "text", text: askerContext(role, pagePath(page), canDraft) },
+    { type: "text", text: stableInstructions(contact, donorData, contactOn), cache_control: { type: "ephemeral", ttl: "1h" } },
+    { type: "text", text: askerContext(role, pagePath(page), canDraft, { contactOn, canContact }) },
   ];
   const convo: Anthropic.Beta.BetaMessageParam[] = messages.map((m) => ({ role: m.role, content: m.content }));
 
@@ -134,7 +140,8 @@ export async function POST(req: Request) {
       // Which lookups ran, so the panel can offer fitting follow-up questions (22/11/2026).
       const used: string[] = [];
       // A thank-you prepared in this answer (at most one): what the panel's button needs.
-      let prepared: { draftId: string | null; audience: GivyAudience } | null = null;
+      let prepared: { draftId: string | null; audience: DraftAudience } | null = null;
+      let contactLookups = 0;
       try {
         for (let round = 0; round <= assistantConfig.maxToolRounds && !stopped; round++) {
           // The last round has no tools: by then it must answer with what it found. Short of time, it answers now.
@@ -181,18 +188,18 @@ export async function POST(req: Request) {
                 results.push({ type: "tool_result", tool_use_id: block.id, content: "Too many lookups at once. Answer with what you have, or look up fewer things.", is_error: true });
                 continue;
               }
-              const call = checkToolCall(block.name, block.input, donorData, canDraft);
+              const call = checkToolCall(block.name, block.input, donorData, canDraft, canContact);
               if (!call.ok) {
                 results.push({ type: "tool_result", tool_use_id: block.id, content: call.error, is_error: true });
                 continue;
               }
-              if (call.name === "prepare_thank_you") {
+              if (call.name === "prepare_thank_you" || call.name === "prepare_thank_you_to_donor") {
                 if (prepared) {
                   results.push({ type: "tool_result", tool_use_id: block.id, content: "One thank-you per answer: one is already prepared.", is_error: true });
                   continue;
                 }
                 try {
-                  const r = await runPrepare(call, preparer);
+                  const r = await runPrepare(call, preparer, { donorData, source });
                   results.push({ type: "tool_result", tool_use_id: block.id, content: r.text, ...(r.isError ? { is_error: true } : {}) });
                   if (r.prepared) {
                     prepared = r.prepared;
@@ -203,6 +210,14 @@ export async function POST(req: Request) {
                   results.push({ type: "tool_result", tool_use_id: block.id, content: "The thank-you couldn't be prepared just now. Nothing was sent.", is_error: true });
                 }
                 continue;
+              }
+              // Contact details one donor at a time (24/11/2026): one contact lookup per answer, never a run of them.
+              if (call.name === "donor_contact") {
+                if (contactLookups >= 1) {
+                  results.push({ type: "tool_result", tool_use_id: block.id, content: ONE_CONTACT_PER_ANSWER, is_error: true });
+                  continue;
+                }
+                contactLookups += 1;
               }
               try {
                 results.push({ type: "tool_result", tool_use_id: block.id, content: await runTool(call, source, donorData) });

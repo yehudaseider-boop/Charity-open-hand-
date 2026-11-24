@@ -4,8 +4,9 @@ import { pickAudience } from "@/lib/charity/appeals";
 import { parseAudience } from "@/lib/charity/appeals-rules";
 import { can, refusedFor, type Role } from "@/lib/charity/permissions";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isGivyAudience, type GivyAudience } from "./thank-you-draft";
+import { isDraftAudience, type DraftAudience } from "./thank-you-draft";
 import type { ThankYouPreparer } from "./tools";
+import { isErasedEmail } from "@/lib/charity/dashboard";
 
 /**
  * Where a thank-you Givy prepared waits for the person to check and send it (24/11/2026). The draft is kept on our
@@ -18,7 +19,7 @@ import type { ThankYouPreparer } from "./tools";
 const isMissingTable = (e: { code?: string } | null | undefined) => e?.code === "PGRST205" || e?.code === "42P01";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export type Draft = { audience: GivyAudience; subject: string; body: string };
+export type Draft = { audience: DraftAudience; subject: string; body: string };
 
 /** Keeps a draft for this person and charity. The new id, or null when it can't be kept (no table yet, a failed write). */
 export async function saveDraft(args: { charityId: string; userId: string } & Draft, now = new Date()): Promise<string | null> {
@@ -56,28 +57,37 @@ export async function loadDraft(id: string, charityId: string, userId: string, n
     if (isMissingTable(error)) return null;
     throw error;
   }
-  if (!data || !isGivyAudience(data.audience)) return "gone";
+  if (!data || !isDraftAudience(data.audience)) return "gone";
   return { audience: data.audience, subject: data.subject as string, body: data.body as string };
 }
 
 /**
  * Givy's "prepare a thank-you" for a real charity: checks the person may email donors and the page is live, works out
- * on the server how many donors the audience reaches now (a count only, never names, so it works with the
- * donor-names switch off), and keeps the draft. Sends nothing.
+ * on the server how many donors the audience reaches now, and keeps the draft. Sends nothing.
+ *
+ * `withNames` (only when donors' names are switched on, 24/11/2026): who is in it, by name, so Givy can answer
+ * "who's in it?". A donor who gave anonymously is listed as "Anonymous donor", never by name; erased donors are never
+ * in an audience. With it off, only the count comes back, as before.
  */
-export function livePreparer(args: { charityId: string; userId: string; role: Role; status: () => Promise<string | null> }): ThankYouPreparer {
+export function livePreparer(args: { charityId: string; userId: string; role: Role; status: () => Promise<string | null>; withNames?: boolean }): ThankYouPreparer {
   return {
     async prepare(d) {
       if (!can(args.role, "message")) return { refused: refusedFor("message") };
       if ((await args.status()) !== "approved") return { refused: "The charity can email donors once its page is live, so nothing was prepared." };
       const audience = parseAudience(d.audience);
       if (!audience) return { refused: "That audience isn't one the Email donors page knows." };
+      let failed = false;
       const pick = await pickAudience(args.charityId, audience).catch((e: unknown) => {
         console.error("[assistant] audience count failed", e instanceof Error ? e.message : e);
+        failed = true;
         return null;
       });
+      // One donor: checked again here, as the person asking, in this charity's own list (null: not there, or erased).
+      if (!pick && !failed && audience.kind === "donor") return { refused: "That donor isn't on the charity's donor list (or was erased at their request)." };
       const draftId = await saveDraft({ charityId: args.charityId, userId: args.userId, ...d }).catch(() => null);
-      return { label: pick?.label ?? null, count: pick ? pick.donors.length : null, draftId };
+      const names =
+        args.withNames && pick ? pick.donors.map((x) => (isErasedEmail(x.email) ? null : x.is_anonymous ? "Anonymous donor" : x.display_name)).filter((n): n is string => n !== null) : undefined;
+      return { label: pick?.label ?? null, count: pick ? pick.donors.length : null, draftId, ...(names ? { names } : {}) };
     },
   };
 }

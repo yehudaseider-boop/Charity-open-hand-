@@ -22,16 +22,23 @@ const Q = {
   logo: "How do I add my logo?",
   goLive: "What happens once we're approved?",
   thank: "Prepare a thank-you for this month's donors",
+  // With donors' names switched on (24/11/2026).
+  newDonors: "Who gave for the first time this month?",
+  stopped: "Who stopped their monthly donation?",
+  s18aMissing: "Who asked for an s18A receipt and still has details missing?",
+  topDonors: "Who are my top donors?",
 } as const;
 
 /**
  * The questions shown when the chat is empty. `canDraft`: the person may email donors, so a live charity is also
- * offered a thank-you to prepare (24/11/2026).
+ * offered a thank-you to prepare (24/11/2026). `names`: donors' names are switched on, so a live charity is also
+ * offered questions about donors by name (24/11/2026).
  */
-export function startingSuggestions(live: boolean, canDraft = false): string[] {
-  return live
-    ? [Q.thisMonth, ...(canDraft ? [Q.thank] : []), Q.monthly, Q.receiptsLeft, Q.recent, Q.team]
-    : [Q.setup, Q.logo, Q.team, Q.goLive, Q.receiptsHow];
+export function startingSuggestions(live: boolean, canDraft = false, names = false): string[] {
+  if (!live) return [Q.setup, Q.logo, Q.team, Q.goLive, Q.receiptsHow];
+  return names
+    ? [Q.thisMonth, ...(canDraft ? [Q.thank] : []), Q.newDonors, Q.stopped, Q.s18aMissing, Q.monthly]
+    : [Q.thisMonth, ...(canDraft ? [Q.thank] : []), Q.monthly, Q.receiptsLeft, Q.recent, Q.team];
 }
 
 /** What to offer after an answer that used each lookup, best first. */
@@ -44,7 +51,11 @@ const AFTER: Record<string, string[]> = {
   recent_gifts: [Q.thisMonth, Q.monthly, Q.receiptsLeft],
   top_donors: [Q.recent, Q.monthly, Q.thisMonth],
   find_donor: [Q.recent, Q.thisMonth, Q.monthly],
+  donor_giving: [Q.topDonors, Q.newDonors, Q.recent],
+  donor_list: [Q.newDonors, Q.stopped, Q.s18aMissing],
+  donor_contact: [Q.recent, Q.thisMonth, Q.monthly],
   prepare_thank_you: [Q.thisMonth, Q.monthly, Q.receiptsLeft],
+  prepare_thank_you_to_donor: [Q.thisMonth, Q.newDonors, Q.monthly],
 };
 
 /**
