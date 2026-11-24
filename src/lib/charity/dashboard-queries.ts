@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import type { MonthlyRow, Period } from "./dashboard";
 import { readAllPages } from "./read-pages";
 import { leftCents } from "@/lib/donations/what-is-left";
+import { platformConfig } from "@/config/platform";
+import { taxYearFor } from "@/lib/dates";
+import { annualReport, pickReportYear, reportFromSummary, reportYears, toReportSummary, type AnnualReport } from "./annual-report";
+import { isMissingFunction } from "./keeping-donors-queries";
 
 /** Everything here is read as the signed-in person, so row-level security decides what comes back. */
 
@@ -163,6 +167,37 @@ export async function loadReportData(charityId: string) {
     campaignTitles,
     onIssued,
   };
+}
+
+/**
+ * One tax year's annual report, for the Report page and its CSV (24/11/2026). The database works the figures out
+ * (`charity_report_summary`, which checks the person may see this charity's gifts), so a big charity's 20 000 gifts
+ * are no longer read here. Until that function is on the database, the gifts are read and worked out here as before.
+ * A refusal or any other error is never taken for "not there yet".
+ */
+export async function loadAnnualReport(charityId: string, askedYear: number, now: Date): Promise<{ years: number[]; year: number; report: AnnualReport }> {
+  const supabase = await createClient();
+  const [answer, campaignTitles] = await Promise.all([
+    supabase.rpc("charity_report_summary", {
+      p_charity_id: charityId,
+      p_asked_year: Number.isInteger(askedYear) ? askedYear : null,
+      p_current_year: taxYearFor(now),
+      p_start_month: platformConfig.taxYear.startMonth,
+      p_time_zone: platformConfig.timeZone,
+    }),
+    loadCampaignTitles(charityId),
+  ]);
+  if (!answer.error && answer.data && typeof answer.data === "object") {
+    const summary = toReportSummary(answer.data as Record<string, unknown>);
+    return { years: summary.years, year: summary.taxYear, report: reportFromSummary(summary, campaignTitles, now) };
+  }
+  if (answer.error && !isMissingFunction(answer.error)) throw new Error(answer.error.message);
+  if (!answer.error) throw new Error("The annual report came back empty.");
+
+  const data = await loadReportData(charityId);
+  const years = reportYears(data.gifts, now);
+  const year = pickReportYear(years, askedYear);
+  return { years, year, report: annualReport(data.gifts, year, data.campaignTitles, data.onIssued, now) };
 }
 
 export const DONATION_FIELDS =

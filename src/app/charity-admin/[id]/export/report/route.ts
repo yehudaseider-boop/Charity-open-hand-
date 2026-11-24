@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { annualReport, reportYears } from "@/lib/charity/annual-report";
-import { loadReportData } from "@/lib/charity/dashboard-queries";
+import { loadAnnualReport } from "@/lib/charity/dashboard-queries";
 import { audit, authoriseExport, csvResponse } from "@/lib/charity/export";
 import { centsToPlain, toCsv } from "@/lib/csv";
 import { taxYearName } from "@/lib/dates";
@@ -10,17 +9,15 @@ export async function GET(request: Request, ctx: RouteContext<"/charity-admin/[i
   const { id } = await ctx.params;
   const who = await authoriseExport(id);
   if (who instanceof NextResponse) return who;
-  let data;
+  const now = new Date();
+  const asked = Number(new URL(request.url).searchParams.get("year"));
+  let loaded: Awaited<ReturnType<typeof loadAnnualReport>>;
   try {
-    data = await loadReportData(id);
+    loaded = await loadAnnualReport(id, asked, now);
   } catch {
     return new NextResponse("Could not read the donations.", { status: 500 });
   }
-  const now = new Date();
-  const years = reportYears(data.gifts, now);
-  const asked = Number(new URL(request.url).searchParams.get("year"));
-  const year = years.includes(asked) ? asked : years[0];
-  const r = annualReport(data.gifts, year, data.campaignTitles, data.onIssued, now);
+  const { year, report: r } = loaded;
   await audit({ actorUserId: who.userId, action: "charity.report_exported", entityType: "charity", entityId: id, details: { taxYear: year } });
   const rows: (string | number)[][] = [
     ["Raised (R)", centsToPlain(r.totalCents)],

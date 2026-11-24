@@ -154,3 +154,85 @@ export function annualReport(
     s18a: { donors: askedDonors.size, receipted: askedDonors.size - waitingDonors.size, waitingCents: cents(waiting) },
   };
 }
+
+/** The year the report shows: the one asked for when it has figures (or is the current one), else the latest. */
+export function pickReportYear(years: number[], asked: number): number {
+  return years.includes(asked) ? asked : years[0];
+}
+
+/**
+ * The figures the database works out for one tax year (`charity_report_summary`, 24/11/2026): the same rules as
+ * annualReport above, from the same gifts, without reading them all. Money in integer cents.
+ */
+export type ReportSummary = {
+  taxYear: number;
+  /** Every tax year with a paid, refunded or charged-back gift, and the current one, newest first. */
+  years: number[];
+  totalCents: number;
+  donationCount: number;
+  donors: number;
+  newDonors: number;
+  monthlyCents: number;
+  /** Only the months with gifts, as "2026-04". */
+  months: { month: string; cents: number; count: number }[];
+  /** Largest first; ties in the order the gifts were first seen. */
+  campaigns: { id: string; cents: number; count: number }[];
+  refundedCount: number;
+  refundedCents: number;
+  s18aDonors: number;
+  s18aWaitingDonors: number;
+  s18aWaitingCents: number;
+};
+
+const num = (v: unknown) => Number(v ?? 0);
+
+/** The database's answer (JSON numbers, or strings for big ones) as a ReportSummary. */
+export function toReportSummary(raw: Record<string, unknown>): ReportSummary {
+  const list = <T>(v: unknown) => (Array.isArray(v) ? (v as T[]) : []);
+  return {
+    taxYear: num(raw.tax_year),
+    years: list<unknown>(raw.years).map(num),
+    totalCents: num(raw.total_cents),
+    donationCount: num(raw.donation_count),
+    donors: num(raw.donors),
+    newDonors: num(raw.new_donors),
+    monthlyCents: num(raw.monthly_cents),
+    months: list<Record<string, unknown>>(raw.months).map((m) => ({ month: String(m.month), cents: num(m.cents), count: num(m.count) })),
+    campaigns: list<Record<string, unknown>>(raw.campaigns).map((c) => ({ id: String(c.id), cents: num(c.cents), count: num(c.count) })),
+    refundedCount: num(raw.refunded_count),
+    refundedCents: num(raw.refunded_cents),
+    s18aDonors: num(raw.s18a_donors),
+    s18aWaitingDonors: num(raw.s18a_waiting_donors),
+    s18aWaitingCents: num(raw.s18a_waiting_cents),
+  };
+}
+
+/** The annual report from the database's figures: exactly what annualReport gives from the gifts themselves. */
+export function reportFromSummary(s: ReportSummary, campaignTitles: Map<string, string>, now: Date): AnnualReport {
+  const taxYear = s.taxYear;
+  const { start, end } = taxYearRange(taxYear);
+  const got = new Map(s.months.map((m) => [m.month, m]));
+  const months = taxYearMonths(taxYear).map((m) => ({ ...m, cents: got.get(m.month)?.cents ?? 0, count: got.get(m.month)?.count ?? 0 }));
+  const bestMonth = months.reduce<MonthLine | null>((best, m) => (m.cents > 0 && (!best || m.cents > best.cents) ? m : best), null);
+  return {
+    taxYear,
+    running: taxYear >= taxYearFor(now),
+    start,
+    end,
+    totalCents: s.totalCents,
+    donationCount: s.donationCount,
+    donors: s.donors,
+    newDonors: s.newDonors,
+    returningDonors: s.donors - s.newDonors,
+    monthlyCents: s.monthlyCents,
+    onceOffCents: s.totalCents - s.monthlyCents,
+    averageCents: averageCents(s.totalCents, s.donationCount),
+    months,
+    bestMonth,
+    campaigns: s.campaigns
+      .map((c) => ({ id: c.id, title: campaignTitles.get(c.id) ?? "A campaign", cents: c.cents, count: c.count }))
+      .sort((a, b) => b.cents - a.cents),
+    refunded: { count: s.refundedCount, cents: s.refundedCents },
+    s18a: { donors: s.s18aDonors, receipted: s.s18aDonors - s.s18aWaitingDonors, waitingCents: s.s18aWaitingCents },
+  };
+}

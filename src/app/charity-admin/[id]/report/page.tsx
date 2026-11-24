@@ -4,8 +4,7 @@ import { ActionLink, PageHeader, Tabs } from "@/components/dash";
 import { PrintButton } from "../poster/print-button";
 import { requireViewer } from "@/lib/auth";
 import { timed } from "@/lib/timing";
-import { annualReport, reportYears } from "@/lib/charity/annual-report";
-import { loadReportData } from "@/lib/charity/dashboard-queries";
+import { loadAnnualReport } from "@/lib/charity/dashboard-queries";
 import { saDate } from "@/lib/charity/dashboard";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate, taxYearLabel, taxYearName } from "@/lib/dates";
@@ -39,11 +38,9 @@ export default async function AnnualReportPage({ params, searchParams }: PagePro
   const canDownload = await timed("report", "viewerCan", viewerCan(id, "export"));
   const sp = await searchParams;
   const now = new Date();
-  const { gifts, campaignTitles, onIssued } = await timed("report", "loadReportData", loadReportData(id));
-  const years = reportYears(gifts, now);
   const asked = Number(typeof sp.year === "string" ? sp.year : NaN);
-  const year = years.includes(asked) ? asked : years[0];
-  const r = annualReport(gifts, year, campaignTitles, onIssued, now);
+  // The figures are worked out in the database; the gifts are read here only until its function is there (24/11/2026).
+  const { years, year, report: r } = await timed("report", "loadAnnualReport", loadAnnualReport(id, asked, now));
   const base = `/charity-admin/${id}/report`;
   const top = Math.max(1, ...r.months.map((m) => m.cents));
   const thisMonth = saDate(now).slice(0, 7);
