@@ -15,9 +15,11 @@ import { hitRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { cleanImage } from "@/lib/charity/clean-image";
 import { refusal } from "@/lib/charity/team";
+import { revalidateCharitySlugs } from "@/lib/charity/public-cache";
 import { isMissingColumn, parseVideoLink, updateVideoColumns } from "@/lib/charity/video";
 
 function revalidate(charityId: string, slug: string) {
+  revalidateCharitySlugs(slug); // the charity's page keeps its public details for a short while (24/11/2026)
   revalidatePath(`/charity-admin/${charityId}/updates`);
   revalidatePath(`/c/${slug}`);
 }

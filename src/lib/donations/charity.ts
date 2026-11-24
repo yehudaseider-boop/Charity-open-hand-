@@ -6,15 +6,27 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { impactUnitFrom } from "@/lib/charity/impact";
 import { givingPaused } from "@/lib/giving-pause";
 
-/** A charity as checkout needs it, or null if it isn't public. */
+/** The columns checkout and the give page need. */
+export const DONATABLE_COLUMNS = "id, slug, name_en, status, is_verified, is_s18a, mandate_signed_at, gateway, gateway_subaccount_ref, suggested_amounts_cents, impact_unit_cents, impact_unit_one, impact_unit_many";
+
+/** A charity as checkout needs it, or null if it isn't public. Always read live: money paths never use the cache. */
 export async function loadDonatableCharity(slug: string) {
-  const { data } = await createAdminClient()
-    .from("charities")
-    .select("id, slug, name_en, status, is_verified, is_s18a, mandate_signed_at, gateway, gateway_subaccount_ref, suggested_amounts_cents, impact_unit_cents, impact_unit_one, impact_unit_many")
-    .eq("slug", slug)
-    .eq("status", "approved")
-    .maybeSingle();
-  if (!data) return null;
+  const { data } = await createAdminClient().from("charities").select(DONATABLE_COLUMNS).eq("slug", slug).eq("status", "approved").maybeSingle();
+  return data ? donatableFrom(data) : null;
+}
+
+type DonatableRow = {
+  id: string; slug: string; name_en: string; status: string; is_verified: boolean; is_s18a: boolean; mandate_signed_at: string | null;
+  gateway: string | null; gateway_subaccount_ref: string | null; suggested_amounts_cents: unknown;
+  impact_unit_cents: number | string | null; impact_unit_one: string | null; impact_unit_many: string | null;
+};
+
+/**
+ * What the pages and checkout work out from a charity's row. Done on every request, never inside the page cache
+ * (24/11/2026): the pause switch, the gateway settings and the day's rules always act at once; only the database
+ * row can be a little old, for the pages (src/lib/charity/public-cache.ts).
+ */
+export function donatableFrom<R extends DonatableRow>(data: R) {
   let gateway: PaymentGateway | null = null;
   try {
     gateway = getGateway();

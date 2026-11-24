@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { dropEmptyImports } from "./recorded-gifts-store";
 import { removeContactImport } from "./contacts-store";
 import { memberRole } from "./team";
+import { revalidateCharityPages } from "./public-cache";
 import { can, isRole, permissionForAction } from "./permissions";
 import { removeDecisions } from "@/lib/receipts/runs";
 import { canUndo, isActionKind, type ActionKind, type Details } from "./done";
@@ -152,6 +153,8 @@ export async function undoAction(charityId: string, id: string, userId: string, 
     await db.from("charity_actions").update({ undone_at: null, undone_by: null }).eq("id", id);
     return { ok: false, why, row };
   }
+  // Taking an action back can change the charity's page (text, pictures, video, a campaign, its focus): show it at once.
+  await revalidateCharityPages(charityId);
   await logAudit({ actorUserId: userId, action: "charity.action_undone", entityType: "charity", entityId: charityId, details: { kind: row.kind, actionId: id } });
   // A role put back is a role change like any other, in the audit log too.
   if (row.undo.type === "set_role") {

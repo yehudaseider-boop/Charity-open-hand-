@@ -1,3 +1,4 @@
+import { isValidCompanyRegistration } from "../sars-numbers";
 /**
  * What SARS's IT3(d) file can hold, checked where a donor types their s18A details (tester, 23/11/2026): at checkout
  * on the website and in the app, and on the "add my s18A details" form. Until now a name with "ễ", a 150-character
@@ -108,4 +109,24 @@ export function sarsAddressProblems(a: S18aAddress): Partial<Record<keyof S18aAd
     if (problem) e[field] = problem;
   }
   return e;
+}
+
+/**
+ * What is wrong with a company's or trust's registration number at checkout, or null. SARS reports a company by its
+ * CIPC number (Appendix K) and a trust by its Master's number (decided 03/11/2026), at most 15 characters
+ * (23/11/2026). The give form runs it again when the donor switches between "A company" and "A trust", so a
+ * company's message never stays on a trust's number (tester, 23/11/2026).
+ */
+export function registrationNumberProblem(
+  donorType: "individual" | "company" | "trust",
+  value: string | null | undefined,
+  s18a: { want18a: boolean; detailsNow: boolean },
+  today: Date = new Date(),
+): string | null {
+  if (donorType === "individual") return null;
+  const reg = value?.trim() ?? "";
+  if (s18a.detailsNow && !reg) return "Needed for an s18A receipt";
+  if (s18a.want18a && reg && donorType === "company" && !isValidCompanyRegistration(reg, today)) return "Use the company's CIPC number, for example 2015/123456/07";
+  if (s18a.detailsNow && donorType === "trust") return trustNumberProblem(reg);
+  return null;
 }

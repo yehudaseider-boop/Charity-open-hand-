@@ -11,6 +11,8 @@ export function NavLink({ href, children, className = "", tone = "light" }: { hr
   return (
     <Link
       href={href}
+      // Not fetched ahead (24/11/2026): the header is on every page, so each page would pull in every other page's data.
+      prefetch={false}
       aria-current={here ? "page" : undefined}
       className={`inline-flex min-h-11 items-center rounded-full px-2.5 sm:px-3 font-semibold transition-colors ${tone === "dark" ? `hover:bg-white/15 ${here ? "bg-white/15 text-white" : "text-white/90 hover:text-white"}` : `hover:bg-honey-soft ${here ? "bg-honey-soft text-brand" : "text-navy"}`} ${className}`}
     >

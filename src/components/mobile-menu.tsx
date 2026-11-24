@@ -68,6 +68,7 @@ export function MobileMenu({ items, tone = "light" }: { items: MenuItem[]; tone?
               <li key={i.href}>
                 <Link
                   href={i.href}
+                  prefetch={false}
                   aria-current={here(i.href) ? "page" : undefined}
                   onClick={() => setOpenOn(null)}
                   className={`flex min-h-11 items-center rounded-control px-3 font-semibold transition-colors hover:bg-honey-soft ${here(i.href) ? "bg-honey-soft text-brand" : "text-navy"}`}

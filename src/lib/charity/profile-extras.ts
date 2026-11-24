@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { activeFocus, FOCUS_COLUMNS, type Focus, type FocusRow } from "./focus";
+import { revalidateCharityPages } from "./public-cache";
 import { videoFrom, type ProfileVideo } from "./video";
 
 /**
@@ -47,10 +48,13 @@ export async function writeFocus(charityId: string, row: FocusRow | null, userId
   if (!row) {
     const { error } = await db.from("charity_focus").delete().eq("charity_id", charityId);
     if (error) throw error;
+    await revalidateCharityPages(charityId);
     return;
   }
   const { error } = await db
     .from("charity_focus")
     .upsert({ charity_id: charityId, ...row, updated_at: new Date().toISOString(), updated_by: userId }, { onConflict: "charity_id" });
   if (error) throw error;
+  // The charity's page keeps its public details for a short while: the focus shows at once (24/11/2026).
+  await revalidateCharityPages(charityId);
 }

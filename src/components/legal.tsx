@@ -16,8 +16,8 @@ export function TermsAndPrivacyLinks() {
   return (
     <>
       the{" "}
-      <Link href="/terms" target="_blank" className="text-brand underline">Terms<span className="sr-only"> (opens in a new tab)</span></Link> and the{" "}
-      <Link href="/privacy" target="_blank" className="text-brand underline">Privacy Policy<span className="sr-only"> (opens in a new tab)</span></Link>
+      <Link href="/terms" prefetch={false} target="_blank" className="text-brand underline">Terms<span className="sr-only"> (opens in a new tab)</span></Link> and the{" "}
+      <Link href="/privacy" prefetch={false} target="_blank" className="text-brand underline">Privacy Policy<span className="sr-only"> (opens in a new tab)</span></Link>
     </>
   );
 }
@@ -36,7 +36,7 @@ export function SiteFooter() {
       <span aria-hidden className="pointer-events-none absolute -bottom-10 left-[40%] h-28 w-28 rounded-full border-[10px] border-white/5" />
       <div className="relative mx-auto grid max-w-[75rem] grid-cols-2 gap-x-6 gap-y-9 px-4 pb-8 pt-12 sm:grid-cols-3 sm:px-6 md:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
         <div className="col-span-2 flex flex-col items-start gap-3 sm:col-span-3 md:col-span-1">
-          <Link href="/" aria-label="Givezy home" className="rounded-xl bg-white px-3 py-2">
+          <Link href="/" prefetch={false} aria-label="Givezy home" className="rounded-xl bg-white px-3 py-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/logo-400.png" alt="Givezy" width={97} height={32} className="h-8 w-auto" />
           </Link>
@@ -48,7 +48,7 @@ export function SiteFooter() {
             <ul className="flex flex-col text-[15px]">
               {g.links.map(([label, href]) => (
                 <li key={href}>
-                  <Link href={href} className="inline-flex min-h-11 items-center text-white/70 underline-offset-4 transition-colors hover:text-white hover:underline">{label}</Link>
+                  <Link href={href} prefetch={false} className="inline-flex min-h-11 items-center text-white/70 underline-offset-4 transition-colors hover:text-white hover:underline">{label}</Link>
                 </li>
               ))}
             </ul>

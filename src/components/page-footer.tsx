@@ -29,8 +29,8 @@ export function PageFooter() {
             Card details are handled by our payment provider. We never see or store them.
           </p>
           <p className="flex flex-wrap gap-x-4">
-            <Link href="/privacy" className="inline-flex min-h-11 items-center underline-offset-4 hover:text-brand hover:underline">Privacy Policy</Link>
-            <Link href="/terms" className="inline-flex min-h-11 items-center underline-offset-4 hover:text-brand hover:underline">Terms</Link>
+            <Link href="/privacy" prefetch={false} className="inline-flex min-h-11 items-center underline-offset-4 hover:text-brand hover:underline">Privacy Policy</Link>
+            <Link href="/terms" prefetch={false} className="inline-flex min-h-11 items-center underline-offset-4 hover:text-brand hover:underline">Terms</Link>
             <span className="inline-flex min-h-11 items-center">© {new Date().getFullYear()} Givezy</span>
           </p>
         </div>

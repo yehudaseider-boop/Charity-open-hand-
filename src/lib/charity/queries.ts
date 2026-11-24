@@ -139,8 +139,8 @@ export type CharityPhoto = { id: string; storage_path: string; caption_en: strin
 export type CharityUpdate = { id: string; body_en: string; photo_path: string | null; created_at: string; video: ProfileVideo | null };
 
 /** A charity's photos (oldest first) and latest updates, read under row-level security. */
-export async function loadStories(charityId: string, updatesLimit = 20) {
-  const supabase = await createClient();
+export async function loadStories(charityId: string, updatesLimit = 20, client?: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createPublicClient>) {
+  const supabase = client ?? (await createClient());
   const [photos, updates] = await Promise.all([
     supabase.from("charity_photos").select("id, storage_path, caption_en, created_at").eq("charity_id", charityId).order("created_at"),
     supabase.from("charity_updates").select("id, body_en, photo_path, created_at").eq("charity_id", charityId).order("created_at", { ascending: false }).limit(updatesLimit),
