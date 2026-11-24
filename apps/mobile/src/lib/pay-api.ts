@@ -5,6 +5,7 @@
  */
 
 import type { CardChargeRates } from "@shared/fees";
+import { CODE_CHECK_BUSY, CODE_CHECK_DOWN } from "@shared/sign-in-code";
 import { helpLine } from "./help";
 
 export type Pricing = { amountCents: number; contributionCents: number; cardChargeCents?: number; totalCents: number };
@@ -53,16 +54,27 @@ export type DonorDetails = {
 type Post = (url: string, body: unknown, token?: string | null) => Promise<{ status: number; json: unknown }>;
 
 const NETWORK = "We couldn't reach Givezy. Please check your connection and try again.";
+/**
+ * Our server (or the host in front of it) answered, but not with a usable reply: an outage page, "too busy", a time-out
+ * (24/11/2026). The phone's connection is fine, so "check your connection" would send the donor looking in the wrong place.
+ */
+export const SERVER_BUSY = "Givezy isn't answering properly just now. Please try again in a few minutes.";
+
+/** What to say when there was no usable reply: the phone's connection, or our side, by whether an answer came at all. */
+export const noReplyMessage = (status: number | null): string => (status !== null && (status === 429 || status >= 500) ? SERVER_BUSY : NETWORK);
 
 async function call<T extends { ok: boolean; message?: string }>(post: Post, url: string, body: unknown, token?: string | null): Promise<T> {
+  let status: number | null = null;
   try {
-    const { json } = await post(url, body, token);
+    const reply = await post(url, body, token);
+    status = reply.status;
+    const { json } = reply;
     if (json && typeof json === "object" && typeof (json as { ok?: unknown }).ok === "boolean") return json as T;
   } catch {
     // fall through
   }
   // `noReply`: the request may or may not have reached our server.
-  return { ok: false, message: NETWORK, noReply: true } as unknown as T;
+  return { ok: false, message: noReplyMessage(status), noReply: true } as unknown as T;
 }
 
 /** Our server's address. The sign-in token travels with some calls, so never over plain http. */
@@ -136,8 +148,10 @@ export type ReadyReply =
   | { ok: false; closed?: false; message: string };
 
 export async function checkReady(site: string, slug: string, campaignId: string | undefined, post: Post = fetchPost, token?: string | null): Promise<ReadyReply> {
+  let answered: number | null = null;
   try {
     const { status, json } = await post(api(site, "ready"), { slug, campaignId }, token);
+    answered = status;
     if (status === 404) return { ok: false, closed: true };
     const j = json as Record<string, unknown> | null;
     if (j?.ok === true && typeof j.minGiftCents === "number" && typeof j.minContributionCents === "number") {
@@ -169,7 +183,7 @@ export async function checkReady(site: string, slug: string, campaignId: string 
   } catch {
     // fall through
   }
-  return { ok: false, message: NETWORK };
+  return { ok: false, message: noReplyMessage(answered) };
 }
 
 /** A refusal's plain message from our server (a 4xx with `message`), or null. Short text only; never raw errors. */
@@ -456,6 +470,9 @@ export async function signInWithCode(steps: {
   const { error } = await steps.verifyCode();
   if (!error) return { ok: true };
   if (steps.isNetworkError(error)) return { ok: false, message: steps.offline };
+  // Supabase busy or down is not a wrong code (24/11/2026): the website's words, never "That code didn't work".
+  if (error.status === 429) return { ok: false, message: CODE_CHECK_BUSY };
+  if (typeof error.status === "number" && error.status >= 500) return { ok: false, message: CODE_CHECK_DOWN };
   const answer = await steps.reviewer();
   if (answer && "message" in answer) return { ok: false, message: answer.message };
   if (answer) {

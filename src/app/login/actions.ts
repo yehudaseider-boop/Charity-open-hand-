@@ -7,8 +7,8 @@ import { clientIp } from "@/lib/client-ip";
 import { forgetAttempts, hitRateLimit, takeAttempt } from "@/lib/rate-limit";
 import { siteOrigin } from "@/lib/request-origin";
 import { safeNextPath } from "@/lib/safe-path";
-import { looksLikeEmail, sentPageUrl, signInKeys, signInLimitsWork } from "@/lib/sign-in";
-import { SIGN_IN_CODE } from "@/lib/sign-in-code";
+import { looksLikeEmail, sentPageUrl, signInKeys, signInLimitsWork, supabaseRefusal } from "@/lib/sign-in";
+import { cleanSignInCode } from "@/lib/sign-in-code";
 import { createClient } from "@/lib/supabase/server";
 import { linkDonorsToUser } from "@/lib/donors/link";
 import { verifyBotCheck } from "@/lib/bot-check";
@@ -73,7 +73,9 @@ export async function sendLoginLink(formData: FormData) {
     email,
     options: { emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}` },
   });
-  if (error) redirect(back("send"));
+  // An address Supabase itself won't send to (a typo such as "name@gmail..com") is "check the address", not "try again
+  // in a minute", which would never work (24/11/2026).
+  if (error) redirect(back(supabaseRefusal(error) === "address" ? "email" : "send"));
   // The address shows on "Check your email" only with our own short-lived proof (lib/sign-in.ts), so a link
   // someone else makes can't say we sent an email to any address they like.
   redirect(sentPageUrl(email, next));
@@ -88,12 +90,14 @@ export async function sendLoginLink(formData: FormData) {
  */
 export async function verifyLoginCode(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
-  const code = String(formData.get("code") ?? "").replace(/\s/g, "");
+  // The shared rule, as in the app: spaces, dashes and invisible marks in a pasted code are fine (24/11/2026: the
+  // website took out spaces only, so "1234-5678" was turned down here and accepted in the app).
+  const code = cleanSignInCode(String(formData.get("code") ?? ""));
   const next = safeNext(formData.get("next"));
   // Back to the code box: the address stays only with the proof the page already had (never a new one from here).
   const proof = String(formData.get("s") ?? "");
-  const back = (error: "code" | "tries" | "unavailable") => sentPageUrl(email, next, { error }, proof);
-  if (email.length > 254 || !looksLikeEmail(email) || !SIGN_IN_CODE.test(code)) redirect(back("code"));
+  const back = (error: "code" | "tries" | "unavailable" | "code-busy" | "code-down") => sentPageUrl(email, next, { error }, proof);
+  if (email.length > 254 || !looksLikeEmail(email) || !code) redirect(back("code"));
   // No limit key can be made: wrong codes couldn't be counted, so no code is checked.
   if (!signInLimitsWork()) redirect(back("unavailable"));
   const keys = signInKeys(email, clientIp(await headers()));
@@ -118,6 +122,13 @@ export async function verifyLoginCode(formData: FormData) {
   if (limited) redirect(back("tries"));
   const supabase = await createClient();
   const { data, error } = await supabase.auth.verifyOtp({ email, token: code, type: "email" });
+  // Supabase busy (too many checks) or down is not a wrong code (24/11/2026): the person was told "That code didn't
+  // work" and could type the right code again and again. Said plainly, and not counted against them.
+  const refusal = error ? supabaseRefusal(error) : null;
+  if (refusal === "busy" || refusal === "down") {
+    await forgetAttempts(counted);
+    redirect(back(refusal === "busy" ? "code-busy" : "code-down"));
+  }
   if (error || !data.user) redirect(back("code"));
   // A right code: its count is taken back, so it never uses up the allowance.
   await forgetAttempts(counted);

@@ -2,6 +2,7 @@ import "server-only";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { hashedKey, ipKeys } from "@/lib/rate-limit";
 import { botCheckRefusedMessage, botCheckUnreachableMessage } from "@/lib/bot-check-words";
+import { CODE_CHECK_BUSY, CODE_CHECK_DOWN } from "@/lib/sign-in-code";
 
 /**
  * Sign-in on the website: the plain messages (the same on the Sign in page and on the apply page), the limit keys,
@@ -21,7 +22,24 @@ export const signInMessages: Record<string, string> = {
   "check-down": botCheckUnreachableMessage(),
   // The limits can't be kept (no server key on the live or test site): sign-in refuses rather than run without limits.
   unavailable: "Sign-in isn't available just now, so no email was sent. Please try again in a few minutes, or contact us if it keeps happening.",
+  // Checking the code, when Supabase was busy or down rather than the code wrong (24/11/2026).
+  "code-busy": CODE_CHECK_BUSY,
+  "code-down": CODE_CHECK_DOWN,
 };
+
+/**
+ * What a refusal from Supabase's sign-in means: "busy" (429, too many requests), "down" (5xx, or no answer at all),
+ * "address" (its code for an address it can't send to, such as "name@gmail..com"), or null (anything else, such as a
+ * wrong or expired code, 403). Read from the status and code, never the wording, which Supabase changes.
+ */
+export function supabaseRefusal(error: { status?: number; name?: string; code?: string } | null | undefined): "busy" | "down" | "address" | null {
+  if (!error) return null;
+  const s = error.status;
+  if (s === 429) return "busy";
+  if ((typeof s === "number" && s >= 500) || error.name === "AuthRetryableFetchError") return "down";
+  if (error.code === "email_address_invalid") return "address";
+  return null;
+}
 
 export const signInMessage = (code: unknown): string | undefined => (typeof code === "string" && Object.hasOwn(signInMessages, code) ? signInMessages[code] : undefined);
 

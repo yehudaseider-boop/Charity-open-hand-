@@ -30,6 +30,9 @@ export function parseDedication(kind: string | null | undefined, name: string | 
   if (kind !== "honour" && kind !== "memory") return { error: "Choose in honour of or in memory of" };
   const clean = cleanDedicationName(name);
   if (!clean) return { error: "Enter the name of the person" };
+  // A name has at least one letter, in any script, as for the donor's own name (24/11/2026): "---" or emoji alone
+  // would reach the charity as "In memory of ---".
+  if (!/\p{L}/u.test(clean)) return { error: "Enter their name in letters" };
   if (clean.length > DEDICATION_NAME_MAX) return { error: `Keep the name to ${DEDICATION_NAME_MAX} characters` };
   return { kind, name: clean };
 }
