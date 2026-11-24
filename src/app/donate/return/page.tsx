@@ -171,20 +171,22 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
             <p className="mt-1 whitespace-pre-line text-navy [overflow-wrap:anywhere]" dir="auto">{charityNote}</p>
           </div>
         ) : null}
+        {/* On a phone a long charity name squeezed the amount until "R1 250" broke over two lines, and "Dedication"
+            broke mid-word (24/11/2026). Amounts and labels now never wrap; the long text beside them does. */}
         <dl className="space-y-1.5 rounded-control border-2 border-border p-4 text-[15px] tabular-nums">
-          <div className="flex justify-between gap-3"><dt>Donation to <bdi>{charity.name_en}</bdi></dt><dd className="font-semibold">{formatRand(d.amount_cents)}</dd></div>
+          <div className="flex justify-between gap-3"><dt className="min-w-0">Donation to <bdi>{charity.name_en}</bdi></dt><dd className="shrink-0 whitespace-nowrap font-semibold">{formatRand(d.amount_cents)}</dd></div>
           {Number(d.contribution_cents) > 0 ? (
-            <div className="flex justify-between gap-3"><dt>Contribution to Givezy</dt><dd>{formatRand(d.contribution_cents)}</dd></div>
+            <div className="flex justify-between gap-3"><dt className="min-w-0">Contribution to Givezy</dt><dd className="shrink-0 whitespace-nowrap">{formatRand(d.contribution_cents)}</dd></div>
           ) : null}
           {Number(d.processing_charge_cents) > 0 ? (
-            <div className="flex justify-between gap-3"><dt className="min-w-0">Card charge you covered</dt><dd>{formatRand(d.processing_charge_cents)}</dd></div>
+            <div className="flex justify-between gap-3"><dt className="min-w-0">Card charge you covered</dt><dd className="shrink-0 whitespace-nowrap">{formatRand(d.processing_charge_cents)}</dd></div>
           ) : null}
-          <div className="flex justify-between gap-3 border-t border-border pt-1"><dt>Paid</dt><dd>{formatRand(d.total_charged_cents)} on {formatDate(d.paid_at!)}</dd></div>
-          <div className="flex justify-between gap-3"><dt>Reference</dt><dd className="font-mono">{donationReference(d.id)}</dd></div>
+          <div className="flex justify-between gap-3 border-t border-border pt-1"><dt className="shrink-0">Paid</dt><dd className="min-w-0 text-right"><span className="whitespace-nowrap">{formatRand(d.total_charged_cents)}</span> on <span className="whitespace-nowrap">{formatDate(d.paid_at!)}</span></dd></div>
+          <div className="flex justify-between gap-3"><dt className="shrink-0">Reference</dt><dd className="min-w-0 font-mono [overflow-wrap:anywhere]">{donationReference(d.id)}</dd></div>
           {dedicationFrom(d.dedication_kind, d.dedication_name) ? (
             <div className="flex justify-between gap-3">
-              <dt>Dedication</dt>
-              <dd className="text-right" dir="auto">{dedicationLine(dedicationFrom(d.dedication_kind, d.dedication_name)!)}</dd>
+              <dt className="shrink-0">Dedication</dt>
+              <dd className="min-w-0 text-right [overflow-wrap:anywhere]" dir="auto">{dedicationLine(dedicationFrom(d.dedication_kind, d.dedication_name)!)}</dd>
             </div>
           ) : null}
         </dl>

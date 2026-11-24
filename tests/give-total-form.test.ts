@@ -147,6 +147,35 @@ describe("the form sends the total on screen, and the server's own re-quote agre
   });
 });
 
+describe("a donor on a phone sees what to fix, next to the box it is about (24/11/2026)", () => {
+  it("monthly with only the contribution wrong says to fix the contribution, not to choose an amount", async () => {
+    await tick("monthly");
+    await choose("other");
+    await type("#contribution", "5");
+    expect(host.textContent).toContain("Fix the contribution above to authorise the monthly payments.");
+    expect(host.textContent).not.toContain("Choose an amount above to authorise");
+    // With no amount, it still asks for one.
+    await choose("1000");
+    await type("#amount", "");
+    expect(host.textContent).toContain("Choose an amount above to authorise the monthly payments.");
+  });
+
+  it("puts the minimum right under the amount box, before the charity's 'pays for' line", async () => {
+    await act(async () => {
+      root.render(
+        createElement(DonateFlow, {
+          slug: "meals", charityName: "Meals for All", receiptsAvailable: false, minimumLabel: "R30", contributionMinimumLabel: "R10", fromApp: false, initialAmountCents: 25_000,
+          impactUnit: { cents: 2_500, one: "meal", many: "meals" },
+        }),
+      );
+    });
+    expect(host.textContent).toContain("pays for 10 meals");
+    const box = $<HTMLInputElement>("#amount").parentElement!.parentElement!;
+    expect(box.nextElementSibling?.id).toBe("amount-hint");
+    expect($("#amount-hint").textContent).toBe("Minimum R30.");
+  });
+});
+
 describe("a total the server refuses", () => {
   it("shows the server's figures and message, sends exactly those next time, and goes back to the live total once the donor edits", async () => {
     await choose("1000");

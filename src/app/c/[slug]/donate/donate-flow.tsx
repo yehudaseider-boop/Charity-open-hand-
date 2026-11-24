@@ -341,14 +341,19 @@ export function DonateFlow({
             />
           </div>
         </div>
-        {amountError ? <p id="amount-error" role="alert" className="flex items-start gap-1.5 text-sm font-semibold text-danger"><ErrorMark /><span>{amountError}</span></p> : null}
+        {/* While the amount has a problem, its message says what to do; the hint comes back once it is fixed. The hint
+            sits right under the box it belongs to, above the "pays for" line (24/11/2026: below it, it read as a
+            footnote to the charity's figure). */}
+        {amountError ? (
+          <p id="amount-error" role="alert" className="flex items-start gap-1.5 text-sm font-semibold text-danger"><ErrorMark /><span>{amountError}</span></p>
+        ) : (
+          <p id="amount-hint" className="-mt-3 text-sm text-muted">Minimum {minimumLabel}.</p>
+        )}
         {typedImpact && impactUnit && !amountError ? (
           <p className="rounded-control bg-honey-soft px-4 py-3 text-sm" aria-live="polite">
             <span className="font-semibold text-navy">{typedImpact}.</span> <span className="text-muted">{impactSource(charityName, impactUnit)}</span>
           </p>
         ) : null}
-        {/* While the amount has a problem, its message says what to do; the hint comes back once it is fixed. */}
-        {amountError ? null : <p id="amount-hint" className="text-sm text-muted">Minimum {minimumLabel}.</p>}
 
         {/* Gift amount, then the card charge, then the contribution, then the total (decided 09/11/2026). */}
         {cardChargeAvailable ? (
@@ -614,7 +619,13 @@ export function DonateFlow({
                 <Check key={quote.totalCents} name="monthly_authorised" error={state.fieldErrors?.monthly_authorised}>
                   I authorise Givezy to collect {formatRand(quote.totalCents)} from my card every month until I cancel.
                 </Check>
-              ) : <p className="text-sm text-muted">Choose an amount above to authorise the monthly payments.</p>}
+              ) : (
+                // Say what is actually missing: with an amount chosen and only the contribution wrong, "Choose an
+                // amount" sent the donor to a box that was already filled in (24/11/2026).
+                <p className="text-sm text-muted">
+                  {!live.ok && live.field === "contribution" ? "Fix the contribution above to authorise the monthly payments." : "Choose an amount above to authorise the monthly payments."}
+                </p>
+              )}
             </>
           ) : null}
         </div>}
