@@ -7,9 +7,8 @@
 --    (same encrypted account number and same "checked" time). Otherwise it saves nothing and answers false.
 -- 2. Starting an application was three separate writes (the charity, its owner, its private row), so a failure
 --    in the second or third left a charity with no owner. start_charity_application does all three or none.
--- 3. agree_to_policy let any signed-in person record any version text. The server records agreement itself
---    (src/app/agree/actions.ts, with the current version from code), so a browser may no longer call it.
---    Account agreements are also unique per person and version (a double press can't record twice).
+-- 3. Account agreements are unique per person and version (a double press can't record twice). agree_to_policy
+--    still lets a signed-in person record any version text; closing that waits for the phone app (see section 3).
 -- All the new functions are for the server only (service role).
 
 -- 1 --------------------------------------------------------------------------------------------------------------
@@ -75,5 +74,20 @@ delete from public.consents c
 create unique index if not exists consents_account_once
   on public.consents (user_id, kind, policy_version) where kind = 'account';
 
-revoke execute on function public.agree_to_policy(text) from public, anon, authenticated;
-grant execute on function public.agree_to_policy(text) to service_role;
+-- Not revoked here (24/11/2026): the phone app records agreement by calling agree_to_policy with the donor's own
+-- sign-in (apps/mobile/src/lib/account.tsx). Taking it away from signed-in users waits until the app goes through a
+-- server route instead; see docs/go-live-checklist.md.
+
+-- With the unique index, a second "I agree" (a double tap in the app, two tabs) counts as already recorded instead of
+-- failing. Otherwise exactly as in 20261017000001_security_review.sql; create or replace keeps its grants.
+create or replace function public.agree_to_policy(p_version text)
+returns void
+language plpgsql security definer set search_path = '' as $$
+declare uid uuid := (select auth.uid());
+begin
+  if uid is null then raise exception 'Not signed in'; end if;
+  if not public.signed_in_without_password() then raise exception 'Please sign in with the emailed code'; end if;
+  if p_version is null or p_version !~ '^[0-9a-z.-]{1,40}$' then raise exception 'Unknown policy version'; end if;
+  insert into public.consents (kind, policy_version, user_id) values ('account', p_version, uid)
+    on conflict (user_id, kind, policy_version) where kind = 'account' do nothing;
+end $$;

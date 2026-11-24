@@ -21,6 +21,8 @@ afterAll(() => client.end());
 const ANON_MAY_RUN = ["campaign_progress", "charity_can_issue_18a", "has_second_step", "is_charity_admin", "is_platform_admin", "signed_in_without_password"];
 const SIGNED_IN_MAY_RUN = [
   ...ANON_MAY_RUN,
+  // The phone app records agreement with the donor's own sign-in (closing this waits for an app route; go-live list).
+  "agree_to_policy",
   "charity_application_open",
   "charity_can",
   "charity_contact_or_null",
