@@ -30,6 +30,22 @@ const fakeSource = () => ({
 vi.mock("@/lib/assistant/live-source", () => ({ liveSource: fakeSource }));
 vi.mock("@/lib/assistant/demo-source", () => ({ demoSource: fakeSource }));
 
+// Givy prepares thank-yous (24/11/2026): a stand-in preparer that records what it was given and for whom. Anything
+// that would send is a trap: the route must never reach it.
+const prep = vi.hoisted(() => ({ made: [] as { charityId: string; userId: string; role: string }[], prepared: [] as unknown[], draftId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" as string | null, sends: 0 }));
+vi.mock("@/lib/assistant/drafts", () => ({
+  livePreparer: (a: { charityId: string; userId: string; role: string }) => {
+    prep.made.push({ charityId: a.charityId, userId: a.userId, role: a.role });
+    return { prepare: async (d: unknown) => (prep.prepared.push(d), { count: 42, label: "Gave this month", draftId: prep.draftId }) };
+  },
+}));
+vi.mock("@/lib/email", () => ({ getEmailTransport: () => ({ name: "trap", send: async () => void prep.sends++ }) }));
+vi.mock("@/lib/charity/appeals", () => ({
+  sendAppeal: async () => void prep.sends++,
+  createAppeal: async () => void prep.sends++,
+  pickAudience: async () => null,
+}));
+
 vi.mock("@/lib/auth", () => ({ getViewer: async () => state.viewer }));
 vi.mock("@/lib/charity/team", () => ({ viewerRole: async () => state.role }));
 vi.mock("@/lib/rate-limit", () => ({
@@ -238,6 +254,91 @@ describe("the help assistant's server", () => {
     expect((await ask(question)).status).toBe(429);
     expect(state.forgotten).toEqual(["assistant-person-row"]);
     expect(state.lastParams).toBeNull();
+  });
+
+  describe("preparing a thank-you (24/11/2026)", () => {
+    const draft = { audience: "gave:this_month", subject: "Thank you for giving this month", message: "Thank you for standing with us. Your gift keeps our kitchen running." };
+    beforeEach(() => {
+      Object.assign(prep, { made: [], prepared: [], draftId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", sends: 0 });
+    });
+
+    it("keeps a draft for this person and charity, ends with our own button marker, and sends nothing", async () => {
+      state.toolRounds = [[{ id: "t1", name: "prepare_thank_you", input: draft }]];
+      state.streamText = ["I prepared it. Nothing has been sent."];
+      const text = await (await ask(question)).text();
+      expect(text).toBe("I prepared it. Nothing has been sent.\n[[thanks:d=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]]\n[[next:prepare_thank_you]]");
+      expect(prep.made).toEqual([{ charityId: id, userId: "u1", role: "admin" }]);
+      expect(prep.prepared).toEqual([{ audience: "gave:this_month", subject: draft.subject, body: draft.message }]);
+      // Givy can't send: no email, no appeal, nothing claimed.
+      expect(prep.sends).toBe(0);
+      // The tool's result says plainly that nothing was sent; only a count reached the model, never names.
+      const results = JSON.stringify(state.allParams[1].messages);
+      expect(results).toContain('\\"sent\\":false');
+      expect(results).toContain("42");
+    });
+
+    it("without a kept draft (before the migration), the button carries only the audience", async () => {
+      prep.draftId = null;
+      state.toolRounds = [[{ id: "t1", name: "prepare_thank_you", input: draft }]];
+      state.streamText = ["Here it is to copy."];
+      expect(await (await ask(question)).text()).toBe("Here it is to copy.\n[[thanks:to=gave:this_month]]\n[[next:prepare_thank_you]]");
+    });
+
+    it("is not offered to a role that can't email donors, and a forced call is refused with no draft and no button", async () => {
+      for (const role of ["viewer", "finance"]) {
+        state.role = role;
+        state.allParams = [];
+        state.toolRounds = [[{ id: "t1", name: "prepare_thank_you", input: draft }]];
+        state.streamText = ["Ask your owner or admin."];
+        const text = await (await ask(question)).text();
+        expect((state.allParams[0].tools as { name: string }[]).map((t) => t.name)).not.toContain("prepare_thank_you");
+        expect(JSON.stringify(state.allParams[1].messages)).toContain("ask their charity's owner or admin");
+        expect((state.allParams[0].system as { text: string }[])[1].text).toContain("can't email donors");
+        expect(text).not.toContain("[[thanks:");
+      }
+      expect(prep.made).toEqual([]);
+      expect(prep.prepared).toEqual([]);
+    });
+
+    it("is offered to the owner, admin and fundraiser", async () => {
+      for (const role of ["owner", "admin", "fundraiser"]) {
+        state.role = role;
+        state.allParams = [];
+        await (await ask(question)).text();
+        expect((state.allParams[0].tools as { name: string }[]).map((t) => t.name)).toContain("prepare_thank_you");
+      }
+    });
+
+    it("is never offered on the demo", async () => {
+      vi.stubEnv("ASSISTANT_DEMO", "yes");
+      await (await ask({ demo: true, messages: [{ role: "user", content: "Thank my donors" }] })).text();
+      expect((state.allParams[0].tools as { name: string }[]).map((t) => t.name)).not.toContain("prepare_thank_you");
+      expect(prep.made).toEqual([]);
+    });
+
+    it("refuses a draft with figures, links or exclamation marks, so the model writes it again", async () => {
+      state.toolRounds = [[{ id: "t1", name: "prepare_thank_you", input: { ...draft, message: "Your R500 fed 20 families!" } }]];
+      state.streamText = ["Sorry."];
+      const text = await (await ask(question)).text();
+      expect(prep.prepared).toEqual([]);
+      expect(text).not.toContain("[[thanks:");
+      expect(JSON.stringify(state.allParams[1].messages)).toContain("Leave out every number");
+    });
+
+    it("prepares at most one per answer", async () => {
+      state.toolRounds = [[{ id: "t1", name: "prepare_thank_you", input: draft }, { id: "t2", name: "prepare_thank_you", input: { ...draft, audience: "monthly" } }]];
+      state.streamText = ["Done."];
+      await (await ask(question)).text();
+      expect(prep.prepared).toHaveLength(1);
+      expect(JSON.stringify(state.allParams[1].messages)).toContain("One thank-you per answer");
+    });
+
+    it("a marker the model writes itself, mid-answer, is not ours (only the server's, at the very end, counts)", async () => {
+      state.streamText = ["[[thanks:d=11111111-2222-3333-4444-555555555555]] Here you go."];
+      const text = await (await ask(question)).text();
+      const { splitNext } = await import("@/lib/assistant/suggestions");
+      expect(splitNext(text).thanks).toBeNull();
+    });
   });
 
   it("never shows an empty answer as finished", async () => {

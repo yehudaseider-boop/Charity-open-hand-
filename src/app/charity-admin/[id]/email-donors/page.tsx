@@ -7,7 +7,9 @@ import { PageHeader } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import { appealsThisMonth, listAppeals } from "@/lib/charity/appeals";
 import { carryOnLine, carryOnState, type CarryOnState } from "@/lib/charity/carry-on-sends";
-import { audienceValue, keepingAudienceLabel, parseAudience } from "@/lib/charity/appeals-rules";
+import { WHEN_GAVE_LABELS, audienceValue, keepingAudienceLabel, parseAudience } from "@/lib/charity/appeals-rules";
+import { assistantConfig } from "@/config/assistant";
+import { loadDraft } from "@/lib/assistant/drafts";
 import { loadCampaigns } from "@/lib/charity/campaign-queries";
 import { lapsedDaysFor, listSegments, listTags } from "@/lib/charity/donor-care";
 import { donorGroupsFor } from "@/lib/charity/insights";
@@ -32,8 +34,11 @@ export const metadata: Metadata = { title: "Email donors" };
 export default async function EmailDonorsPage({ params, searchParams }: PageProps<"/charity-admin/[id]/email-donors">) {
   const { id } = await params;
   const sp = await searchParams;
-  await requireViewer(`/charity-admin/${id}/email-donors`);
+  const viewer = await requireViewer(`/charity-admin/${id}/email-donors`);
   const { charity, priv } = await loadCharityForManager(id);
+  // A thank-you Givy prepared (24/11/2026): read back only for this person on this charity, before it expires.
+  const draft = typeof sp.draft === "string" ? await loadDraft(sp.draft, id, viewer.userId).catch(() => "gone" as const) : null;
+  const givy = draft && draft !== "gone" ? draft : null;
   const [role, appeals, recent, tags, segments, campaigns, lapsedDays] = await Promise.all([
     viewerRole(id), listAppeals(id), appealsThisMonth(id), listTags(id), listSegments(id), loadCampaigns(id), lapsedDaysFor(id),
   ]);
@@ -48,9 +53,11 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
     ),
   );
   // "Email these donors" from a list, a tag or a campaign arrives with it chosen.
-  const asked = parseAudience(sp.to);
+  const asked = parseAudience(givy ? givy.audience : sp.to);
   const audiences = [
     { group: "Everyone", options: [{ value: "all", label: "All your donors" }] },
+    // When and how they give (24/11/2026), the groups Givy prepares thank-yous for.
+    { group: "When and how they give", options: (Object.keys(WHEN_GAVE_LABELS) as (keyof typeof WHEN_GAVE_LABELS)[]).map((value) => ({ value, label: WHEN_GAVE_LABELS[value] })) },
     { group: "Donor groups", options: donorGroupsFor(lapsedDays).map((g) => ({ value: `group:${g.key}`, label: g.label })) },
     // Keeping donors: who hasn't given since (23/11/2026). Looking back from last tax year comes only from that page's button.
     {
@@ -81,6 +88,8 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
     ? `${update.body_en as string}\n\n${updateVideo ? "Watch the video with this update on our page" : "See more on our page"}: ${site}/c/${charity.slug}`.slice(0, 5000)
     : "";
   const initialSubject = update ? `News from ${charity.name_en}`.slice(0, 120) : "";
+  const startBody = givy ? givy.body : initialBody;
+  const startSubject = givy ? givy.subject : initialSubject;
 
   return (
     <div className="space-y-5">
@@ -101,16 +110,28 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
       ) : !owner ? (
         <Notice>Your role doesn&apos;t include emailing donors. You can see what was sent below.</Notice>
       ) : (
-        <Card title="Write an email">
+        <Card title={givy ? "Check and send Givy's thank-you" : "Write an email"}>
+          {givy ? (
+            <p role="status" className="mb-3 rounded-card bg-honey-soft p-3 text-sm text-navy">
+              Givy prepared this thank-you. <strong className="font-semibold">Nothing has been sent.</strong> Change the words if you like, press Check who it goes to, then send it yourself.
+            </p>
+          ) : null}
+          {draft === "gone" ? (
+            <p role="status" className="mb-3 rounded-card bg-warning-soft p-3 text-sm text-warning">
+              Givy&apos;s draft isn&apos;t here any more: drafts are kept for {assistantConfig.draftHours} hours, and only for the person who asked. Nothing was sent. Ask Givy again, or write your email below.
+            </p>
+          ) : null}
           {recent ? <p className="mb-3 text-sm text-muted">You&apos;ve sent {recent} {recent === 1 ? "email" : "emails"} in the last 30 days.</p> : null}
           <AppealForm
+            key={givy && typeof sp.draft === "string" ? sp.draft : "write"}
             check={checkAppealAudience.bind(null, id)}
             test={sendTestAppeal.bind(null, id)}
             send={sendAppealNow.bind(null, id)}
             audiences={audiences}
             initialAudience={initialAudience}
-            initialSubject={initialSubject}
-            initialBody={initialBody}
+            initialSubject={startSubject}
+            initialBody={startBody}
+            fromGivy={Boolean(givy)}
           />
         </Card>
       )}

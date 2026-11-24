@@ -31,13 +31,13 @@ describe("follow-up questions", () => {
 
 describe("the marker at the end of an answer", () => {
   it("is split off, keeping only our own lookup names", () => {
-    expect(splitNext("R1 250 came in.\n[[next:giving_totals,made_up]]")).toEqual({ text: "R1 250 came in.", tools: ["giving_totals"] });
-    expect(splitNext("Open [Team](dash:/team).\n[[next:]]")).toEqual({ text: "Open [Team](dash:/team).", tools: [] });
+    expect(splitNext("R1 250 came in.\n[[next:giving_totals,made_up]]")).toEqual({ text: "R1 250 came in.", tools: ["giving_totals"], thanks: null });
+    expect(splitNext("Open [Team](dash:/team).\n[[next:]]")).toEqual({ text: "Open [Team](dash:/team).", tools: [], thanks: null });
   });
   it("is hidden while it is still arriving in pieces, and an answer without one is left alone", () => {
-    expect(splitNext("R1 250 came in.\n[[ne")).toEqual({ text: "R1 250 came in.", tools: null });
-    expect(splitNext("R1 250 came in.\n[[next:giving_to")).toEqual({ text: "R1 250 came in.", tools: null });
-    expect(splitNext("Plain answer.")).toEqual({ text: "Plain answer.", tools: null });
+    expect(splitNext("R1 250 came in.\n[[ne")).toEqual({ text: "R1 250 came in.", tools: null, thanks: null });
+    expect(splitNext("R1 250 came in.\n[[next:giving_to")).toEqual({ text: "R1 250 came in.", tools: null, thanks: null });
+    expect(splitNext("Plain answer.")).toEqual({ text: "Plain answer.", tools: null, thanks: null });
   });
   it("is written from names only, once each", () => {
     expect(nextMark(["giving_totals", "giving_totals", "bad name]]"])).toBe("\n[[next:giving_totals]]");

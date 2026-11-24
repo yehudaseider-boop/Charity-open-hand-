@@ -18,7 +18,7 @@ export type GuideSection = {
   body: string;
 };
 
-export const GUIDE_VERSION = "2026-11-21";
+export const GUIDE_VERSION = "2026-11-24";
 
 export const DASHBOARD_GUIDE: GuideSection[] = [
   // Getting in and finding your way
@@ -498,7 +498,7 @@ It shows what was raised and the average donation, donors (new and returning), m
 
 Ways to narrow the list:
 - Groups: "All", "New" (first donation in the last 30 days), "Coming back", "Gave once" and "Lapsed" (nothing in your lapsed period, 180 days unless you change it).
-- s18A receipt: "Everyone", "Asked for an s18A receipt", "Didn't ask", "Details missing".
+- s18A receipt: "Everyone", "Asked for an s18A receipt", "Didn't ask", "Details missing". s18A receipts aren't issued donor by donor: the charity issues them for the whole tax year from the s18A receipts page, and a donor with details missing can't get one until their details are in.
 - Your tags and saved lists.
 - "Search name or email", and "Sort by" (usual order is most given first).
 
@@ -622,15 +622,29 @@ Everything sent is listed under "Sent".`,
     roles: "Owner, admin and fundraiser send; others see what was sent",
     body: `Send your donors news or an appeal. Givezy sends it for you, so you never handle their addresses. Replies go to your contact email. Your page must be live.
 
-1. "Who it goes to": "All your donors", a donor group, a saved list, a tag, or the people who gave to a campaign.
+1. "Who it goes to": "All your donors"; "When and how they give" ("Gave this month", "Gave this tax year", "Give every month", "Asked for an s18A receipt"); a donor group; a Keeping donors list; a saved list; a tag; or the people who gave to a campaign.
 2. "Subject" (what donors see in their inbox) and "Your message" (plain text, up to 5 000 characters; use real numbers only). Each donor sees "Dear" and their first name above it, your charity's name below, and a link to stop these emails.
-3. Press "Check who it goes to". It shows how many donors, and who is left out: those who asked not to get emails, those who had a message from you this week, and donors who have only given by EFT, cash or a file you imported (left out for now).
+3. Press "Check who it goes to". It shows how many donors ("See who it goes to" lists their names), and who is left out: those who asked not to get emails, those who had a message from you this week, and donors who have only given by EFT, cash or a file you imported (left out for now).
 4. Press "Send me a test" to see it in your own inbox.
 5. Press "Send to N donors", then "Yes, send it". Sent emails can't be called back. Keep the page open while it sends.
 
 Nobody gets more than 4 emails from you in 30 days. If a send stops part way, press "Send the rest" under "Sent".
 
 From Photos and updates, "Email this to your donors" starts an email from that update.`,
+  },
+  {
+    id: "givy-thank-you",
+    title: "Ask Givy to prepare a thank-you",
+    path: "/charity-admin/[id]/email-donors",
+    roles: "Owner, admin and fundraiser (the roles that can email donors); others ask their owner or admin",
+    body: `Givy can prepare a thank-you to a group of your donors. Givy never sends anything: a person on your team checks it and presses Send.
+
+1. Ask Givy, for example "Prepare a thank-you for this month's donors". Givy picks the group ("Gave this month", "Gave this tax year", "Give every month", "Asked for an s18A receipt", a donor group or a Keeping donors list) and writes a short draft in your charity's voice, without figures or links.
+2. Press "Check and send" under Givy's answer. Email donors opens with the group chosen and the words filled in. The draft is kept for 6 hours, for you only.
+3. Change the words if you like. "Also show it in the Givezy app" is ticked: donors who use the Givezy app also see it there as a message from you (no phone notification). Untick it for email only.
+4. Press "Check who it goes to", then "Send to N donors" and "Yes, send it". Sent emails can't be called back.
+
+Everything on Email donors still applies: donors who asked not to get your emails are left out (of the app message too), one message a week, at most 4 emails in 30 days, one email per inbox, and the stop link in every email.`,
   },
   {
     id: "donor-journey",

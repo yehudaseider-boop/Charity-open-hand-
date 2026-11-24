@@ -11,6 +11,9 @@ import { Bubbles, People } from "@/components/people";
 import { Button } from "@/components/button";
 import { CharityPhotoCard } from "@/components/charity-photo-card";
 import { NewsCard } from "@/components/charity-news";
+import { MessageCard } from "@/components/charity-message";
+import { useCharityMessages } from "@/lib/charity-messages-live";
+import { HOME_MESSAGES, unreadCount } from "@/lib/charity-messages";
 import { GoalRing } from "@/components/goal-ring";
 import { CalendarIcon, ChevronIcon, GivingIcon, ReceiptsIcon } from "@/components/icons";
 import { useStatusCover } from "@/components/status-cover";
@@ -115,6 +118,10 @@ export default function Home() {
       ? "Find a checked charity you care about and give in a few taps."
       : `You gave ${rand(next.cents)} to ${next.charityName} on ${ddmmyyyy(next.date)}.`;
   const charityNews = useCharityNews(gaveTo.map((c) => c.slug));
+  // Messages from charities (24/11/2026): the newest few on Home, every one on the Messages page.
+  const charityMessages = useCharityMessages();
+  const homeMessages = preview && demoState !== "ready" ? [] : (charityMessages.messages ?? []).slice(0, HOME_MESSAGES);
+  const unreadMessages = unreadCount(charityMessages.messages ?? []);
   const news = charityNews.news && !(preview && demoState !== "ready") ? newsFeed(gaveTo, charityNews.news, jhbToday(), charityNews.live ? undefined : Infinity) : [];
   // Live campaign bars from the charities they gave to or saved (11/11/2026): real campaigns only, and only when there are some.
   const raising = preview && demoState !== "ready" ? [] : yourCampaigns(all, gaveTo.map((c) => c.slug), saved.map((c) => c.slug));
@@ -308,6 +315,19 @@ export default function Home() {
             <View style={styles.gutter}><SkeletonBlock height={260} /></View>
           )}
         </View>
+
+        {/* Thank-yous charities sent (24/11/2026): the newest two, only when there are some, so Home never shows an empty box. */}
+        {homeMessages.length ? (
+          <View style={[styles.gutter, { gap: 12 }]}>
+            <View style={styles.sectionHead}>
+              <Text variant="h2" accessibilityRole="header">From your charities</Text>
+              <Pressable onPress={() => router.push("/messages")} accessibilityRole="link" accessibilityLabel={unreadMessages ? `See all messages, ${unreadMessages} new` : "See all messages"} hitSlop={12}>
+                <Text style={styles.seeAll}>See all</Text>
+              </Pressable>
+            </View>
+            {homeMessages.map((m) => <MessageCard key={m.id} message={m} today={jhbToday()} onRead={charityMessages.markRead} />)}
+          </View>
+        ) : null}
 
         {news.length ? (
           <View style={[styles.gutter, { gap: 12 }]}>

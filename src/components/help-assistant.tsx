@@ -7,6 +7,8 @@ import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore }
 import { createPortal } from "react-dom";
 import { parseAnswer, type Block, type Inline } from "@/lib/assistant/answer";
 import { followUps, splitNext, startingSuggestions } from "@/lib/assistant/suggestions";
+import { thanksHref } from "@/lib/assistant/thank-you-draft";
+import { blueAction } from "@/components/dash";
 
 /**
  * The Givezy helper on every charity dashboard page (21/11/2026; looks things up since 22/11/2026): a round white
@@ -17,8 +19,11 @@ import { followUps, splitNext, startingSuggestions } from "@/lib/assistant/sugge
  * refused, too many questions.
  */
 
-/** `next`: the lookups an answer used, for its follow-up questions (22/11/2026). */
-type Turn = { role: "user" | "assistant"; content: string; failed?: boolean; next?: string[] };
+/**
+ * `next`: the lookups an answer used, for its follow-up questions (22/11/2026). `thanks`: a thank-you Givy prepared
+ * (24/11/2026), from the server's own marker, for the "Check and send" button.
+ */
+type Turn = { role: "user" | "assistant"; content: string; failed?: boolean; next?: string[]; thanks?: string };
 
 const ERROR_MARK = "[[error]]";
 const noSubscribe = () => () => {};
@@ -65,10 +70,13 @@ export function HelpAssistant({
   names = false,
   demo = false,
   live = false,
+  drafts = false,
   base,
   whatsApp,
   email,
 }: {
+  /** The person may email donors: Givy offers to prepare a thank-you (24/11/2026). The server decides anyway. */
+  drafts?: boolean;
   charityId?: string;
   /** The signed-in person's id: the saved chat is theirs only. */
   who?: string;
@@ -198,8 +206,8 @@ export function HelpAssistant({
         setTurns([...asked, { role: "assistant", content: partial || "We couldn't finish that answer. Nothing was changed.", failed: true }]);
         setAnnounce("The answer didn't finish");
       } else {
-        const { text: answer, tools } = splitNext(text);
-        setTurns([...asked, { role: "assistant", content: answer, ...(tools ? { next: tools } : {}) }]);
+        const { text: answer, tools, thanks } = splitNext(text);
+        setTurns([...asked, { role: "assistant", content: answer, ...(tools ? { next: tools } : {}), ...(thanks ? { thanks } : {}) }]);
         setAnnounce("Answer ready");
       }
     } catch (e) {
@@ -283,12 +291,15 @@ export function HelpAssistant({
               <div className="space-y-4">
                 <div className="rounded-[1.25rem] bg-surface p-4 shadow-sm">
                   <p className="font-semibold">Hi, I&apos;m Givy. Ask me about your charity&apos;s donations, what&apos;s left to set up, or how to do something in your dashboard.</p>
-                  <p className="mt-1.5 text-[14px] text-muted">I see what you see on your dashboard, and I&apos;ll link you to the right page. I can&apos;t change, send or approve anything.</p>
+                  <p className="mt-1.5 text-[14px] text-muted">
+                    I see what you see on your dashboard, and I&apos;ll link you to the right page. I can&apos;t change, send or approve anything
+                    {drafts ? ", but I can prepare a thank-you to your donors for you to check and send." : "."}
+                  </p>
                 </div>
                 <div>
                   <p className="mb-2 text-[13px] font-semibold text-muted">Try asking</p>
                   <ul className="flex flex-wrap gap-2">
-                    {startingSuggestions(live).map((s) => (
+                    {startingSuggestions(live, drafts).map((s) => (
                       <li key={s}>
                         <button type="button" onClick={() => ask(s, turns)} className="min-h-10 rounded-full border-2 border-border bg-surface px-3.5 py-1.5 text-left text-[14px] font-semibold text-brand hover:border-brand">
                           {s}
@@ -318,6 +329,17 @@ export function HelpAssistant({
                         Looking that up
                       </p>
                     )}
+                    {/* A thank-you Givy prepared: our own button (from the server's marker), to the Email donors page. */}
+                    {!t.failed && t.thanks && thanksHref(t.thanks, base) ? (
+                      <div className="mt-3 space-y-2 rounded-[1rem] border-2 border-border bg-honey-soft/70 p-3">
+                        <p className="text-[13px] leading-snug text-navy">
+                          <strong className="font-semibold">Nothing has been sent.</strong> Check who it goes to and the words, then send it yourself.
+                        </p>
+                        <Link href={thanksHref(t.thanks, base)!} onClick={onLink} className={`${blueAction} w-full justify-center text-[15px]`}>
+                          Check and send
+                        </Link>
+                      </div>
+                    ) : null}
                     {/* What to ask next, fitting what was just looked up: under the newest answer only. */}
                     {!busy && !t.failed && t.next && i === turns.length - 1 ? (
                       <ul aria-label="Ask next" className="mt-3 flex flex-wrap gap-2 border-t-2 border-border pt-3">

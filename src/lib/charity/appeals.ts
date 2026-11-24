@@ -5,13 +5,14 @@ import { getEmailTransport, isTemporaryRefusal } from "@/lib/email";
 import { oneClickStopUrl } from "@/lib/email/headers";
 import { JOB_SEND_TIMEOUT_MS, mayHaveSent } from "@/lib/email/retry-plan";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { appealEmail, audienceValue, greetingName, keepingAudienceLabel, type Audience } from "./appeals-rules";
+import { WHEN_GAVE_LABELS, showsInApp, appealEmail, audienceValue, greetingName, keepingAudienceLabel, type Audience } from "./appeals-rules";
 import { keepingListRows, keepingWindow } from "./keeping-donors";
 import { loadKeepingDonors } from "./keeping-donors-queries";
-import { donorMatches, isErasedEmail } from "./dashboard";
-import { loadDonors, type DonorRow } from "./dashboard-queries";
+import { donorMatches, isErasedEmail, thisMonth, thisTaxYear } from "./dashboard";
+import { loadDonors, loadMonthlyDonations, loadMonthlyGifts, type DonorRow } from "./dashboard-queries";
 import { lapsedDaysFor, listSegments, listTags, tagsByDonor } from "./donor-care";
-import { donorGroup, donorGroupsFor } from "./insights";
+import { donorGroup, donorGroupsFor, monthlyByDonor } from "./insights";
+import { writeInAppMessages } from "./donor-messages";
 import { EMAIL_HASH_VERSION, emailHash, emailHashesToMatch, keyedFromStored, storedEmailHash } from "@/lib/email-fingerprint";
 import { messagedThisWeek } from "./weekly-limit";
 import { inboxKey, onePerAddress } from "./one-per-address";
@@ -105,6 +106,25 @@ export async function pickAudience(charityId: string, audience: Audience, now = 
       label = keepingAudienceLabel(audience.list, audience.year);
       break;
     }
+    case "gave": {
+      // A paid gift since the first moment of this month, or of this tax year (Johannesburg time).
+      const from = Date.parse(audience.period === "this_month" ? thisMonth(now).from : thisTaxYear(now).from);
+      donors = all.filter((d) => Date.parse(d.last_paid_at) >= from);
+      label = WHEN_GAVE_LABELS[`gave:${audience.period}`];
+      break;
+    }
+    case "monthly": {
+      // A monthly donation running now (not paused, ended or being set up), as the Donors page shows it.
+      const [gifts, monthly] = await Promise.all([loadMonthlyGifts(charityId), loadMonthlyDonations(charityId)]);
+      const running = monthlyByDonor(gifts, monthly);
+      donors = all.filter((d) => running.get(d.donor_id) === "active");
+      label = WHEN_GAVE_LABELS.monthly;
+      break;
+    }
+    case "s18a":
+      donors = all.filter((d) => d.wants_18a);
+      label = WHEN_GAVE_LABELS["s18a:asked"];
+      break;
   }
   const gaveOnGivezy = await donorsWhoGaveOnGivezy(charityId);
   const reachable = donors.filter((d) => gaveOnGivezy.has(d.donor_id));
@@ -169,10 +189,18 @@ export async function recentSameAppeal(charityId: string, subject: string, body:
   return (data?.[0]?.id as string | undefined) ?? null;
 }
 
-export async function createAppeal(args: { charityId: string; userId: string; subject: string; body: string; audience: Audience; pick: AudiencePick }): Promise<string> {
+export async function createAppeal(args: { charityId: string; userId: string; subject: string; body: string; audience: Audience; pick: AudiencePick; inApp?: boolean }): Promise<string> {
   const { data, error } = await db()
     .from("charity_appeals")
-    .insert({ charity_id: args.charityId, subject: args.subject, body: args.body, audience: { value: audienceValue(args.audience) }, audience_label: args.pick.label.slice(0, 200), created_by: args.userId })
+    .insert({
+      charity_id: args.charityId,
+      subject: args.subject,
+      body: args.body,
+      // `inApp`: a thank-you prepared with Givy also shows in the app (24/11/2026). Kept here, so no new column is needed.
+      audience: { value: audienceValue(args.audience), ...(args.inApp ? { inApp: true } : {}) },
+      audience_label: args.pick.label.slice(0, 200),
+      created_by: args.userId,
+    })
     .select("id")
     .single();
   if (error) throw error;
@@ -291,6 +319,7 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
   // "Gave last year, not since" and "Lapsed" lists: a donor who has given since the list was made is no longer on it
   // and must not be told "you haven't given since". Checked again at the start of every run (review 23/11/2026).
   if (staysOnList((appeal.audience as { value?: unknown } | null)?.value)) await skipWhoGaveSince(args.charityId, appeal.id as string, appeal.created_at as string);
+  const inApp = showsInApp(appeal.audience);
   // Before claiming anyone: a sending set-up problem must not use up a donor's place.
   const transport = getEmailTransport();
   const site = (process.env.SITE_URL ?? "").replace(/\/+$/, "");
@@ -313,6 +342,8 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
     if (claimError) throw claimError;
     const ids = ((claimed ?? []) as { donor_id: string }[]).map((r) => r.donor_id);
     if (!ids.length) break;
+    // This batch's donors whose email went, for the in-app copy below.
+    const sentNow: string[] = [];
     const stopped = await stoppedEmails(args.charityId, ids.map((id) => donorsById.get(id)?.email ?? "").filter(Boolean));
     // Checked again as each one goes ("Send the rest" can be days later): a donor who had another message from the
     // charity this week (a thank-you, a reminder, another email) is left out of this one. This email's own claims don't count.
@@ -355,7 +386,10 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
         });
         // "skipped" (email not switched on here, or an address off the allowed list) is not a send.
         await mark(outcome === "sent" ? "sent" : "skipped");
-        if (outcome === "sent") sentThisRun++;
+        if (outcome === "sent") {
+          sentThisRun++;
+          sentNow.push(id);
+        }
       } catch (e) {
         console.error("[appeal] not sent", e instanceof Error ? e.message : e);
         if (isTemporaryRefusal(e)) {
@@ -370,6 +404,12 @@ export async function sendAppeal(args: { charityId: string; appealId: string; ch
         // donor's message for the week, never sent again). Only a refusal is marked failed.
         if (!mayHaveSent(e)) await mark("failed");
       }
+    }
+    // A thank-you prepared with Givy (24/11/2026) also shows in the Givezy app, for each donor whose email went and who
+    // has an app account linked to that donor record. Only after the email went, so the same opt-outs, weekly and
+    // monthly limits and one-per-inbox rule cover both. Never stops the send: the emails have already gone.
+    if (inApp && sentNow.length) {
+      await writeInAppMessages({ charityId: args.charityId, appealId: appeal.id as string, subject: appeal.subject as string, body: appeal.body as string, donorIds: sentNow });
     }
   }
   const progress = await appealProgress(appeal.id as string);

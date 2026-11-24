@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { formatRand } from "@/lib/money";
 import { leftCents } from "@/lib/donations/what-is-left";
+import { GIVY_AUDIENCE_KEYS, GIVY_AUDIENCES, checkDraft, type GivyAudience } from "./thank-you-draft";
 
 /**
  * What the dashboard helper may look up about the charity it's asked from (22/11/2026, Yehuda: "answer questions
@@ -8,6 +9,9 @@ import { leftCents } from "@/lib/donations/what-is-left";
  * person asking may already see on their dashboard: the live source reads as them, so row-level security decides.
  * Donors' names are a separate switch (ASSISTANT_DONOR_DATA): without it the donor tools aren't offered at all and
  * gifts are shown without names. Email addresses, phone numbers, ID and bank numbers are never sent.
+ *
+ * The one exception (24/11/2026): prepare_thank_you keeps a draft thank-you for the person to check and send on the
+ * Email donors page. It is offered only to roles that may email donors, and it never sends anything.
  *
  * Pure: the definitions, the input checks and the wording of each answer live here; the data comes from a
  * HelperSource (live: ./live-source.ts, demo: ./demo-source.ts). Amounts go to the model already written as Rand,
@@ -57,6 +61,15 @@ export interface HelperSource {
   donors(): Promise<DonorSummary[]>;
 }
 
+/**
+ * Givy's one writing tool (24/11/2026): it keeps a draft thank-you for the person to check and send on the Email
+ * donors page. It never sends anything. `count` and `label`: how many donors the audience reaches now, worked out on
+ * the server (null when that couldn't be worked out). `draftId`: null when the draft couldn't be kept.
+ */
+export interface ThankYouPreparer {
+  prepare(d: { audience: GivyAudience; subject: string; body: string }): Promise<{ count: number | null; label: string | null; draftId: string | null } | { refused: string }>;
+}
+
 const PERIODS: PeriodKey[] = ["this_month", "last_month", "this_tax_year", "all_time"];
 
 // Inputs stream as they are written (eager_input_streaming), so checkToolCall validates each one before it runs.
@@ -68,8 +81,11 @@ const tool = (name: string, description: string, properties: Record<string, unkn
   eager_input_streaming: true,
 });
 
-/** The tools offered, in a fixed order so the request's start stays the same and is cached. */
-export function toolDefinitions(donorData: boolean): Anthropic.Beta.BetaTool[] {
+/**
+ * The tools offered, in a fixed order so the request's start stays the same and is cached. `canDraft`: the person's
+ * role may email donors (and it isn't the demo), so prepare_thank_you is offered too, last.
+ */
+export function toolDefinitions(donorData: boolean, canDraft = false): Anthropic.Beta.BetaTool[] {
   const tools = [
     tool(
       "giving_totals",
@@ -109,18 +125,37 @@ export function toolDefinitions(donorData: boolean): Anthropic.Beta.BetaTool[] {
       ),
     );
   }
+  if (canDraft) {
+    tools.push(
+      tool(
+        "prepare_thank_you",
+        `Prepare (never send) a thank-you email to a group of the charity's donors. It keeps your draft and adds a button under your answer that opens the Email donors page with the group chosen and your words filled in; the person checks who it goes to, edits the words and presses Send themselves. Use only when they ask for a thank-you (or similar message) to a group of donors. Groups: ${GIVY_AUDIENCE_KEYS.map((k) => `${k} (${GIVY_AUDIENCES[k]})`).join("; ")}. Write in the charity's voice: warm, short (2 to 5 sentences), plain, no guilt, no pressure to give again, no exclamation marks, no numbers or figures of any kind, no impact claims you weren't told, no links, no religious wording unless it is the charity's own words, and no greeting or sign-off (the email adds "Dear" and the donor's first name, and the charity's name).`,
+        {
+          audience: { type: "string", enum: GIVY_AUDIENCE_KEYS, description: "Who it is for" },
+          subject: { type: "string", description: "The email's subject, 3 to 120 characters" },
+          message: { type: "string", description: "The message, 2 to 5 short sentences, no greeting or sign-off" },
+        },
+        ["audience", "subject", "message"],
+      ),
+    );
+  }
   return tools;
 }
 
 /** The tools each call may use, by name. */
-export type ToolName = "giving_totals" | "giving_by_month" | "monthly_donations" | "setup_progress" | "receipts_progress" | "recent_gifts" | "top_donors" | "find_donor";
+export type ToolName = "giving_totals" | "giving_by_month" | "monthly_donations" | "setup_progress" | "receipts_progress" | "recent_gifts" | "top_donors" | "find_donor" | "prepare_thank_you";
 
-type Checked = { ok: true; name: ToolName; period?: PeriodKey; limit?: number; search?: string } | { ok: false; error: string };
+type Checked =
+  | { ok: true; name: ToolName; period?: PeriodKey; limit?: number; search?: string; draft?: { audience: GivyAudience; subject: string; body: string } }
+  | { ok: false; error: string };
+
+/** What a role that can't email donors is told (and Givy passes on). */
+export const NO_DRAFT_FOR_ROLE = "This person's role can't email donors, so you can't prepare a thank-you for them. Tell them plainly to ask their charity's owner or admin.";
 
 const clampLimit = (v: unknown) => (typeof v === "number" && Number.isInteger(v) ? Math.min(10, Math.max(1, v)) : null);
 
 /** Checks a tool call's name and input before it runs (the input can arrive incomplete while streaming). */
-export function checkToolCall(name: string, input: unknown, donorData: boolean): Checked {
+export function checkToolCall(name: string, input: unknown, donorData: boolean, canDraft = false): Checked {
   const i = (input && typeof input === "object" && !Array.isArray(input) ? input : null) as Record<string, unknown> | null;
   if (!i) return { ok: false, error: "The tool input couldn't be read. Call the tool again with valid input." };
   switch (name) {
@@ -141,6 +176,12 @@ export function checkToolCall(name: string, input: unknown, donorData: boolean):
       if (!donorData) return { ok: false, error: "Donors' details aren't available." };
       const search = typeof i.name === "string" ? i.name.replace(/\s+/g, " ").trim().slice(0, 60) : "";
       return search.length >= 2 ? { ok: true, name, search } : { ok: false, error: "name must be at least 2 letters." };
+    }
+    case "prepare_thank_you": {
+      // Refused here too, not only left out of the list: a role that can't email donors never gets a draft.
+      if (!canDraft) return { ok: false, error: NO_DRAFT_FOR_ROLE };
+      const d = checkDraft(i);
+      return d.ok ? { ok: true, name, draft: { audience: d.audience, subject: d.subject, body: d.body } } : { ok: false, error: d.error };
     }
     default:
       return { ok: false, error: `There is no tool called ${name}.` };
@@ -211,7 +252,41 @@ export async function runTool(call: Extract<Checked, { ok: true }>, source: Help
       const hits = (await source.donors()).filter((d) => !d.hidden && d.name.toLowerCase().includes(needle)).slice(0, 10);
       return JSON.stringify(hits.length ? hits.map(donorLine) : { found: 0, note: "No donor's name contains that. Anonymous donors can't be found by name." });
     }
+    case "prepare_thank_you":
+      // Has side effects (it keeps a draft), so it runs only through runPrepare, with the person's preparer.
+      throw new Error("prepare_thank_you runs through runPrepare");
   }
+}
+
+/**
+ * Runs a checked prepare_thank_you call: keeps the draft (through the preparer, which checks the role and the page
+ * again) and words the result for the model. Sends nothing. `prepared` is what the panel's button needs, or null.
+ */
+export async function runPrepare(
+  call: Extract<Checked, { ok: true }>,
+  preparer: ThankYouPreparer | null,
+): Promise<{ text: string; isError: boolean; prepared: { draftId: string | null; audience: GivyAudience } | null }> {
+  if (call.name !== "prepare_thank_you" || !call.draft) throw new Error("not a prepare_thank_you call");
+  if (!preparer) return { text: NO_DRAFT_FOR_ROLE, isError: true, prepared: null };
+  const r = await preparer.prepare(call.draft);
+  if ("refused" in r) return { text: `Nothing was prepared: ${r.refused}`, isError: true, prepared: null };
+  const reach =
+    r.count === null
+      ? "How many donors it reaches couldn't be worked out just now; the page shows it when they press Check who it goes to."
+      : `It would reach ${r.count} ${r.count === 1 ? "donor" : "donors"} now (${r.label}), before the page's own checks; the page shows the exact number.`;
+  const kept = r.draftId
+    ? "A button under your answer opens the Email donors page with this filled in."
+    : "The words couldn't be kept for the page, so a button under your answer opens the Email donors page with only the group chosen: write the subject and message in your answer so they can copy them.";
+  return {
+    text: JSON.stringify({
+      prepared: true,
+      sent: false,
+      reach,
+      next: `${kept} Tell them in a sentence or two: you prepared it and nothing has been sent; they check who it goes to, can change the words, then press Send. Donors who use the Givezy app also see it there. Don't repeat the whole message unless asked.`,
+    }),
+    isError: false,
+    prepared: { draftId: r.draftId, audience: call.draft.audience },
+  };
 }
 
 /** Names are typed by the public: kept short, so one can't carry a long message to the model (review 22/11/2026). */

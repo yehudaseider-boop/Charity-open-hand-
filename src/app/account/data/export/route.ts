@@ -180,6 +180,12 @@ export async function GET(request: Request) {
     charities_you_stopped_emails_from: choices[1].data ?? [],
   };
 
+  // Charities' thank-yous shown to them in the Givezy app (24/11/2026): read as them, so only their own. Before that
+  // table's migration has run there are none.
+  const inApp = await readAll((from, to) => supabase.from("donor_messages").select("subject, body, sent_at, read_at, charities(name_en)").eq("user_id", user.id).order("sent_at").order("id").range(from, to));
+  const inAppMissing = inApp.error && ["PGRST205", "42P01"].includes((inApp.error as { code?: string }).code ?? "");
+  if (inApp.error && !inAppMissing) return new NextResponse(FAILED, { status: 503 });
+
   // Their place on the landing page's launch list (10/11/2026), found by the account's email; nothing before that
   // migration has run.
   const accountEmail = (profile.data?.email as string | undefined)?.toLowerCase() ?? user.email?.toLowerCase();
@@ -218,6 +224,7 @@ export async function GET(request: Request) {
     thank_you_notes_from_charities: thanks.data ?? [],
     donor_journeys_from_charities: journeysMissing ? [] : (journeys.data ?? []),
     emails_from_charities: charityEmails,
+    messages_from_charities_in_the_app: inAppMissing ? [] : inApp.data,
     charities_notes_about_you: charityNotes,
     charities_follow_ups_about_you: charityFollowUps,
     charities_tags_on_you: charityTags,

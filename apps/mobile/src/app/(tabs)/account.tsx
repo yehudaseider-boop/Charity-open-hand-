@@ -4,6 +4,9 @@ import { Linking, Pressable, ScrollView, StyleSheet, useWindowDimensions, View }
 import { initials } from "@shared/charity/initials";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { InsightsLink } from "@/components/insights-link";
+import { MessagesLink } from "@/components/charity-message";
+import { useCharityMessages } from "@/lib/charity-messages-live";
+import { unreadCount } from "@/lib/charity-messages";
 import { useStatusCover } from "@/components/status-cover";
 import { Button } from "@/components/button";
 import { ChevronIcon, GivingIcon, ReceiptsIcon } from "@/components/icons";
@@ -43,6 +46,8 @@ export default function Account() {
   const { width } = useWindowDimensions();
   const p = useLocalSearchParams<{ demo?: string }>();
   const account = useAccount();
+  // Messages from charities (24/11/2026): how many are new, for the link below the tiles.
+  const charityMessages = useCharityMessages();
   const [demoSignedIn, setDemoSignedIn] = useState(p.demo === "signedin");
   // Signing out clears this phone and then waits for the sign-in service, so the button says so while it runs.
   const [signingOut, setSigningOut] = useState(false);
@@ -146,6 +151,7 @@ export default function Account() {
               <Tile label="s18A receipts" icon={<ReceiptsIcon color={colors.blue} size={26} />} tint={colors.peach} onPress={() => router.push("/receipts")} />
             </View>
             <InsightsLink />
+            <MessagesLink unread={unreadCount(charityMessages.messages ?? [])} />
             {account.demo ? (
               <Text variant="label" style={{ textAlign: "center" }}>Demo account. Sample data only: nothing here is real and no payment is taken.</Text>
             ) : null}

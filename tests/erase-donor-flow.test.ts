@@ -163,6 +163,8 @@ describe("erasing a donor by their account", () => {
       // erasure that stops part way can be finished by running it again.
       "rpc",
       ...["maaser_income_entries", "external_giving_entries", "donation_private_notes", "favourites", "maaser_settings", "saved_cards", "card_save_requests"].map((t) => `${t}:deleted:user_id=${USER}`),
+      // Charities' thank-yous shown in the app (24/11/2026).
+      `donor_messages:deleted:user_id=${USER}`,
       "consents:kind=account",
       "deleteUser",
       // The email goes once the account is gone, so someone with an account but no gifts hears too (18/11/2026).
@@ -326,6 +328,8 @@ describe("erasing a donor with no account", () => {
 describe("what charities kept about them (review 23/11/2026)", () => {
   it("clears the private note on their receipt decisions and removes them from appeal send lists, before the database erasure", async () => {
     await eraseDonor({ userId: USER, actorUserId: "admin1" });
+    // Charities' thank-yous shown in the app to them (24/11/2026).
+    expect(deletedByDonor).toContain("donor_messages");
     expect(updateFilters).toContain('receipt_plan_decisions:donor_id=["d1","d2"]');
     expect(deletedByDonor).toContain("charity_appeal_recipients");
     expect(calls.indexOf('receipt_plan_decisions:update:{"note":null}')).toBeLessThan(calls.indexOf("rpc"));

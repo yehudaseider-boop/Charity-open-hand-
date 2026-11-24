@@ -53,6 +53,8 @@ export const assistantConfig = {
   /** The public demo: per visitor per hour, and for all demo visitors together per day. */
   demoPerVisitorPerHour: 10,
   demoPerDay: 300,
+  /** How long a thank-you Givy prepared waits for the person to check and send it (24/11/2026), in hours. */
+  draftHours: 6,
 } as const;
 
 /** Whether the assistant is on for the real dashboard. */

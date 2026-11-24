@@ -21,12 +21,16 @@ const Q = {
   team: "How do I add someone to my team?",
   logo: "How do I add my logo?",
   goLive: "What happens once we're approved?",
+  thank: "Prepare a thank-you for this month's donors",
 } as const;
 
-/** The questions shown when the chat is empty. */
-export function startingSuggestions(live: boolean): string[] {
+/**
+ * The questions shown when the chat is empty. `canDraft`: the person may email donors, so a live charity is also
+ * offered a thank-you to prepare (24/11/2026).
+ */
+export function startingSuggestions(live: boolean, canDraft = false): string[] {
   return live
-    ? [Q.thisMonth, Q.monthly, Q.receiptsLeft, Q.recent, Q.team]
+    ? [Q.thisMonth, ...(canDraft ? [Q.thank] : []), Q.monthly, Q.receiptsLeft, Q.recent, Q.team]
     : [Q.setup, Q.logo, Q.team, Q.goLive, Q.receiptsHow];
 }
 
@@ -40,6 +44,7 @@ const AFTER: Record<string, string[]> = {
   recent_gifts: [Q.thisMonth, Q.monthly, Q.receiptsLeft],
   top_donors: [Q.recent, Q.monthly, Q.thisMonth],
   find_donor: [Q.recent, Q.thisMonth, Q.monthly],
+  prepare_thank_you: [Q.thisMonth, Q.monthly, Q.receiptsLeft],
 };
 
 /**
@@ -60,16 +65,26 @@ export function followUps(tools: string[], asked: string[], live: boolean, max =
   return out;
 }
 
-/** The marker the server puts at the very end of an answer: which lookups ran. */
-export const NEXT_MARK = /\n*\[\[next:([a-z_,]*)\]\]\s*$/;
+/**
+ * The markers the server puts at the very end of an answer: a prepared thank-you's button (24/11/2026, only when Givy
+ * prepared one), then which lookups ran. Only read at the very end, after everything the model wrote, so a marker the
+ * model writes itself is never taken for ours.
+ */
+export const NEXT_MARK = /\n*(?:\[\[thanks:([a-z0-9:=_-]{1,80})\]\]\n)?\[\[next:([a-z_,]*)\]\]\s*$/;
 
-/** Splits the marker off a (possibly still arriving) answer. A half-arrived marker is hidden too. */
-export function splitNext(text: string): { text: string; tools: string[] | null } {
+/** A half-arrived marker (or two), at the very end of an answer still streaming in. */
+const PARTIAL_MARK = /\n*\[(?:\[(?:t(?:h(?:a(?:n(?:k(?:s(?::[a-z0-9:=_-]*(?:\](?:\](?:\n(?:\[(?:\[(?:n(?:e(?:x(?:t(?::[a-z_,]*\]?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?|n(?:e(?:x(?:t(?::[a-z_,]*\]?)?)?)?)?)?)?$/;
+
+/**
+ * Splits the markers off a (possibly still arriving) answer. A half-arrived marker is hidden too. `thanks` is the
+ * prepared thank-you's marker value ("d=<draft id>" or "to=<audience>"), for thanksHref; null when there is none.
+ */
+export function splitNext(text: string): { text: string; tools: string[] | null; thanks: string | null } {
   const m = NEXT_MARK.exec(text);
-  if (m) return { text: text.slice(0, m.index), tools: m[1].split(",").filter((t) => t in AFTER) };
-  // While streaming, the marker can arrive in pieces: never show "[[ne..." to the reader.
-  const partial = /\n*\[\[(n(e(x(t(:[a-z_,]*)?)?)?)?)?$/.exec(text);
-  return { text: partial ? text.slice(0, partial.index) : text, tools: null };
+  if (m) return { text: text.slice(0, m.index), tools: m[2].split(",").filter((t) => t in AFTER), thanks: m[1] ?? null };
+  // While streaming, the markers can arrive in pieces: never show "[[ne..." or "[[thanks:..." to the reader.
+  const partial = PARTIAL_MARK.exec(text);
+  return { text: partial ? text.slice(0, partial.index) : text, tools: null, thanks: null };
 }
 
 /** The marker for these lookups (names only, from our own tool list). */

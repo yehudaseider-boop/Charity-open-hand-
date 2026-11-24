@@ -72,6 +72,16 @@ export function ReceiptsIcon({ size = 24, color = colors.ink }: IconProps) {
   );
 }
 
+/** An envelope: messages from charities (24/11/2026). */
+export function MailIcon({ size = 24, color = colors.ink }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path d="M5.5 5.5h13a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z" {...stroke(color)} />
+      <Path d="M4.5 7.5l7.5 5.5 7.5-5.5" {...stroke(color)} />
+    </Svg>
+  );
+}
+
 export function AccountIcon({ size = 24, color = colors.ink }: IconProps) {
   return (
     <Svg {...base(size)}>

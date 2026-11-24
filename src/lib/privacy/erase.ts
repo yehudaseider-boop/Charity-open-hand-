@@ -19,6 +19,8 @@ export type EraseSummary = {
 };
 
 const UUID = /^[0-9a-f-]{36}$/i;
+/** A table whose migration hasn't run yet: nothing in it to erase. */
+const isMissingTable = (e: { code?: string } | null | undefined) => e?.code === "PGRST205" || e?.code === "42P01";
 
 /** What stays after an erasure, in words a person can read. */
 export const ERASE_KEPT_TEXT =
@@ -104,6 +106,9 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
     // The charities' personal thank-yous to them, and their name in the dashboard's "what just happened" rows.
     const { error: thanksError } = await db.from("charity_donor_thanks").delete().in("donor_id", [...ids]);
     if (thanksError) throw new Error(`Could not erase: ${thanksError.message}`);
+    // Charities' thank-yous shown in the app to them (24/11/2026). Before that table's migration there are none.
+    const { error: inAppError } = await db.from("donor_messages").delete().in("donor_id", [...ids]);
+    if (inAppError && !isMissingTable(inAppError)) throw new Error(`Could not erase: ${inAppError.message}`);
     // Filtered in the database and read in pages: the history of every charity is far more than one page.
     const actions = await allPages((from) =>
       db.from("charity_actions").select("id, details").eq("kind", "donor_thanked").in("details->>donorId", [...ids]).order("id").range(from, from + 999),
@@ -242,6 +247,9 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
       const { error: ownError } = await db.from(table).delete().eq("user_id", userId);
       if (ownError) throw new Error(`Could not erase their ${table.replace(/_/g, " ")}: ${ownError.message}`);
     }
+    // Charities' thank-yous shown to them in the app (24/11/2026), also any no longer tied to a donor record.
+    const { error: inAppError } = await db.from("donor_messages").delete().eq("user_id", userId);
+    if (inAppError && !isMissingTable(inAppError)) throw new Error(`Could not erase their messages from charities: ${inAppError.message}`);
     const blocked = await accountBlocker(userId);
     if (blocked) {
       keptForWork = true;

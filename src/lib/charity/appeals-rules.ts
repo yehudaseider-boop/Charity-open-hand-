@@ -40,7 +40,28 @@ export type Audience =
   | { kind: "segment"; segmentId: string }
   | { kind: "campaign"; campaignId: string }
   /** A Keeping donors list (23/11/2026): who gave in the year before the chosen tax year, or earlier, and not since. */
-  | { kind: "keeping"; list: KeepingAudienceList; year: "this" | "last" };
+  | { kind: "keeping"; list: KeepingAudienceList; year: "this" | "last" }
+  /** Donors with a paid gift this calendar month, or this tax year (24/11/2026, for thank-yous Givy prepares). */
+  | { kind: "gave"; period: GavePeriod }
+  /** Donors with a monthly donation running now (24/11/2026). */
+  | { kind: "monthly" }
+  /** Donors who asked for an s18A receipt on at least one gift (24/11/2026), as the Donors page's s18A filter. */
+  | { kind: "s18a" };
+
+export type GavePeriod = "this_month" | "this_tax_year";
+
+/** What the 24/11/2026 audiences are called in the form and on the sent email's line. */
+export const WHEN_GAVE_LABELS = {
+  "gave:this_month": "Gave this month",
+  "gave:this_tax_year": "Gave this tax year",
+  monthly: "Give every month",
+  "s18a:asked": "Asked for an s18A receipt",
+} as const;
+
+/** Whether an email also shows in donors' Givezy app: a thank-you prepared with Givy (kept on the email's audience). */
+export function showsInApp(audience: unknown): boolean {
+  return Boolean(audience && typeof audience === "object" && (audience as { inApp?: unknown }).inApp === true);
+}
 
 /** The Keeping donors lists that can be emailed: the donors who haven't given since. */
 export type KeepingAudienceList = "lybunt" | "sybunt";
@@ -60,6 +81,10 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function parseAudience(v: unknown): Audience | null {
   const s = String(v ?? "");
   if (s === "all") return { kind: "all" };
+  if (s === "gave:this_month") return { kind: "gave", period: "this_month" };
+  if (s === "gave:this_tax_year") return { kind: "gave", period: "this_tax_year" };
+  if (s === "monthly") return { kind: "monthly" };
+  if (s === "s18a:asked") return { kind: "s18a" };
   const parts = s.split(":");
   const [kind, id, extra] = parts;
   if (kind === "group" && isDonorGroup(id)) return { kind: "group", group: id };
@@ -79,6 +104,9 @@ export function audienceValue(a: Audience): string {
     case "segment": return `segment:${a.segmentId}`;
     case "campaign": return `campaign:${a.campaignId}`;
     case "keeping": return `keeping:${a.list}${a.year === "last" ? ":last" : ""}`;
+    case "gave": return `gave:${a.period}`;
+    case "monthly": return "monthly";
+    case "s18a": return "s18a:asked";
   }
 }
 

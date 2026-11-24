@@ -6,7 +6,11 @@ import { liveSource } from "@/lib/assistant/live-source";
 import { askerContext, stableInstructions } from "@/lib/assistant/prompt";
 import { checkQuestion, pagePath, type AssistantRequest } from "@/lib/assistant/request";
 import { nextMark } from "@/lib/assistant/suggestions";
-import { checkToolCall, runTool, toolDefinitions, type HelperSource } from "@/lib/assistant/tools";
+import { checkToolCall, runPrepare, runTool, toolDefinitions, type HelperSource, type ThankYouPreparer } from "@/lib/assistant/tools";
+import { livePreparer } from "@/lib/assistant/drafts";
+import { thanksMark, type GivyAudience } from "@/lib/assistant/thank-you-draft";
+import { can } from "@/lib/charity/permissions";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getViewer } from "@/lib/auth";
 import { viewerRole } from "@/lib/charity/team";
 import { clientIp } from "@/lib/client-ip";
@@ -18,7 +22,9 @@ import { fromThisSite } from "@/lib/same-site";
  * The dashboard helper (21/11/2026; looks things up since 22/11/2026). A signed-in member of the charity who has
  * passed the second step (or a visitor to the public demo, when it is on) sends a question; the answer streams back as
  * plain text. To answer, the model may call read-only tools (src/lib/assistant/tools.ts) that read the charity's own
- * figures as the person asking, so it never sees more than their dashboard shows them; nothing is changed. The
+ * figures as the person asking, so it never sees more than their dashboard shows them; nothing is changed. Since
+ * 24/11/2026 it may also prepare a thank-you (prepare_thank_you, for roles that may email donors): a draft is kept and
+ * the answer ends with a button to the Email donors page, where the person checks it and presses Send. Givy never sends. The
  * question, and what the tools return, go to Anthropic to be answered; neither is stored by us. Only counts (tokens
  * used, lookups made) are logged, never the question, the figures or the answer.
  */
@@ -52,6 +58,8 @@ export async function POST(req: Request) {
   let role: Awaited<ReturnType<typeof viewerRole>> | "demo";
   let keys: { bucket: string; keys: string[]; limit: number; minutes: number }[];
   let source: HelperSource;
+  // Preparing a thank-you (24/11/2026): only for a role that may email donors, never on the demo. Givy never sends.
+  let preparer: ThankYouPreparer | null = null;
   if (demo) {
     if (!assistantDemoOn()) return plain(404, "Givy isn't switched on for the demo.");
     const visitor = ipKeys(clientIp(req.headers));
@@ -75,6 +83,11 @@ export async function POST(req: Request) {
       { bucket: "assistant-charity", keys: [`charity#${charityId}`], limit: assistantConfig.perCharityPerDay, minutes: 24 * 60 },
     ];
     source = liveSource(charityId!);
+    if (can(role, "message")) {
+      const status = async () =>
+        ((await createAdminClient().from("charities").select("status").eq("id", charityId!).maybeSingle()).data?.status as string | undefined) ?? null;
+      preparer = livePreparer({ charityId: charityId!, userId: viewer.userId, role, status });
+    }
   }
 
   try {
@@ -94,11 +107,12 @@ export async function POST(req: Request) {
   // The demo is made up, so its donors' names may always be shown there.
   const donorData = demo || assistantDonorDataOn();
   const contact = { whatsApp: legalConfig.supportWhatsApp, email: legalConfig.supportEmail };
-  const tools = toolDefinitions(donorData);
+  const canDraft = preparer !== null;
+  const tools = toolDefinitions(donorData, canDraft);
   const system: Anthropic.Beta.BetaTextBlockParam[] = [
     // The tools, rules and whole guide: identical for everyone with the same switches, so cached for an hour.
     { type: "text", text: stableInstructions(contact, donorData), cache_control: { type: "ephemeral", ttl: "1h" } },
-    { type: "text", text: askerContext(role, pagePath(page)) },
+    { type: "text", text: askerContext(role, pagePath(page), canDraft) },
   ];
   const convo: Anthropic.Beta.BetaMessageParam[] = messages.map((m) => ({ role: m.role, content: m.content }));
 
@@ -119,6 +133,8 @@ export async function POST(req: Request) {
       let lookups = 0;
       // Which lookups ran, so the panel can offer fitting follow-up questions (22/11/2026).
       const used: string[] = [];
+      // A thank-you prepared in this answer (at most one): what the panel's button needs.
+      let prepared: { draftId: string | null; audience: GivyAudience } | null = null;
       try {
         for (let round = 0; round <= assistantConfig.maxToolRounds && !stopped; round++) {
           // The last round has no tools: by then it must answer with what it found. Short of time, it answers now.
@@ -165,9 +181,27 @@ export async function POST(req: Request) {
                 results.push({ type: "tool_result", tool_use_id: block.id, content: "Too many lookups at once. Answer with what you have, or look up fewer things.", is_error: true });
                 continue;
               }
-              const call = checkToolCall(block.name, block.input, donorData);
+              const call = checkToolCall(block.name, block.input, donorData, canDraft);
               if (!call.ok) {
                 results.push({ type: "tool_result", tool_use_id: block.id, content: call.error, is_error: true });
+                continue;
+              }
+              if (call.name === "prepare_thank_you") {
+                if (prepared) {
+                  results.push({ type: "tool_result", tool_use_id: block.id, content: "One thank-you per answer: one is already prepared.", is_error: true });
+                  continue;
+                }
+                try {
+                  const r = await runPrepare(call, preparer);
+                  results.push({ type: "tool_result", tool_use_id: block.id, content: r.text, ...(r.isError ? { is_error: true } : {}) });
+                  if (r.prepared) {
+                    prepared = r.prepared;
+                    used.push(block.name);
+                  }
+                } catch (e) {
+                  console.error("[assistant] prepare failed", e instanceof Error ? e.message : e);
+                  results.push({ type: "tool_result", tool_use_id: block.id, content: "The thank-you couldn't be prepared just now. Nothing was sent.", is_error: true });
+                }
                 continue;
               }
               try {
@@ -195,6 +229,8 @@ export async function POST(req: Request) {
         // Never an empty answer shown as finished.
         if (!anySent && !stopped) send("I couldn't put an answer together just now. Please try again, or contact the Givezy team.");
         // Last of all, after the answer: which lookups ran (names only, from our own list). The panel hides it.
+        // A prepared thank-you's button: our own marker (a draft id or one of our fixed audiences), just before the last.
+        if (!stopped && prepared) send(thanksMark(prepared));
         if (!stopped) send(nextMark(used));
         console.info(`[assistant] lookups: ${lookups}`);
       } catch (e) {

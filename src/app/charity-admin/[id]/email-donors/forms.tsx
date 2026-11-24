@@ -22,6 +22,7 @@ export function AppealForm({
   initialAudience,
   initialSubject = "",
   initialBody = "",
+  fromGivy = false,
 }: {
   check: (s: AppealCheck, f: FormData) => Promise<AppealCheck>;
   test: (s: FormState, f: FormData) => Promise<FormState>;
@@ -30,7 +31,10 @@ export function AppealForm({
   initialAudience: string;
   initialSubject?: string;
   initialBody?: string;
+  /** A thank-you Givy prepared (24/11/2026): offered in donors' Givezy app too, ticked to start with. */
+  fromGivy?: boolean;
 }) {
+  const [inApp, setInApp] = useState(fromGivy);
   const [subject, setSubject] = useState(initialSubject);
   const [body, setBody] = useState(initialBody);
   const [audience, setAudience] = useState(initialAudience);
@@ -51,6 +55,7 @@ export function AppealForm({
     f.set("subject", subject);
     f.set("body", body);
     f.set("audience", audience);
+    if (fromGivy && inApp) f.set("in_app", "yes");
   };
   const errors = preview.state === "refused" ? preview.fieldErrors ?? {} : {};
 
@@ -90,6 +95,15 @@ export function AppealForm({
               <p className="text-xs text-muted">Plain text, up to 5 000 characters. Each donor sees &quot;Dear&quot; and their first name above it, your charity&apos;s name below it, and a link to stop these emails. Use real numbers only.</p>
             )}
           </div>
+          {fromGivy ? (
+            <label className="flex items-start gap-3 text-sm text-navy">
+              <input type="checkbox" checked={inApp} onChange={(e) => setInApp(e.currentTarget.checked)} className="mt-0.5 h-6 w-6 shrink-0 accent-brand" />
+              <span>
+                <span className="font-semibold">Also show it in the Givezy app</span>
+                <span className="block text-xs text-muted">Donors who use the app see it there too, as a message from you. Only donors who get the email, and no phone notification.</span>
+              </span>
+            </label>
+          ) : null}
           <div className="flex flex-wrap items-center gap-3">
             <button disabled={checking} className={`${blueAction} disabled:opacity-60`}>
               {checking ? "Checking…" : "Check who it goes to"}
@@ -109,6 +123,15 @@ export function AppealForm({
               <p className="font-display text-lg font-bold text-indigo [overflow-wrap:anywhere]">
                 {preview.count ? `${preview.label}: ${preview.count} ${preview.count === 1 ? "donor" : "donors"}.` : `${preview.label}: nobody to send it to.`}
               </p>
+              {preview.names.length ? (
+                <details className="rounded-control border-2 border-border bg-surface p-3">
+                  <summary className="cursor-pointer font-semibold text-brand">See who it goes to</summary>
+                  <ul className="mt-2 max-h-64 space-y-1 overflow-y-auto text-navy">
+                    {preview.names.map((n, i) => <li key={i} dir="auto" className="[overflow-wrap:anywhere]">{n}</li>)}
+                  </ul>
+                  {preview.count > preview.names.length ? <p className="mt-2 text-xs text-muted">And {preview.count - preview.names.length} more. The Donors page lists everyone.</p> : null}
+                </details>
+              ) : null}
               {preview.stopped ? <p className="text-muted">{preview.stopped} more {preview.stopped === 1 ? "is" : "are"} left out because they asked not to get emails.</p> : null}
               {preview.thisWeek ? (
                 <p className="text-muted">

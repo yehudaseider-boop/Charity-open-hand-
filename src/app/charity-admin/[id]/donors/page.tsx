@@ -30,7 +30,8 @@ import type { DonorRow } from "@/lib/charity/dashboard-queries";
 import { MAX_REMINDERS, S18A_FILTERS, S18A_FILTER_HINTS, inS18aFilter, isS18aFilter, missingList, s18aCounts, type S18aFilter } from "@/lib/charity/s18a-reminder";
 import { lastReminded, loadS18aMissing } from "@/lib/charity/s18a-reminder-send";
 import type { MissingDetail } from "@/lib/donations/s18a-details";
-import { isOwner, viewerCan } from "@/lib/charity/team";
+import { isOwner, viewerCan, viewerRole } from "@/lib/charity/team";
+import { hiddenPages } from "@/lib/charity/permissions";
 import { remindS18aDetails } from "./reminder-actions";
 import { ReminderForm, ReminderTick } from "./reminder-form";
 
@@ -50,6 +51,8 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   await timed("donors", "requireViewer", requireViewer(`/charity-admin/${id}/donors`));
   const { charity } = await timed("donors", "loadCharityForManager", loadCharityForManager(id));
   const canDownload = await timed("donors", "viewerCan", viewerCan(id, "export"));
+  // The s18A receipts page, for the line under the s18A filter: linked only for roles that see that page (24/11/2026).
+  const seesReceipts = !hiddenPages(await timed("donors", "viewerRole", viewerRole(id))).includes("/receipts");
   const sp = await searchParams;
   const q = safeSearch(typeof sp.q === "string" ? sp.q : "");
   const asked = Math.max(1, Math.min(10_000, Number(typeof sp.page === "string" ? sp.page : 1) || 1));
@@ -178,6 +181,18 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
           />
         </div>
         {s18a ? <p className="text-xs text-muted">{S18A_FILTER_HINTS[s18a]}.</p> : null}
+        {/* s18A receipts aren't sent donor by donor (Yehuda, 24/11/2026): say where they are issued, so nobody looks for a button here. */}
+        {s18a === "asked" || s18a === "details_missing" ? (
+          <p className="text-xs text-muted">
+            s18A receipts aren&apos;t issued donor by donor: your charity issues them for the whole tax year at once, from the{" "}
+            {seesReceipts ? (
+              <Link href={`/charity-admin/${id}/receipts`} className="font-semibold text-brand underline underline-offset-2">s18A receipts page</Link>
+            ) : (
+              "s18A receipts page"
+            )}
+            .{s18a === "details_missing" ? " A donor with details missing can't get one until their details are in." : ""}
+          </p>
+        ) : null}
         {missingRead === null ? (
           <p role="status" className="rounded-card bg-warning-soft p-3 text-sm text-warning">We couldn&apos;t check which donors have s18A details missing just now. Nothing has changed. Refresh the page to try again.</p>
         ) : null}

@@ -124,7 +124,10 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ from, rpc
 vi.mock("@/lib/audit", () => ({ logAudit: async () => undefined }));
 vi.mock("@/lib/charity/charity-actions", () => ({ recordAction: async () => "act1" }));
 vi.mock("@/lib/charity/weekly-limit", () => ({ WEEKLY_LIMIT: "One a week.", messagedThisWeek: async () => new Set<string>() }));
-vi.mock("@/lib/charity/dashboard-queries", () => ({ loadDonors: async () => donorList }));
+/** Monthly donations, for the "Give every month" audience (24/11/2026). */
+let monthlyGifts: Row[] = [];
+let monthlyRows: Row[] = [];
+vi.mock("@/lib/charity/dashboard-queries", () => ({ loadDonors: async () => donorList, loadMonthlyGifts: async () => monthlyGifts, loadMonthlyDonations: async () => monthlyRows }));
 /** The Keeping donors rows the database would answer (23/11/2026: emailing a "not since" list). */
 let keepingRows: Row[] = [];
 const keepingAsked: { taxYear: number }[] = [];
@@ -242,6 +245,63 @@ describe("an appeal reaches each inbox once", () => {
     expect(status).toEqual({ sarah: "sent", "sarah-co": "skipped", ben: "sending" });
     // "sending" counts as not sent on the page, and is never claimed again by "Send the rest".
     expect(p).toMatchObject({ sent: 1, skipped: 1, failed: 1, waiting: 0 });
+  });
+});
+
+describe("a thank-you Givy prepared (24/11/2026)", () => {
+  const at = (donor_id: string, email: string, last: string, over: Row = {}) => ({ ...donor(donor_id, email), last_paid_at: last, ...over });
+
+  it("its audiences are worked out on the server, from the charity's own donors", async () => {
+    donorList = [
+      at("ann", "ann@x.co", "2026-11-03T10:00:00+02:00", { wants_18a: true }),
+      at("ben", "ben@x.co", "2026-10-30T10:00:00+02:00"),
+      at("cat", "cat@x.co", "2026-02-27T10:00:00+02:00", { wants_18a: true }),
+    ];
+    tables.donations.push(gift("g1", "ann", "2026-11-03T10:00:00+02:00", "ann@x.co"), gift("g2", "ben", "2026-10-30T10:00:00+02:00", "ben@x.co"), gift("g3", "cat", "2026-02-27T10:00:00+02:00", "cat@x.co"));
+    monthlyGifts = [{ donor_id: "ben", recurring_id: "r1" }, { donor_id: "cat", recurring_id: "r2" }];
+    monthlyRows = [{ recurring_id: "r1", status: "active" }, { recurring_id: "r2", status: "paused" }];
+    const ids = async (a: Parameters<typeof pickAudience>[1]) => (await pickAudience(C, a, NOW))?.donors.map((d) => d.donor_id);
+    // November so far; this tax year from 1 March (Cat's gift on 27/02/2026 was last tax year).
+    expect(await ids({ kind: "gave", period: "this_month" })).toEqual(["ann"]);
+    expect(await ids({ kind: "gave", period: "this_tax_year" })).toEqual(["ann", "ben"]);
+    expect(await ids({ kind: "monthly" })).toEqual(["ben"]);
+    expect(await ids({ kind: "s18a" })).toEqual(["ann", "cat"]);
+    expect((await pickAudience(C, { kind: "s18a" }, NOW))?.label).toBe("Asked for an s18A receipt");
+  });
+
+  it("also shows in the app, only for donors whose email went and who have a linked app account, once each", async () => {
+    donorList = [donor("sarah", "sarah@x.co"), donor("sarah-co", "Sarah@X.co", "company"), donor("ben", "ben@x.co"), donor("cat", "cat@x.co")];
+    // Sarah (both records) uses the app; Ben too, but his email may not have gone; Cat has no app account.
+    tables.donors = [{ id: "sarah", user_id: "app-sarah" }, { id: "sarah-co", user_id: "app-sarah" }, { id: "ben", user_id: "app-ben" }, { id: "cat", user_id: null }];
+    tables.charity_appeals = [];
+    tables.charity_appeal_recipients = [];
+    tables.donor_messages = [];
+    const pick = { donors: donorList as never, stopped: 0, thisWeek: 0, recordedOnly: 0, label: "Gave this month" };
+    const id = await createAppeal({ charityId: C, userId: "u1", subject: "Thank you", body: "Thank you for giving this month.", audience: { kind: "gave", period: "this_month" }, pick, inApp: true });
+    expect(tables.charity_appeals[0].audience).toEqual({ value: "gave:this_month", inApp: true });
+    for (const r of tables.charity_appeal_recipients) r.status = "waiting";
+    dropFor = new Set(["ben@x.co"]);
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    await sendAppeal({ charityId: C, appealId: id, charityName: "Meals Fund", replyTo: null, userId: "u1" });
+    // Pressing again ("Send the rest") never adds a second copy.
+    await sendAppeal({ charityId: C, appealId: id, charityName: "Meals Fund", replyTo: null, userId: "u1" });
+    err.mockRestore();
+    // One email per inbox still: Sarah once, Cat once; Ben's may not have gone.
+    expect(sent.map((m) => m.to).sort()).toEqual(["cat@x.co", "sarah@x.co"]);
+    expect(tables.donor_messages.map((m) => ({ user: m.user_id, donor: m.donor_id, appeal: m.appeal_id, subject: m.subject }))).toEqual([{ user: "app-sarah", donor: "sarah", appeal: id, subject: "Thank you" }]);
+  });
+
+  it("an ordinary email to donors doesn't show in the app", async () => {
+    donorList = [donor("sarah", "sarah@x.co")];
+    tables.donors = [{ id: "sarah", user_id: "app-sarah" }];
+    tables.charity_appeals = [];
+    tables.charity_appeal_recipients = [];
+    tables.donor_messages = [];
+    const id = await createAppeal({ charityId: C, userId: "u1", subject: "Winter parcels", body: "News from our kitchen.", audience: { kind: "all" }, pick: { donors: donorList as never, stopped: 0, thisWeek: 0, recordedOnly: 0, label: "All your donors" } });
+    for (const r of tables.charity_appeal_recipients) r.status = "waiting";
+    await sendAppeal({ charityId: C, appealId: id, charityName: "Meals Fund", replyTo: null, userId: "u1" });
+    expect(sent.map((m) => m.to)).toEqual(["sarah@x.co"]);
+    expect(tables.donor_messages).toEqual([]);
   });
 });
 
