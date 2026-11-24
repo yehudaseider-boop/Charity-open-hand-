@@ -4,6 +4,7 @@ import { EmptyState, PageHeader } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import { loadActivity } from "@/lib/charity/activity-store";
 import { loadCharityForManager } from "@/lib/charity/queries";
+import { timed } from "@/lib/timing";
 
 export const metadata: Metadata = { title: "Activity" };
 
@@ -15,7 +16,8 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   await requireViewer(`/charity-admin/${id}/activity`);
   await loadCharityForManager(id);
-  const lines = await loadActivity(id).catch((e: unknown) => {
+  // Timed until the speed check shows it fast (24/11/2026), with the audit log's index (migration 20261124000010) applied.
+  const lines = await timed("activity", "loadActivity", loadActivity(id)).catch((e: unknown) => {
     console.error("[activity] not loaded", e instanceof Error ? e.message : e);
     return null;
   });

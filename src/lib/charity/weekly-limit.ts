@@ -37,6 +37,11 @@ export async function messagedThisWeek(
     addresses.add(d.email);
   }
   const asked = new Set(donors.map((d) => d.donorId));
+  // The monthly thank-yous that can have reached anyone this week (started in the last two months) don't depend on
+  // the donors, so they are read straight away, beside the addresses (24/11/2026: five trips one after another on the
+  // Donors list, now three).
+  const monthsRead = db().from("charity_thank_yous").select("id").eq("charity_id", charityId).gte("sent_at", new Date(new Date(since).getTime() - 62 * 86_400_000).toISOString())
+    .then((r) => r, (error: unknown) => ({ data: null, error }));
   // Every donor record with one of their addresses, and the address it has: theirs, and their other records.
   const { hashOf, emailOf } = await sameInbox([...asked]);
   for (const [id, hash] of hashOf) {
@@ -50,33 +55,37 @@ export async function messagedThisWeek(
     const hash = hashOf.get(donorId);
     for (const id of (hash && byHash.get(hash)) || []) out.add(id);
   };
-  for (let i = 0; i < ids.length; i += 200) {
-    const chunk = ids.slice(i, i + 200);
-    let appealQuery = db().from("charity_appeal_recipients").select("donor_id").eq("charity_id", charityId).in("status", ["sending", "sent"]).gte("claimed_at", since).in("donor_id", chunk);
-    if (except.appealId) appealQuery = appealQuery.neq("appeal_id", except.appealId);
-    const [claims, appeals] = await Promise.all([
-      db().from("charity_donor_thanks").select("donor_id").eq("charity_id", charityId).eq("week_start", week).in("donor_id", chunk),
-      // 'sending' may have gone, so it counts; 'failed' and 'skipped' didn't.
-      appealQuery,
-    ]);
-    if (claims.error) throw claims.error;
-    if (appeals.error) throw appeals.error;
-    for (const r of [...(claims.data ?? []), ...(appeals.data ?? [])]) reached(r.donor_id as string);
-  }
-  // The monthly thank-you goes by address (kept as a hash). Only thank-yous started in the last two months can have
-  // reached anyone this week.
-  const { data: months, error } = await db().from("charity_thank_yous").select("id").eq("charity_id", charityId).gte("sent_at", new Date(new Date(since).getTime() - 62 * 86_400_000).toISOString());
-  if (error) throw error;
-  const monthIds = (months ?? []).map((m) => m.id as string).filter((id) => id !== except.thankYouId);
-  const list = [...addresses];
-  if (monthIds.length) {
+  // Thank-yous, reminders and appeals by donor record, and the monthly thank-you by address: side by side.
+  const byRecord = async () => {
+    for (let i = 0; i < ids.length; i += 200) {
+      const chunk = ids.slice(i, i + 200);
+      let appealQuery = db().from("charity_appeal_recipients").select("donor_id").eq("charity_id", charityId).in("status", ["sending", "sent"]).gte("claimed_at", since).in("donor_id", chunk);
+      if (except.appealId) appealQuery = appealQuery.neq("appeal_id", except.appealId);
+      const [claims, appeals] = await Promise.all([
+        db().from("charity_donor_thanks").select("donor_id").eq("charity_id", charityId).eq("week_start", week).in("donor_id", chunk),
+        // 'sending' may have gone, so it counts; 'failed' and 'skipped' didn't.
+        appealQuery,
+      ]);
+      if (claims.error) throw claims.error;
+      if (appeals.error) throw appeals.error;
+      for (const r of [...(claims.data ?? []), ...(appeals.data ?? [])]) reached(r.donor_id as string);
+    }
+  };
+  // The monthly thank-you goes by address (kept as a hash).
+  const byAddress = async () => {
+    const { data: months, error } = await monthsRead;
+    if (error) throw error;
+    const monthIds = (months ?? []).map((m) => m.id as string).filter((id) => id !== except.thankYouId);
+    if (!monthIds.length) return;
+    const list = [...addresses];
     // 100 addresses a read: each is looked up keyed and, until converted, by its plain hash.
     for (let i = 0; i < list.length; i += 100) {
       const { data, error: e } = await db().from("charity_thank_you_recipients").select("email_hash, email_hash_v").in("thank_you_id", monthIds).in("email_hash", emailHashesToMatch(list.slice(i, i + 100))).neq("status", "failed").gte("claimed_at", since);
       if (e) throw e;
       for (const r of data ?? []) for (const id of byHash.get(keyedFromStored(r.email_hash as string, r.email_hash_v)) ?? []) out.add(id);
     }
-  }
+  };
+  await Promise.all([byRecord(), byAddress()]);
   return out;
 }
 

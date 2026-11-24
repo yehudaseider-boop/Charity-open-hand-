@@ -8,7 +8,8 @@ import { can, isRole, refusedFor, type Permission, type Role } from "./permissio
 /**
  * Who manages a charity and in which role (CRM step 9, 10/11/2026): owner, admin, finance, fundraiser or viewer.
  * What each role may do is in ./permissions.ts (and the same table in the database's charity_can()). A Givezy
- * platform admin counts as an owner. Every call here comes after loadCharityForManager.
+ * platform admin counts as an owner. Every call here comes after loadCharityForManager (which itself reads the
+ * person's own role alongside its access check, and uses it only once that check has passed).
  */
 
 export type { Role } from "./permissions";

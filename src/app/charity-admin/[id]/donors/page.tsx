@@ -114,24 +114,27 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   const emailed = shownDonors.flatMap((d) => (shownEmail(d.email) ? [{ ...d, email: d.email! }] : []));
   // One message a week per donor from the charity (09/11/2026): anyone who had any this week (a thank-you, a
   // reminder, a news email or appeal, the monthly thank-you) isn't offered "Say thank you" until Monday.
-  const [thanked, stopped, thisWeek] = canThank
-    ? await t("thank-you checks", Promise.all([
-        t("lastThanked", lastThanked(id, shownDonors.map((d) => d.donor_id))),
-        t("optedOut", optedOut(emailed.map((d) => d.email), id)),
-        // If this check fails the button still shows: sending checks again and says plainly if it's this week.
-        t("messagedThisWeek", messagedThisWeek(id, emailed.map((d) => ({ donorId: d.donor_id, email: d.email })))).catch((e: unknown) => {
-          console.error("[donors] weekly check failed", e instanceof Error ? e.message : e);
-          return new Set<string>();
-        }),
-      ]))
-    : [new Map<string, string>(), new Set<string>(), new Set<string>()];
-  const here = href(page);
-  const key = formKey(sp);
   // "Remind to add their details": only on "Details missing", for the owner of a live charity (as for Email donors).
   const reminding = s18a === "details_missing" && missingRead !== null;
   const canRemind = reminding && owner && charity.status === "approved";
   const reminderIds = canRemind ? donorLines.map((l) => l.id) : [];
-  const reminded = reminding ? await lastReminded(id, shownDonors.map((d) => d.donor_id)) : new Map<string, string>();
+  // The checks for the 25 donors shown, all at once (24/11/2026: the reminder dates waited for the thank-you checks).
+  const [[thanked, stopped, thisWeek], reminded] = await Promise.all([
+    canThank
+      ? t("thank-you checks", Promise.all([
+          t("lastThanked", lastThanked(id, shownDonors.map((d) => d.donor_id))),
+          t("optedOut", optedOut(emailed.map((d) => d.email), id)),
+          // If this check fails the button still shows: sending checks again and says plainly if it's this week.
+          t("messagedThisWeek", messagedThisWeek(id, emailed.map((d) => ({ donorId: d.donor_id, email: d.email })))).catch((e: unknown) => {
+            console.error("[donors] weekly check failed", e instanceof Error ? e.message : e);
+            return new Set<string>();
+          }),
+        ]))
+      : ([new Map<string, string>(), new Set<string>(), new Set<string>()] as const),
+    reminding ? t("lastReminded", lastReminded(id, shownDonors.map((d) => d.donor_id))) : new Map<string, string>(),
+  ]);
+  const here = href(page);
+  const key = formKey(sp);
 
   const pill = "inline-flex min-h-9 items-center rounded-full border-2 px-3.5 text-sm font-semibold transition";
 

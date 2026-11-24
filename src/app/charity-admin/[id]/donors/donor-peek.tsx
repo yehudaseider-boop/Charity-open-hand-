@@ -41,9 +41,12 @@ export function DonorPeekLink({ charityId, donorId, href, children, stretch = fa
 
   return (
     <>
+      {/* Not fetched ahead (24/11/2026): a click opens the panel, never this page, so fetching up to 25 donor pages in
+          the background on every list was work for the server and the network that nobody used. */}
       <Link
         ref={opener}
         href={href}
+        prefetch={false}
         className={`block truncate font-display text-base font-bold text-brand underline underline-offset-2 hover:decoration-2 focus-visible:decoration-2 ${stretch ? "after:absolute after:inset-0 after:rounded-control after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-brand" : ""}`}
         onClick={(e) => {
           if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
