@@ -161,7 +161,7 @@ describe("converting stored plain hashes", () => {
     const r = await convertEmailFingerprints(Date.now() + 60_000);
     expect(r.cutOff).toBe(false);
     expect(r.converted).toBe(3700);
-    expect(Object.values(r.left)).toEqual([0, 0, 0, 0, 0]);
+    expect(Object.values(r.left!)).toEqual([0, 0, 0, 0, 0]);
     expect(Math.max(...reads.map((x) => x.rows))).toBeLessThanOrEqual(CAP);
     expect(tables.thank_you_opt_outs.every((x) => x.email_hash_v === 2)).toBe(true);
     expect(new Set(tables.thank_you_opt_outs.map((x) => x.email_hash))).toEqual(new Set(many(2500).map((e) => emailHash(e))));
@@ -178,6 +178,13 @@ describe("converting stored plain hashes", () => {
     expect(JSON.stringify(tables)).toBe(after);
   });
 
+  it("hands rows to the database 50 at a time, so one call stays well inside the job's few seconds (review 24/11/2026)", async () => {
+    tables.thank_you_opt_outs = many(120).map((e) => ({ email_hash: plain(e), email_hash_v: 1 }));
+    const r = await convertEmailFingerprints(Date.now() + 60_000);
+    expect(r.converted).toBe(120);
+    expect(rpcCalls).toBe(3);
+  });
+
   it("never touches a row already keyed (it would be keyed twice)", async () => {
     tables.thank_you_opt_outs = [{ email_hash: emailHash("new@x.co"), email_hash_v: 2 }];
     await convertEmailFingerprints(Date.now() + 60_000);
@@ -188,9 +195,11 @@ describe("converting stored plain hashes", () => {
     tables.thank_you_opt_outs = many(10).map((e) => ({ email_hash: plain(e), email_hash_v: 1 }));
     const first = await convertEmailFingerprints(Date.now() - 1);
     expect(first.cutOff).toBe(true);
-    expect(first.left.thank_you_opt_outs).toBe(10);
+    // Cut off: no time to count every table, so no counts (review 24/11/2026).
+    expect(first.left).toBeNull();
+    expect(reads.some((r) => r.table === "thank_you_opt_outs")).toBe(false);
     const next = await convertEmailFingerprints(Date.now() + 60_000);
-    expect(next.left.thank_you_opt_outs).toBe(0);
+    expect(next.left?.thank_you_opt_outs).toBe(0);
   });
 });
 

@@ -3,11 +3,16 @@
  * thank-you and news email and carries it on with the very same send functions as "Send the rest". Against a small
  * in-memory database, with the real claims and the real one-message-a-week check.
  */
+import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { weekStart } from "@/lib/charity/thank-you";
 import { emailHash } from "@/lib/email-fingerprint";
 
 type Row = Record<string, unknown>;
+/** The plain hash stored before 24/11/2026 (version 1). */
+const plain = (email: string) => createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
+/** The addresses (keyed) claim_thank_you_recipient() was asked to claim. */
+const claimCalls: string[] = [];
 let tables: Record<string, Row[]> = {};
 let seq = 0;
 
@@ -86,8 +91,18 @@ function from(table: string) {
   return q;
 }
 
-/** Hands out waiting appeal recipients, marking them "sending", as the database function does. */
-async function rpc(_name: string, args: { p_appeal_id: string; p_limit: number }) {
+/**
+ * Hands out waiting appeal recipients, marking them "sending", as the database function does. And
+ * claim_thank_you_recipient(): claims the keyed value only when neither it nor the plain one is claimed.
+ */
+async function rpc(name: string, args: { p_appeal_id: string; p_limit: number } & { p_thank_you_id?: string; p_keyed?: string; p_plain?: string }) {
+  if (name === "claim_thank_you_recipient") {
+    claimCalls.push(args.p_keyed!);
+    const list = (tables.charity_thank_you_recipients ??= []);
+    if (list.some((r) => r.thank_you_id === args.p_thank_you_id && (r.email_hash === args.p_keyed || r.email_hash === args.p_plain))) return { data: false, error: null };
+    list.push({ thank_you_id: args.p_thank_you_id, email_hash: args.p_keyed, email_hash_v: 2, status: "sending", claimed_at: new Date().toISOString() });
+    return { data: true, error: null };
+  }
   const rows = (tables.charity_appeal_recipients ?? []).filter((r) => r.appeal_id === args.p_appeal_id && r.status === "waiting").slice(0, args.p_limit);
   for (const r of rows) Object.assign(r, { status: "sending", claimed_at: new Date().toISOString() });
   return { data: rows.map((r) => ({ donor_id: r.donor_id })), error: null };
@@ -171,6 +186,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
   sent.length = 0;
+  claimCalls.length = 0;
   refuseAll = false;
   seq = 0;
   process.env.SITE_URL = "https://g.test";
@@ -443,5 +459,39 @@ describe("what the charity's page says about the rest (review 21/11/2026)", () =
     expect(await carryOnState(send, { pageLive: true, emailOn: on, now: NOW })).toBe("sender_left");
     expect(await carryOnState({ ...send, startedBy: null }, { pageLive: true, emailOn: on, now: NOW })).toBe("sender_left");
     expect(await carryOnState(send, { pageLive: true, emailOn: () => false, now: NOW })).toBe("email_off");
+  });
+});
+
+describe("rows from before 24/11/2026 (plain hashes, version 1) are still found", () => {
+  it("a thank-you claim at the plain hash counts as claimed: no second claim is tried and nobody is emailed twice", async () => {
+    unfinishedThankYou({ benMayHaveGone: true });
+    // Both claims were made before the change: stored plain, at version 1.
+    for (const r of tables.charity_thank_you_recipients) {
+      const email = r.email_hash === emailHash("ann@x.co") ? "ann@x.co" : "ben@x.co";
+      Object.assign(r, { email_hash: plain(email), email_hash_v: 1 });
+    }
+    await job();
+    expect(to()).toEqual(["cat@x.co"]);
+    // Read back as their keyed fingerprints (keyedFromStored), so only cat is claimed.
+    expect(claimCalls).toEqual([emailHash("cat@x.co")]);
+  });
+
+  it("a monthly thank-you at the plain hash this week counts for the one-message-a-week rule", async () => {
+    unfinishedAppeal();
+    // Ben had last month's thank-you this week, claimed before the change (plain).
+    tables.charity_thank_yous = [{ id: "t0", charity_id: C, period_month: "2026-09-01", body: "Thanks.", sent_by: OWNER, sent_at: "2026-11-10T10:00:00+02:00", finished_at: "2026-11-10T10:05:00+02:00", recipient_count: 1 }];
+    tables.charity_thank_you_recipients = [{ thank_you_id: "t0", email_hash: plain("ben@x.co"), email_hash_v: 1, status: "sent", claimed_at: "2026-11-10T10:01:00+02:00" }];
+    await job();
+    expect(to()).toEqual(["cat@x.co"]);
+    expect(Object.fromEntries(tables.charity_appeal_recipients.map((x) => [x.donor_id, x.status]))).toMatchObject({ ben: "skipped", cat: "sent" });
+  });
+
+  it("an opt-out at the plain hash stops a news email: this charity's own, and thank-yous from every charity", async () => {
+    unfinishedAppeal();
+    tables.charity_email_opt_outs = [{ charity_id: C, email_hash: plain("ben@x.co"), email_hash_v: 1, source: "checkout" }];
+    tables.thank_you_opt_outs = [{ email_hash: plain("cat@x.co"), email_hash_v: 1 }];
+    await job();
+    expect(sent).toEqual([]);
+    expect(Object.fromEntries(tables.charity_appeal_recipients.map((x) => [x.donor_id, x.status]))).toMatchObject({ ben: "skipped", cat: "skipped" });
   });
 });

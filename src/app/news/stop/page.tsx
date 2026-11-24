@@ -27,6 +27,7 @@ export default async function StopNewsPage({ searchParams }: PageProps<"/news/st
           <p className="text-sm">Stop emails from this charity (news, appeals and thank-yous)? You will still get your donation confirmations and s18A receipts.</p>
           <input type="hidden" name="t" value={token} />
           {sp.error === "1" ? <p role="alert" className="text-sm text-danger">That link didn&apos;t work. Please use the link from the charity&apos;s most recent email.</p> : null}
+          {sp.error === "2" ? <p role="alert" className="text-sm text-danger">Something went wrong on our side, so nothing was changed. Please try again in a few minutes.</p> : null}
           <PendingButton pendingLabel="Stopping…" className="w-full rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Stop these emails</PendingButton>
         </SafeForm>
       ) : (

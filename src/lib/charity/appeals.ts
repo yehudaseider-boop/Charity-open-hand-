@@ -429,7 +429,8 @@ export async function optOutAtCheckout(charityId: string, email: string): Promis
 /** Has this stop link's email already stopped this charity's emails? Read only, for the stop page's "Done" (22/11/2026). */
 export async function appealsStopped(token: string): Promise<boolean> {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return false;
-  const { data } = await db().from("charity_email_stop_tokens").select("charity_id, email_hash, email_hash_v").eq("token_hash", sha(token)).maybeSingle();
+  const { data, error: readError } = await db().from("charity_email_stop_tokens").select("charity_id, email_hash, email_hash_v").eq("token_hash", sha(token)).maybeSingle();
+  if (readError) throw readError;
   if (!data) return false;
   // The link's address as stored then, and keyed: until converted, the saved opt-out may be either.
   const values = [...new Set([data.email_hash as string, keyedFromStored(data.email_hash as string, data.email_hash_v)])];
@@ -440,7 +441,10 @@ export async function appealsStopped(token: string): Promise<boolean> {
 
 export async function stopAppeals(token: string): Promise<{ charityName: string } | null> {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
-  const { data } = await db().from("charity_email_stop_tokens").select("charity_id, email_hash, email_hash_v, charities(name_en)").eq("token_hash", sha(token)).maybeSingle();
+  // A failed read throws (review 24/11/2026): the page and a mail app's one-click stop then get "something went
+  // wrong, try again" (a 503), never a silent "that link didn't work", which would lose the stop.
+  const { data, error: readError } = await db().from("charity_email_stop_tokens").select("charity_id, email_hash, email_hash_v, charities(name_en)").eq("token_hash", sha(token)).maybeSingle();
+  if (readError) throw readError;
   if (!data) return null;
   // Not ignoreDuplicates: an earlier "no news" tick at checkout becomes a stop link, which also stops thank-yous
   // (16/11/2026), as the stop page promises. Saved keyed, even from a link sent before 24/11/2026 (its plain hash is

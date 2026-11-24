@@ -1,6 +1,10 @@
 /** Sending a charity's thank-you: once per address, never to erased or opted-out donors, once per month, and finishable. */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 import { emailHash } from "@/lib/email-fingerprint";
+
+/** The plain hash stored before 24/11/2026. */
+const plain = (e: string) => createHash("sha256").update(e.trim().toLowerCase()).digest("hex");
 
 vi.mock("server-only", () => ({}));
 const sent: { to: string; text: string; headers?: Record<string, string>; signal?: AbortSignal }[] = [];
@@ -9,6 +13,11 @@ let optedOut: string[] = [];
 // The month's claim row, and the addresses claimed for it (hash -> status).
 let month: { id: string; body: string; finished_at: string | null } | null = null;
 let recipients = new Map<string, string>();
+/** Claims stored at the plain hash (version 1, before 24/11/2026); every other claim is keyed. */
+let plainClaims = new Set<string>();
+const claimRpcs: { p_keyed: string; p_plain: string }[] = [];
+/** Runs just before a claim: older code claiming the same address at its plain hash in between. */
+let beforeClaim: (() => void) | null = null;
 let statusSaveFails = false;
 const neqs: string[] = [];
 const tokens: Record<string, string>[] = [];
@@ -51,6 +60,15 @@ vi.mock("@/lib/email", () => ({
 }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
+    // claim_thank_you_recipient(): claims the keyed value only when neither it nor the plain one is claimed.
+    rpc: async (name: string, a: { p_keyed: string; p_plain: string }) => {
+      if (name !== "claim_thank_you_recipient") return { data: null, error: { message: `no ${name}` } };
+      claimRpcs.push(a);
+      beforeClaim?.();
+      if (recipients.has(a.p_keyed) || recipients.has(a.p_plain)) return { data: false, error: null };
+      recipients.set(a.p_keyed, "sending");
+      return { data: true, error: null };
+    },
     from: (table: string) => {
       const b: Record<string, unknown> = {};
       const filters: Record<string, unknown> = {};
@@ -72,7 +90,9 @@ vi.mock("@/lib/supabase/admin", () => ({
       b.in = (c: string, hashes: string[]) =>
         c === "source"
           ? b
-          : Promise.resolve({ data: hashes.filter((h) => (table === "charity_email_opt_outs" ? charityStops : optedOut).includes(h)).map((h) => ({ email_hash: h })), error: null });
+          : table === "charity_thank_you_recipients"
+            ? Promise.resolve({ data: hashes.filter((h) => recipients.has(h)).map((h) => ({ email_hash: h, email_hash_v: plainClaims.has(h) ? 1 : 2 })), error: null })
+            : Promise.resolve({ data: hashes.filter((h) => (table === "charity_email_opt_outs" ? charityStops : optedOut).includes(h)).map((h) => ({ email_hash: h })), error: null });
       b.maybeSingle = async () => ({ data: month, error: null });
       b.insert = (row: Record<string, string>) => {
         if (table === "email_stop_tokens") {
@@ -85,13 +105,6 @@ vi.mock("@/lib/supabase/admin", () => ({
           }),
         };
       };
-      b.upsert = (row: { email_hash: string }) => ({
-        select: async () => {
-          if (recipients.has(row.email_hash)) return { data: [], error: null };
-          recipients.set(row.email_hash, "sending");
-          return { data: [{ email_hash: row.email_hash }], error: null };
-        },
-      });
       b.then = (ok: (v: unknown) => unknown) => {
         if (deleting && table === "charity_thank_you_recipients") recipients.delete(filters.email_hash as string);
         // Handing the month back deletes it, and its claims with it (on delete cascade).
@@ -122,6 +135,9 @@ beforeEach(() => {
   tokens.length = 0;
   month = null;
   recipients = new Map();
+  plainClaims = new Set();
+  claimRpcs.length = 0;
+  beforeClaim = null;
   optedOut = [];
   statusSaveFails = false;
   messaged = new Set();
@@ -305,6 +321,29 @@ describe("sending a thank-you", () => {
     expect(sent.map((m) => m.to)).toEqual(["b@x.co", "c@x.co"]);
     expect(month?.finished_at).not.toBeNull();
     expect(await continueThankYou({ charityId: "c1", charityName: "Meals Fund", month: "2026-10-01", userId: "u1" })).toEqual({ ok: false, message: "This thank-you has already reached everyone." });
+  });
+
+  it("a claim made before 24/11/2026 (a plain hash) is found and never claimed or sent again (review 24/11/2026)", async () => {
+    donations = [gift("a@x.co", "A"), gift("b@x.co", "B")];
+    await sendThankYou({ ...args, budgetMs: 0 });
+    recipients.set(plain("a@x.co"), "sent");
+    plainClaims.add(plain("a@x.co"));
+    const rest = await continueThankYou({ charityId: "c1", charityName: "Meals Fund", month: "2026-10-01", userId: "u1" });
+    expect(sent.map((m) => m.to)).toEqual(["b@x.co"]);
+    // Read back as the keyed fingerprint, so no claim is even tried for it; only b is claimed, keyed with its plain twin.
+    expect(claimRpcs).toEqual([{ p_thank_you_id: "t1", p_keyed: emailHash("b@x.co"), p_plain: plain("b@x.co") }]);
+    expect(rest).toMatchObject({ ok: true, sent: 2, remaining: 0 });
+  });
+
+  it("a claim whose plain twin appears after the read doesn't send: the claim itself refuses it", async () => {
+    donations = [gift("a@x.co", "A")];
+    await sendThankYou({ ...args, budgetMs: 0 });
+    // Older code still running during a deploy claims the same address at its plain hash, after this run read the claims.
+    beforeClaim = () => recipients.set(plain("a@x.co"), "sending");
+    await continueThankYou({ charityId: "c1", charityName: "Meals Fund", month: "2026-10-01", userId: "u1" });
+    expect(claimRpcs).toHaveLength(1);
+    expect(sent).toEqual([]);
+    expect(recipients.has(emailHash("a@x.co"))).toBe(false);
   });
 
   it("an address claimed by a stopped page is never sent again, and counts as not sent", async () => {

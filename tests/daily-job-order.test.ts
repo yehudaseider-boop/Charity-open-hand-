@@ -29,6 +29,17 @@ vi.mock("@/lib/charity/carry-on-sends", () => ({
     return carryOnResult;
   },
 }));
+/** What the fingerprint converter gives (an Error: it throws), and the deadlines it was given. */
+let convertResult: unknown = { converted: 0, left: { thank_you_opt_outs: 0 }, cutOff: false };
+const convertCalls: number[] = [];
+vi.mock("@/lib/email-fingerprint-convert", () => ({
+  convertEmailFingerprints: async (deadline: number) => {
+    steps.push("fingerprints");
+    convertCalls.push(deadline);
+    if (convertResult instanceof Error) throw convertResult;
+    return convertResult;
+  },
+}));
 vi.mock("@/lib/ops/alert", () => ({
   cronAllowed: () => true,
   alertGivezy: async (subject: string) => (steps.push(`alert: ${subject}`), "sent"),
@@ -46,11 +57,14 @@ vi.mock("@/lib/ops/daily", async (orig) => {
 });
 
 const { GET } = await import("@/app/api/jobs/daily/route");
-const { collectMonthlyWithin, dailyDigest, payoutsAlertLines } = await import("@/lib/ops/daily");
+const { collectMonthlyWithin, dailyDigest, fingerprintsAlertLines, payoutsAlertLines } = await import("@/lib/ops/daily");
 const call = () => GET(new Request("https://x.test/api/jobs/daily") as never);
 
 beforeEach(() => {
   steps.length = 0;
+  convertCalls.length = 0;
+  convertResult = { converted: 0, left: { thank_you_opt_outs: 0 }, cutOff: false };
+  vi.unstubAllEnvs();
   payoutsResult = { charities: 2, payouts: 3, lines: 9, unmatched: 0, failed: [] };
   payoutsOpts = undefined;
 });
@@ -165,5 +179,54 @@ describe("the payment provider's wait inside the daily job", () => {
       expect(gatewayTimeoutOverride()).toBe(8_000);
     });
     expect(gatewayTimeoutOverride()).toBeUndefined();
+  });
+});
+
+describe("keying email fingerprints in the daily job (review 24/11/2026)", () => {
+  type Reply = { fingerprints: unknown };
+  it("is off unless FINGERPRINT_CONVERT is exactly \"yes\": nothing converted, no email about it", async () => {
+    for (const v of [undefined, "", "YES", "true", "yes "]) {
+      if (v === undefined) vi.unstubAllEnvs();
+      else vi.stubEnv("FINGERPRINT_CONVERT", v);
+      steps.length = 0;
+      const res = await call();
+      expect(steps).not.toContain("fingerprints");
+      expect(steps.some((x) => x.startsWith("alert: email fingerprints"))).toBe(false);
+      expect(((await res.json()) as Reply).fingerprints).toEqual({ off: true });
+    }
+  });
+
+  it("switched on, it runs in its small time budget, after the day's email, and says nothing when all is done", async () => {
+    vi.stubEnv("FINGERPRINT_CONVERT", "yes");
+    const before = Date.now();
+    const res = await call();
+    expect(steps.indexOf("fingerprints")).toBeGreaterThan(steps.indexOf("alert: 1 thing needs a person today"));
+    expect(convertCalls[0] - before).toBeLessThanOrEqual(3_000 + 1_000);
+    expect(steps.some((x) => x.startsWith("alert: email fingerprints"))).toBe(false);
+    expect(((await res.json()) as Reply).fingerprints).toEqual({ converted: 0, left: 0, cutOff: false });
+  });
+
+  it("switched on, a failure, a cut-off run or rows still left each get a short email; the job carries on", async () => {
+    vi.stubEnv("FINGERPRINT_CONVERT", "yes");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    for (const result of [new Error("database down"), { converted: 50, left: null, cutOff: true }, { converted: 3, left: { thank_you_opt_outs: 2 }, cutOff: false }]) {
+      convertResult = result;
+      steps.length = 0;
+      const res = await call();
+      expect(res.status).toBe(200);
+      expect(steps).toContain("alert: email fingerprints aren't all keyed yet");
+      expect(steps).toContain("payouts");
+    }
+  });
+
+  it("the lines are plain and say opt-outs are still honoured", () => {
+    expect(fingerprintsAlertLines({ converted: 0, left: 0, cutOff: false })).toEqual([]);
+    expect(fingerprintsAlertLines(null)[0]).toMatch(/failed today .* still honoured/);
+    expect(fingerprintsAlertLines(undefined)[0]).toMatch(/no time to start/);
+    expect(fingerprintsAlertLines({ converted: 50, left: null, cutOff: true })[0]).toMatch(/ran out of time today \(50 keyed\)/);
+    expect(fingerprintsAlertLines({ converted: 0, left: 1, cutOff: false })[0]).toMatch(/^1 email fingerprint is still at the plain hash/);
+    expect(fingerprintsAlertLines({ converted: 0, left: 7, cutOff: false })[0]).toMatch(/^7 email fingerprints are still/);
+    for (const l of [null, undefined, { converted: 1, left: null, cutOff: true }, { converted: 0, left: 2, cutOff: false }].flatMap((r) => fingerprintsAlertLines(r))) expect(l).not.toMatch(/!|—/);
   });
 });

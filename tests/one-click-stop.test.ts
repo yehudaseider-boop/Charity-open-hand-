@@ -16,6 +16,8 @@ const thanksTokens = new Map<string, { email_hash: string }>();
 let newsOptOuts: { charity_id: string; email_hash: string }[] = [];
 let thanksOptOuts: string[] = [];
 let limited = false;
+/** The stop-token tables can't be read (the database is down). */
+let tokenReadFails = false;
 const limits: { bucket: string; keys: string[] }[] = [];
 
 vi.mock("@/lib/rate-limit", () => ({
@@ -30,6 +32,7 @@ vi.mock("@/lib/supabase/admin", () => ({
       b.select = () => b;
       b.eq = (_c: string, v: string) => ((hash = v), b);
       b.maybeSingle = async () => {
+        if (tokenReadFails) return { data: null, error: { message: "database down" } };
         if (table === "charity_email_stop_tokens") {
           const t = newsTokens.get(hash);
           return { data: t ? { ...t, charities: { name_en: "Meals Fund" } } : null, error: null };
@@ -70,6 +73,7 @@ beforeEach(() => {
   newsOptOuts = [];
   thanksOptOuts = [];
   limited = false;
+  tokenReadFails = false;
   limits.length = 0;
   newsTokens.set(sha(token("a")), { charity_id: "charity-1", email_hash: "h".repeat(64) });
   thanksTokens.set(sha(token("b")), { email_hash: "k".repeat(64) });
@@ -178,6 +182,19 @@ describe("the one-click stop", () => {
     // With the body, as before.
     expect((await news.POST(req("news", token("a")))).status).toBe(200);
     expect(newsOptOuts).toHaveLength(1);
+  });
+
+  it("a stop link that can't be read gets a server error (5xx), never 'that link didn't work', so the mail app tries again (review 24/11/2026)", async () => {
+    tokenReadFails = true;
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    for (const [kind, t] of [["news", token("a")], ["thanks", token("b")]] as const) {
+      const res = await (kind === "news" ? news : thanks).POST(req(kind, t));
+      expect(res.status).toBe(503);
+      expect(await res.text()).toBe("Something went wrong. Nothing was changed. Please try again later.");
+    }
+    err.mockRestore();
+    expect(newsOptOuts).toEqual([]);
+    expect(thanksOptOuts).toEqual([]);
   });
 
   it("is rate limited, and then changes nothing", async () => {

@@ -6,22 +6,28 @@ import { keyLegacyHash } from "./email-fingerprint";
  * Turns every email fingerprint still stored at version 1 (the plain hash, before 24/11/2026) into version 2 (keyed).
  * It needs the key, so it runs on the server: rows at version 1 are read in order of their value, 1 000 at a time (the
  * most the database gives in one read), their values keyed here, and handed to convert_email_fingerprints() in
- * batches of 200, which changes only rows still at version 1 and merges a row whose keyed twin is already there.
+ * batches of 50 (small, so one call stays well inside the daily job's few seconds), which changes only rows still at
+ * version 1 and merges a row whose keyed twin is already there.
  * Safe to run twice, or at the same time as itself: a row already converted is never read or changed again.
  *
- * Run by the daily job with a small time budget until nothing is left at version 1. Only counts come back.
+ * Run by the daily job with a small time budget, only while FINGERPRINT_CONVERT=yes (24/11/2026: code from before the
+ * change can't read keyed rows, so it is switched on only once the new code has run cleanly for a few days; see the
+ * go-live checklist). Only counts come back.
  */
 export const FINGERPRINT_TABLES = ["thank_you_opt_outs", "email_stop_tokens", "charity_email_opt_outs", "charity_email_stop_tokens", "charity_thank_you_recipients"] as const;
 export type FingerprintTable = (typeof FINGERPRINT_TABLES)[number];
 
 const PAGE = 1000;
-const BATCH = 200;
+const BATCH = 50;
 
 export type ConvertSummary = {
   /** Rows changed or merged this run. */
   converted: number;
-  /** Rows still at version 1 after this run, per table (0 everywhere: nothing left to do). */
-  left: Record<FingerprintTable, number>;
+  /**
+   * Rows still at version 1 after this run, per table (0 everywhere: nothing left to do). Null when the run was cut off:
+   * counting every table takes time the job no longer has, and some are surely left.
+   */
+  left: Record<FingerprintTable, number> | null;
   /** True when the time ran out before every table was read to the end. */
   cutOff: boolean;
 };
@@ -60,6 +66,7 @@ export async function convertEmailFingerprints(deadline: number): Promise<Conver
     }
     if (cutOff) break;
   }
+  if (cutOff) return { converted, left: null, cutOff };
   const left = {} as Record<FingerprintTable, number>;
   for (const table of FINGERPRINT_TABLES) {
     const { count, error } = await db.from(table).select("email_hash", { count: "exact", head: true }).eq("email_hash_v", 1);

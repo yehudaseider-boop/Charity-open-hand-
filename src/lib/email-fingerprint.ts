@@ -70,6 +70,15 @@ export function emailHashesToMatch(emails: Iterable<string>): string[] {
   return [...out];
 }
 
+/**
+ * An address's keyed fingerprint and its plain hash, for a claim that must not succeed when either is stored already
+ * (claim_thank_you_recipient). The plain value is only ever compared, never written.
+ */
+export function emailHashPair(email: string): { keyed: string; plain: string } {
+  const plain = legacyEmailHash(email);
+  return { keyed: keyLegacyHash(plain), plain };
+}
+
 /** A stored fingerprint as the keyed one: a version 1 row is keyed here, as the converter will key it. */
 export function keyedFromStored(hash: string, version: unknown): string {
   return version === 1 ? keyLegacyHash(hash) : hash;

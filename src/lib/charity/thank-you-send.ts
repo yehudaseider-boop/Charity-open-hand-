@@ -6,7 +6,7 @@ import { oneClickStopUrl } from "@/lib/email/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isErasedEmail } from "./dashboard";
 import { monthPeriod, oneDonorThankYouEmail, thankYouEmail, weekStart } from "./thank-you";
-import { EMAIL_HASH_VERSION, emailHash, emailHashesToMatch, keyedFromStored, storedEmailHash } from "@/lib/email-fingerprint";
+import { EMAIL_HASH_VERSION, emailHash, emailHashPair, emailHashesToMatch, keyedFromStored, storedEmailHash } from "@/lib/email-fingerprint";
 import { WEEKLY_LIMIT, messagedThisWeek } from "./weekly-limit";
 import { JOB_SEND_TIMEOUT_MS, mayHaveSent } from "@/lib/email/retry-plan";
 import { isolate } from "@/lib/text";
@@ -139,7 +139,7 @@ async function runThankYou(args: { charityId: string; charityName: string; month
   const db = createAdminClient();
   const transport = getEmailTransport();
   const recipients = await thankYouRecipients(args.charityId, args.month);
-  const claimed = await claimedHashes(args.thankYouId);
+  const claimed = await claimedHashes(args.thankYouId, recipients.map((r) => r.email));
   // One message a week per donor from a charity (09/11/2026): anyone who already had one this week is left out of
   // this thank-you, and counted so the page can say so.
   const waiting = recipients.filter((r) => !claimed.has(emailHash(r.email)));
@@ -156,11 +156,14 @@ async function runThankYou(args: { charityId: string; charityName: string; month
       stoppedEarly = true;
       break;
     }
-    // Claim this address first. Someone else pressing at the same time gets nothing back and moves on.
-    const got = await db.from("charity_thank_you_recipients").upsert({ thank_you_id: args.thankYouId, ...storedEmailHash(r.email) }, { onConflict: "thank_you_id,email_hash", ignoreDuplicates: true }).select("email_hash, email_hash_v");
+    // Claim this address first. Someone else pressing at the same time gets nothing back and moves on. Claimed keyed,
+    // and only when neither the keyed nor the plain value is claimed already (a claim from before 24/11/2026, or from
+    // older code still running during a deploy, is at the plain hash): one database call, so nobody is thanked twice.
+    const pair = emailHashPair(r.email);
+    const got = await db.rpc("claim_thank_you_recipient", { p_thank_you_id: args.thankYouId, p_keyed: pair.keyed, p_plain: pair.plain });
     if (got.error) throw got.error;
     claimed.add(hash);
-    if (!got.data?.length) continue;
+    if (got.data !== true) continue;
     const mark = async (status: "sent" | "failed") => {
       const { error: markError } = await db.from("charity_thank_you_recipients").update({ status }).eq("thank_you_id", args.thankYouId).eq("email_hash", hash);
       if (markError) console.error("[thank-you] status not saved", markError.message);
@@ -210,15 +213,22 @@ async function runThankYou(args: { charityId: string; charityName: string; month
   return { ok: true, sent: counts.sent, failed: counts.failed, maybeSent: counts.maybeSent, remaining, sentThisRun, thisWeek: leftOut.size, ...(leftOut.size ? { from: formatDate(nextWeekStart(new Date())) } : {}), ...(refused ? { refused: true as const } : {}) };
 }
 
-/** Addresses (as keyed fingerprints) already claimed for this thank-you, in pages. */
-async function claimedHashes(thankYouId: string): Promise<Set<string>> {
+/**
+ * Of these addresses, the ones (as keyed fingerprints) already claimed for this thank-you. Looked up by the addresses
+ * being sent, 100 a read (keyed and, until converted, plain), never by paging the whole table: the converter changes
+ * values while it runs, and paging by an offset over changing values can skip a row (review 24/11/2026).
+ */
+async function claimedHashes(thankYouId: string, emails: string[]): Promise<Set<string>> {
   const out = new Set<string>();
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await createAdminClient().from("charity_thank_you_recipients").select("email_hash, email_hash_v").eq("thank_you_id", thankYouId).order("email_hash").range(from, from + 999);
+  for (let i = 0; i < emails.length; i += 100) {
+    const { data, error } = await createAdminClient()
+      .from("charity_thank_you_recipients")
+      .select("email_hash, email_hash_v")
+      .eq("thank_you_id", thankYouId)
+      .in("email_hash", emailHashesToMatch(emails.slice(i, i + 100)));
     if (error) throw error;
     // A claim made before 24/11/2026 (a plain hash) counts as the same address: nobody is emailed twice.
     for (const r of data ?? []) out.add(keyedFromStored(r.email_hash as string, r.email_hash_v));
-    if (!data || data.length < 1000) break;
   }
   return out;
 }
@@ -418,7 +428,8 @@ async function stoppedEverywhere(emails: string[]): Promise<Set<string>> {
 export async function thankYousStopped(token: string): Promise<boolean> {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return false;
   const db = createAdminClient();
-  const { data } = await db.from("email_stop_tokens").select("email_hash, email_hash_v").eq("token_hash", sha(token)).maybeSingle();
+  const { data, error: readError } = await db.from("email_stop_tokens").select("email_hash, email_hash_v").eq("token_hash", sha(token)).maybeSingle();
+  if (readError) throw readError;
   if (!data) return false;
   // The link's address as stored then, and keyed: until converted, the saved opt-out may be either.
   const values = [...new Set([data.email_hash as string, keyedFromStored(data.email_hash as string, data.email_hash_v)])];
@@ -430,7 +441,10 @@ export async function thankYousStopped(token: string): Promise<boolean> {
 export async function stopThankYous(token: string): Promise<boolean> {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return false;
   const db = createAdminClient();
-  const { data } = await db.from("email_stop_tokens").select("email_hash, email_hash_v").eq("token_hash", sha(token)).maybeSingle();
+  // A failed read throws (review 24/11/2026): the page and a mail app's one-click stop then get "something went
+  // wrong, try again" (a 503), never a silent "that link didn't work", which would lose the stop.
+  const { data, error: readError } = await db.from("email_stop_tokens").select("email_hash, email_hash_v").eq("token_hash", sha(token)).maybeSingle();
+  if (readError) throw readError;
   if (!data) return false;
   // Saved keyed, even from a link sent before 24/11/2026: its plain hash is keyed here, as the converter would.
   const keyed = keyedFromStored(data.email_hash as string, data.email_hash_v);

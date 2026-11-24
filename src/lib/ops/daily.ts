@@ -449,6 +449,20 @@ export function sendsAlertLines(jobs: Pick<JobProblems, "sendsFailed" | "sendsLe
   return lines;
 }
 
+/**
+ * Keying email fingerprints (24/11/2026), only while FINGERPRINT_CONVERT=yes: a line when it failed, didn't start, ran
+ * out of time or left rows at the plain hash, so nobody drops the old default or forgets the switch while rows are
+ * left. `result`: null when it failed, undefined when there was no time to start it, else what it did.
+ */
+export function fingerprintsAlertLines(result: { converted: number; left: number | null; cutOff: boolean } | null | undefined): string[] {
+  const safe = "Opt-outs are still honoured meanwhile: both kinds of fingerprint are looked up.";
+  if (result === null) return [`Keying email fingerprints failed today (see the job log). ${safe} It tries again tomorrow.`];
+  if (result === undefined) return [`Keying email fingerprints had no time to start today. ${safe} It tries again tomorrow.`];
+  if (result.cutOff) return [`Keying email fingerprints ran out of time today (${result.converted} keyed). Some are still at the plain hash. ${safe} The rest are keyed on the next runs.`];
+  if (result.left) return [`${result.left} email ${result.left === 1 ? "fingerprint is" : "fingerprints are"} still at the plain hash after today's run. ${safe} The next runs try again; if the number doesn't go down, see the job log.`];
+  return [];
+}
+
 /** The lines of the daily email, or none when nothing needs a person. Plain words, one thing per line. */
 export function dailyDigest(c: DailyChecks, jobs: JobProblems): string[] {
   const lines: string[] = [];

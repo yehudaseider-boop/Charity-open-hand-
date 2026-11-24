@@ -3,7 +3,7 @@ import { runMonthlyGiving } from "@/lib/donations/monthly-store";
 import { syncPayouts } from "@/lib/donations/payouts";
 import { alertGivezy, cronAllowed } from "@/lib/ops/alert";
 import { pingHeartbeat } from "@/lib/ops/heartbeat";
-import { collectMonthlyWithin, dailyDigest, payoutsAlertLines, runDailyChecks, runImportantEmailRetries, sendsAlertLines, type RetriesDone } from "@/lib/ops/daily";
+import { collectMonthlyWithin, dailyDigest, fingerprintsAlertLines, payoutsAlertLines, runDailyChecks, runImportantEmailRetries, sendsAlertLines, type RetriesDone } from "@/lib/ops/daily";
 import { runJourneys } from "@/lib/charity/journey-store";
 import { runCarryOnSends, type CarryOnSummary } from "@/lib/charity/carry-on-sends";
 import { withGatewayTimeout } from "@/lib/gateway/timeout";
@@ -24,6 +24,14 @@ export const CARRY_ON_END_BY_MS = 44_000;
 /** Keying email fingerprints left at the plain hash (24/11/2026): started only in the first 36 seconds, for at most 3. */
 export const FINGERPRINTS_START_BY_MS = 36_000;
 export const FINGERPRINTS_MAX_MS = 3_000;
+
+/**
+ * Keying email fingerprints is off unless FINGERPRINT_CONVERT is exactly "yes" (24/11/2026). Code from before the change
+ * can't read a keyed row, so once rows are converted a rollback to it would see no opt-outs at all. Switched on only
+ * after the new code has run cleanly for a few days (go-live checklist); after that, fix forward, never roll back.
+ * While it is off nothing is lost: every lookup matches both the keyed and the plain value.
+ */
+const fingerprintConvertOn = () => process.env.FINGERPRINT_CONVERT === "yes";
 
 /**
  * Everything that runs once a day, in order: collect the monthly donations that are due, the safety net (pending
@@ -90,14 +98,22 @@ async function run(request: NextRequest) {
   // Email fingerprints still at the plain hash become keyed (24/11/2026), in a small time budget: started only in the
   // first FINGERPRINTS_START_BY_MS, for at most FINGERPRINTS_MAX_MS, so charities' emails keep their time. What isn't
   // reached is done tomorrow; once nothing is left it is a few quick reads. Counts only in the log, never a fingerprint.
-  const fingerprints: ConvertSummary | null | undefined = Date.now() < started + FINGERPRINTS_START_BY_MS
-    ? await convertEmailFingerprints(Math.min(Date.now() + FINGERPRINTS_MAX_MS, started + FINGERPRINTS_START_BY_MS + FINGERPRINTS_MAX_MS)).catch((e) => {
-        console.error("[daily] converting email fingerprints failed", e instanceof Error ? e.message : e);
-        return null;
-      })
-    : undefined;
-  const fingerprintsLeft = fingerprints ? Object.values(fingerprints.left).reduce((a, b) => a + b, 0) : null;
-  if (fingerprints && (fingerprints.converted || fingerprintsLeft)) console.log("[daily] email fingerprints", { converted: fingerprints.converted, left: fingerprintsLeft, cutOff: fingerprints.cutOff });
+  // Only while FINGERPRINT_CONVERT=yes (see fingerprintConvertOn). Its own short email when it failed or rows are left.
+  const convertOn = fingerprintConvertOn();
+  const fingerprints: ConvertSummary | null | undefined = !convertOn
+    ? undefined
+    : Date.now() < started + FINGERPRINTS_START_BY_MS
+      ? await convertEmailFingerprints(Math.min(Date.now() + FINGERPRINTS_MAX_MS, started + FINGERPRINTS_START_BY_MS + FINGERPRINTS_MAX_MS)).catch((e) => {
+          console.error("[daily] converting email fingerprints failed", e instanceof Error ? e.message : e);
+          return null;
+        })
+      : undefined;
+  const fingerprintsLeft = fingerprints?.left ? Object.values(fingerprints.left).reduce((a, b) => a + b, 0) : null;
+  if (fingerprints && (fingerprints.converted || fingerprintsLeft || fingerprints.cutOff)) console.log("[daily] email fingerprints", { converted: fingerprints.converted, left: fingerprintsLeft, cutOff: fingerprints.cutOff });
+  const fingerprintLines = convertOn ? fingerprintsAlertLines(fingerprints && { converted: fingerprints.converted, left: fingerprintsLeft, cutOff: fingerprints.cutOff }) : [];
+  if (fingerprintLines.length && Date.now() < started + 58_000) {
+    await alertGivezy("email fingerprints aren't all keyed yet", fingerprintLines).catch(() => undefined);
+  }
   // Charities' unfinished emails to donors carry on by themselves, after the day's email and the check-in (review
   // 21/11/2026: before them, a slow email service could hold both up). The same send functions as "Send the rest":
   // nobody is emailed twice and the one-a-week rule holds. No new email starts after 44 seconds and each has an
@@ -149,8 +165,9 @@ async function run(request: NextRequest) {
       // Counts only. Undefined: no time left to start it today (it carries on tomorrow).
       sends: sends === undefined ? { notStarted: true } : sends,
       journeys,
-      // Counts only: rows keyed this run and still left at the plain hash (null: it failed; undefined: no time today).
-      fingerprints: fingerprints === undefined ? { notStarted: true } : fingerprints && { converted: fingerprints.converted, left: fingerprintsLeft, cutOff: fingerprints.cutOff },
+      // Counts only: rows keyed this run and still left at the plain hash (left null when cut off; null: it failed;
+      // off: FINGERPRINT_CONVERT isn't "yes"; notStarted: no time today).
+      fingerprints: !convertOn ? { off: true } : fingerprints === undefined ? { notStarted: true } : fingerprints && { converted: fingerprints.converted, left: fingerprintsLeft, cutOff: fingerprints.cutOff },
       attention: lines.length,
     },
     { headers: { "Cache-Control": "no-store" } },
