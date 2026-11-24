@@ -9,8 +9,8 @@ type Variant = "primary" | "cta" | "secondary" | "white" | "dark";
 const look: Record<Variant, { bg: string; text: string; edge: string; border?: string }> = {
   /** Blue, white text, deep blue edge: the usual button. */
   primary: { bg: colors.blue, text: colors.onInk, edge: colors.blueEdge },
-  /** Orange, navy text, navy edge: the one call to action on a screen. */
-  cta: { bg: colors.orange, text: colors.navy, edge: colors.navy },
+  /** Orange, navy text, burnt-orange edge (the same as the website): the one call to action on a screen. */
+  cta: { bg: colors.orange, text: colors.navy, edge: colors.orangeEdge },
   /** White, blue text, lavender edge: for actions that should not shout, and on blue grounds. */
   secondary: { bg: colors.surface, text: colors.blue, edge: colors.lilac, border: colors.lightPurple },
   white: { bg: colors.surface, text: colors.blue, edge: colors.lilac },

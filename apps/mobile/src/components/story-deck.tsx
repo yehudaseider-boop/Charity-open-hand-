@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
   line: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 22, color: colors.lilacSoft },
   actions: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 14 },
   save: { width: touch + 4, height: touch + 4, borderRadius: (touch + 4) / 2, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
-  give: { flex: 1, minHeight: 52, borderRadius: radius.control, backgroundColor: colors.orange, borderBottomWidth: 5, borderBottomColor: colors.navy, alignItems: "center", justifyContent: "center" },
+  give: { flex: 1, minHeight: 52, borderRadius: radius.control, backgroundColor: colors.orange, borderBottomWidth: 5, borderBottomColor: colors.orangeEdge, alignItems: "center", justifyContent: "center" },
   giveText: { fontFamily: fonts.bodyBold, fontSize: 18, color: colors.navy },
   dots: { flexDirection: "row", justifyContent: "center", gap: 6 },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.lightPurple },

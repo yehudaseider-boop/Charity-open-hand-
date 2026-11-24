@@ -2,7 +2,7 @@
  * Givezy brand tokens, v2 (decided 16/10/2026). Every screen uses these and nothing else.
  *
  * Blue carries headlines, buttons, tabs and big colour-block sections (white text on it). Deep navy
- * is for headlines on light grounds, body text on lilac, and the 4px "pressable" edge under
+ * is for headlines on light grounds, body text on lilac, and the 4px "pressable" edge under white
  * buttons. Orange is one call to action per screen, splashes, goal rings and streaks: text on
  * orange is navy, never white. Lavender, light purple and pale lilac are for splashes, card borders,
  * ring tracks and soft cards; peach only for background splashes. Slate is secondary text. Pages
@@ -12,7 +12,7 @@ export const colors = {
   cream: "#FFFFFF", // page background (white in v2; the name stays so every screen follows)
   surface: "#FFFFFF", // cards and forms
   ink: "#0E1B3D", // deep ink: body text and headlines on light grounds
-  navy: "#0E1B3D", // deep ink: text on orange and lilac, the edge under orange and white-faced buttons
+  navy: "#0E1B3D", // deep ink: text on orange and lilac, the edge under white-faced buttons
   blue: "#1749B5", // confirmed logo blue: headlines, buttons, tabs, colour-block sections (white on it 7.0:1)
   blueEdge: "#0B2A73", // deep blue: the solid edge under blue buttons (the same as the website's and the receipt's)
   blueSoft: "#E5D9FF", // selected chips and quiet tints (light purple)

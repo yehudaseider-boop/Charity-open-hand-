@@ -233,7 +233,7 @@ export function HoldToGive({ label, busyLabel, busy, disabled, confirmed, onConf
   };
 
   const working = busy && phase === "done";
-  const face = confirmed || (off && phase !== "done") ? (confirmed ? { bg: colors.orange, text: colors.navy, edge: colors.navy } : { bg: colors.lilacSoft, text: colors.muted, edge: colors.hairline }) : { bg: colors.orange, text: colors.navy, edge: colors.navy };
+  const face = confirmed || (off && phase !== "done") ? (confirmed ? { bg: colors.orange, text: colors.navy, edge: colors.orangeEdge } : { bg: colors.lilacSoft, text: colors.muted, edge: colors.hairline }) : { bg: colors.orange, text: colors.navy, edge: colors.orangeEdge };
   const holding = phase === "holding";
   const stageWords = useHeldLabel(busyLabel, busy);
   const text = confirmed ? "Gift confirmed" : busy ? stageWords : holding ? "Keep holding…" : phase === "done" ? stageWords : label;
