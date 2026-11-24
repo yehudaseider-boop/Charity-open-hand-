@@ -1476,3 +1476,12 @@ Yehuda shared the "Deupload" landing pages (Figma community) as the feel he want
 - **Motion** stops for anyone who asks their device to reduce motion.
 - **New copy, approved by Yehuda 29/10/2026:** "Quick. Checked. Free.", "Your details, kept private" (charities never see the ID number or the maaser choice: both true), "Simple. Fair to every charity.", "No hidden fees and no subscriptions."
 - **Hosting:** stays on Vercel (Yehuda, 29/10/2026), not Netlify. The Netlify copy is only the PSFA demo.
+
+## Load test script built, not yet run (24/11/2026)
+
+- `scripts/loadtest/run.mjs` (plain Node, no packages) ramps pretend donors to a target rate against checkout start, signed test-gateway webhook receipts and the charity dashboard and receipt pages. Runbook: `docs/load-test.md`.
+- Safety: no default address; the base URL must be on an explicit `--allow-host` list; givezy.co.za is always refused; any host not on this machine needs `--approved-by`; checkout stops before the payment page and the run halts if the returned address is not the stand-in test page; secrets come from `TEST_GATEWAY_SECRET` and `LOADTEST_COOKIE` only.
+- The s18A receipt run itself is a person's sign-off plus `npm run receipts`, not a web address, so it is timed by hand (the runbook says how).
+- Thresholds in the runbook are placeholders, marked "Yehuda to confirm". The Vercel cost and the Rand conversion could not be verified from the build environment and are left as open questions; the Supabase figures are cited.
+- Checked only against a stand-in server written for the test. Not run against any real or test site.
+
