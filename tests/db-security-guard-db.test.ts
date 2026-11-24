@@ -32,6 +32,8 @@ const SIGNED_IN_MAY_RUN = [
   "charity_monthly_list",
   "charity_monthly_totals",
   "charity_overview",
+  // The Annual report's figures (24/11/2026): refuses anyone not on the charity's team and not a Givezy admin.
+  "charity_report_summary",
   "charity_role",
   "document_is_bank_letter",
   "link_my_donations",
