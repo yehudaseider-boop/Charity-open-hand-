@@ -56,4 +56,14 @@ describe("the page the person is on", () => {
     expect(pagePath("https://evil.example/charity-admin")).toBeNull();
     expect(pagePath(null)).toBeNull();
   });
+  it("questions in a row are joined but never longer than one question (review 24/11/2026)", () => {
+    const many = Array.from({ length: 12 }, (_, i) => q(`${String(i).padStart(2, "0")}${"x".repeat(790)}`));
+    const r = checkQuestion({ charityId: id, messages: many });
+    if (!r.ok) throw new Error(r.message);
+    expect(r.messages).toHaveLength(1);
+    expect(r.messages[0].content.length).toBe(800);
+    // The newest words are kept.
+    expect(r.messages[0].content.endsWith("x".repeat(790))).toBe(true);
+    expect(r.messages[0].content).toContain("11");
+  });
 });

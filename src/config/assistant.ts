@@ -35,6 +35,9 @@ export const assistantConfig = {
   maxAnswerTokens: 4000,
   /** Lookups per question (each is one more round with the model), and how long one round may take. */
   maxToolRounds: 4,
+  /** Lookups the model may ask for in one round, and in the whole answer (review 24/11/2026); the rest are refused. */
+  maxLookupsPerRound: 6,
+  maxLookups: 12,
   roundTimeoutMs: 40_000,
   /** The whole answer, every round included: under the route's maxDuration (120 s), so it always ends with a message. */
   answerDeadlineMs: 100_000,

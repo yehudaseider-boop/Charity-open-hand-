@@ -44,6 +44,12 @@ export function checkQuestion(body: AssistantRequest, limits = assistantConfig):
     if (prev && prev.role === t.role) prev.content = `${prev.content}\n\n${t.content}`;
     else merged.push({ ...t });
   }
+  // Questions in a row (an answer that failed) are joined above: each joined turn is cut back to one turn's limit,
+  // keeping its newest words, so twelve 800-character questions can't become one of 9 600 (review 24/11/2026).
+  for (const m of merged) {
+    const limit = m.role === "user" ? limits.maxQuestionChars : limits.maxAnswerChars;
+    if (m.content.length > limit) m.content = m.content.slice(-limit);
+  }
   // The whole history is capped too (review 21/11/2026): the oldest turns go first, the question always stays.
   let total = merged.reduce((t, m) => t + m.content.length, 0);
   while (merged.length > 1 && total > limits.maxHistoryChars) {

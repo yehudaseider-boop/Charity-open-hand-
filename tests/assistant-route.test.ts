@@ -187,6 +187,25 @@ describe("the help assistant's server", () => {
     expect(JSON.parse(result.content)).toMatchObject({ raised: "R1 250", gifts: 3 });
   });
 
+  it("runs at most six lookups in one round; the rest are refused, not run (review 24/11/2026)", async () => {
+    state.toolRounds = [Array.from({ length: 30 }, (_, i) => ({ id: `t${i}`, name: "giving_totals", input: { period: "this_month" } }))];
+    state.streamText = ["Done."];
+    await (await ask({ ...question, messages: [{ role: "user", content: "Check every period" }] })).text();
+    expect(state.looked).toHaveLength(6);
+    const results = (state.allParams[1].messages as { content: unknown }[])[2].content as { is_error?: boolean; content: string }[];
+    expect(results).toHaveLength(30);
+    expect(results.filter((r) => r.is_error)).toHaveLength(24);
+    expect(results[29].content).toMatch(/Too many lookups/);
+  });
+
+  it("runs at most twelve lookups in one answer, over all its rounds (review 24/11/2026)", async () => {
+    const round = (n: number) => Array.from({ length: 5 }, (_, i) => ({ id: `r${n}-${i}`, name: "giving_totals", input: { period: "this_month" } }));
+    state.toolRounds = [round(1), round(2), round(3), round(4)];
+    state.streamText = ["Done."];
+    await (await ask({ ...question, messages: [{ role: "user", content: "Check everything" }] })).text();
+    expect(state.looked).toHaveLength(12);
+  });
+
   it("without the donor switch, offers no donor tools and refuses a donor lookup", async () => {
     state.toolRounds = [[{ id: "t1", name: "top_donors", input: { limit: 3 } }]];
     state.streamText = ["Have a look on the Donors page."];

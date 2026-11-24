@@ -39,7 +39,7 @@ export function DashboardShell({
   /** Menu pages this person's role can't use (team roles, 10/11/2026); the pages refuse them anyway. */
   hiddenTabs?: string[];
   /** Givy, the dashboard helper (21/11/2026, named 22/11/2026): left out when its switch is off (src/config/assistant.ts). */
-  help?: { demo?: boolean; who?: string } | null;
+  help?: { demo?: boolean; who?: string; names?: boolean } | null;
   children: React.ReactNode;
 }) {
   const base = baseOverride ?? `/charity-admin/${id}`;
@@ -107,6 +107,7 @@ export function DashboardShell({
         <HelpAssistant
           charityId={help.demo ? undefined : id}
           who={help.who}
+          names={Boolean(help.names)}
           demo={Boolean(help.demo)}
           live={charity.status === "approved"}
           base={base}

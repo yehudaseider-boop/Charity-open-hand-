@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { storageKey } from "@/lib/assistant/storage-key";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -23,9 +24,6 @@ const ERROR_MARK = "[[error]]";
 const noSubscribe = () => () => {};
 
 /** One saved chat per person and charity, so someone signing in next on the same tab never sees it (review 21/11/2026). */
-function storageKey(charityId: string | undefined, demo: boolean, who: string | undefined) {
-  return `givezy.helper.${demo ? "demo" : `${charityId}.${who ?? "anon"}`}`;
-}
 
 function Parts({ parts, onLink }: { parts: Inline[]; onLink: () => void }) {
   return (
@@ -64,6 +62,7 @@ function Answer({ blocks, onLink }: { blocks: Block[]; onLink: () => void }) {
 export function HelpAssistant({
   charityId,
   who,
+  names = false,
   demo = false,
   live = false,
   base,
@@ -73,6 +72,8 @@ export function HelpAssistant({
   charityId?: string;
   /** The signed-in person's id: the saved chat is theirs only. */
   who?: string;
+  /** Givy can see donors' names (ASSISTANT_DONOR_DATA): the saved chat is kept apart from one made without. */
+  names?: boolean;
   demo?: boolean;
   /** The charity takes donations (approved): its starting questions lead with donations, not setting up. */
   live?: boolean;
@@ -94,7 +95,7 @@ export function HelpAssistant({
   const input = useRef<HTMLTextAreaElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const titleId = useId();
-  const key = storageKey(charityId, demo, who);
+  const key = storageKey(charityId, demo, who, names);
 
   // The conversation survives moving between pages and a reload, in this tab only: read back when the panel opens.
   const loaded = useRef(false);

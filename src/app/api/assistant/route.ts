@@ -155,9 +155,16 @@ export async function POST(req: Request) {
             // The whole reply goes back as it came (thinking included), then one message with every lookup's result.
             convo.push({ role: "assistant", content: final.content as Anthropic.Beta.BetaContentBlockParam[] });
             const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
+            let thisRound = 0;
             for (const block of final.content) {
               if (block.type !== "tool_use") continue;
               lookups += 1;
+              thisRound += 1;
+              // Only so many lookups a round and an answer (review 24/11/2026): the rest are refused, not run.
+              if (thisRound > assistantConfig.maxLookupsPerRound || lookups > assistantConfig.maxLookups) {
+                results.push({ type: "tool_result", tool_use_id: block.id, content: "Too many lookups at once. Answer with what you have, or look up fewer things.", is_error: true });
+                continue;
+              }
               const call = checkToolCall(block.name, block.input, donorData);
               if (!call.ok) {
                 results.push({ type: "tool_result", tool_use_id: block.id, content: call.error, is_error: true });

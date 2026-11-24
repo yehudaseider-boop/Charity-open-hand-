@@ -102,6 +102,19 @@ describe("what the model is told", () => {
     expect(await run("top_donors", { limit: 1 }, true)).toHaveLength(1);
   });
 
+  it("cuts a very long donor name to 80 characters in every donor lookup (review 24/11/2026)", async () => {
+    const long = "A".repeat(500);
+    const src = source({
+      donors: async () => [{ name: long, gifts: 1, totalCents: 100, firstGift: null, lastGift: null, monthly: null }],
+      recentGifts: async () => [{ date: "20/11/2026", amountCents: 100, status: "paid", donor: long, monthly: false, anonymous: false }],
+    });
+    for (const [name, input] of [["top_donors", { limit: 1 }], ["find_donor", { name: "AA" }], ["recent_gifts", { limit: 1 }]] as const) {
+      const out = JSON.stringify(await run(name, input, true, src));
+      expect(out).not.toContain("A".repeat(81));
+      expect(out).toContain(`${"A".repeat(80)}…`);
+    }
+  });
+
   it("never sends an email address or phone number, whatever the source holds", async () => {
     const leaky = source({
       donors: async () => [{ name: "Thandi Mokoena", gifts: 1, totalCents: 100, firstGift: null, lastGift: null, monthly: null, email: "t@x.co", phone: "0821234567" } as never],

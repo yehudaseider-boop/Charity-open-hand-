@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { DashboardShell } from "@/components/dashboard-shell";
-import { assistantOn } from "@/config/assistant";
+import { assistantDonorDataOn, assistantOn } from "@/config/assistant";
 import { getViewer, requireViewer } from "@/lib/auth";
 import { hiddenPages } from "@/lib/charity/permissions";
 import { loadCharityForManager } from "@/lib/charity/queries";
@@ -19,7 +19,7 @@ export default async function CharityLayout({ children, params }: LayoutProps<"/
   const role = await viewerRole(id);
   const hiddenTabs = hiddenPages(role);
   return (
-    <DashboardShell id={id} charity={charity} asGivezy={asGivezy} hiddenTabs={hiddenTabs} help={assistantOn() ? { who: viewer?.userId } : null}>
+    <DashboardShell id={id} charity={charity} asGivezy={asGivezy} hiddenTabs={hiddenTabs} help={assistantOn() ? { who: viewer?.userId, names: assistantDonorDataOn() } : null}>
       {children}
     </DashboardShell>
   );
