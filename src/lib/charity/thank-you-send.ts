@@ -238,20 +238,17 @@ async function claimedHashes(thankYouId: string, emails: string[]): Promise<Set<
  * again: counted as failed (not confirmed), and also in `maybeSent`, so a month where some may have gone is never handed back.
  */
 async function thankYouCounts(thankYouId: string): Promise<{ sent: number; failed: number; maybeSent: number }> {
-  const c = { sent: 0, failed: 0, maybeSent: 0 };
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await createAdminClient().from("charity_thank_you_recipients").select("status").eq("thank_you_id", thankYouId).order("email_hash").range(from, from + 999);
+  // Exact counts per status, not rows paged by position: the fingerprint converter rewrites rows while it runs, and an
+  // offset over changing rows can skip one, which could hand a month back that was partly sent (review 24/11/2026).
+  const count = async (status?: string) => {
+    let q = createAdminClient().from("charity_thank_you_recipients").select("thank_you_id", { count: "exact", head: true }).eq("thank_you_id", thankYouId);
+    if (status) q = q.eq("status", status);
+    const { count: n, error } = await q;
     if (error) throw error;
-    for (const r of data ?? []) {
-      if (r.status === "sent") c.sent++;
-      else {
-        c.failed++;
-        if (r.status === "sending") c.maybeSent++;
-      }
-    }
-    if (!data || data.length < 1000) break;
-  }
-  return c;
+    return n ?? 0;
+  };
+  const [all, sent, sending] = await Promise.all([count(), count("sent"), count("sending")]);
+  return { sent, failed: all - sent, maybeSent: sending };
 }
 
 export type DonorThankResult = { ok: true; name: string } | { ok: false; message: string };

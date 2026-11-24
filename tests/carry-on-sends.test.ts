@@ -38,7 +38,9 @@ function from(table: string) {
   let op: { kind: "select" } | { kind: "update"; set: Row } | { kind: "delete" } | { kind: "insert"; rows: Row[] } | { kind: "upsert"; rows: Row[]; conflict: string[] } = { kind: "select" };
   const list = () => (tables[table] ??= []);
   const matching = () => list().filter((r) => filters.every((f) => f(r)));
-  const run = (): { data: Row[] | null; error: { code: string; message: string } | null } => {
+  let counting = false;
+  const run = (): { data: Row[] | null; count?: number; error: { code: string; message: string } | null } => {
+    if (counting && op.kind === "select") return { data: null, count: matching().length, error: null };
     if (op.kind === "update") {
       const hit = matching();
       for (const r of hit) Object.assign(r, op.set);
@@ -70,7 +72,7 @@ function from(table: string) {
     return { data: out.slice(0, lim), error: null };
   };
   const q: Record<string, unknown> = {
-    select: () => q,
+    select: (_c?: string, o?: { count?: string }) => ((counting = Boolean(o?.count)), q),
     eq: (c: string, v: unknown) => (filters.push((r) => value(r, c) === v), q),
     neq: (c: string, v: unknown) => (filters.push((r) => value(r, c) !== v), q),
     in: (c: string, v: unknown[]) => (filters.push((r) => v.includes(value(r, c))), q),

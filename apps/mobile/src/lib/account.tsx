@@ -17,7 +17,7 @@ import { TEST_BUILD } from "./test-build";
 import { setDirectoryDemo } from "./directory";
 import { SITE_URL, siteUrl } from "./website";
 import { fetchCardChargeRates } from "./card-rates";
-import { reviewerSignIn, signInWithCode } from "./pay-api";
+import { recordAgreement, reviewerSignIn, signInWithCode } from "./pay-api";
 
 /**
  * Who is using the app, and their real giving.
@@ -450,8 +450,10 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       },
       async agree() {
         if (!supabase || !session) return { ok: false, message: "Please sign in again." };
-        const { error } = await supabase.rpc("agree_to_policy", { p_version: POLICY_VERSION });
-        if (error) return { ok: false, message: "We couldn't save that. Please try again." };
+        // Recorded by our server for the version this app shows (24/11/2026), never written from the phone.
+        if (!SITE_URL) return { ok: false, message: "We couldn't save that. Please try again." };
+        const r = await recordAgreement(SITE_URL, session.access_token, POLICY_VERSION).catch(() => ({ ok: false as const, message: "We couldn't reach Givezy, so that wasn't saved. Check your connection and try again." }));
+        if (!r.ok) return r;
         agreedFor.current = session.user.id;
         setStatus("signed-in");
         return { ok: true };

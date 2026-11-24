@@ -285,6 +285,16 @@ export async function requestS18aWaiting(site: string, token: string, post: Post
  * opt-outs are kept as keyed fingerprints, which only the server can work out). null when there is no usable answer
  * (offline, an error): Home then shows no news at all, never news they said no to.
  */
+/**
+ * "I agree" to the Terms and Privacy Policy, recorded by our server (24/11/2026), for the version this app shows.
+ * A refusal carries the server's own words (for example "please update the app").
+ */
+export async function recordAgreement(site: string, token: string, version: string, post: Post = fetchPost): Promise<{ ok: true } | { ok: false; message: string }> {
+  const r = await call<{ ok: boolean; message?: string }>(post, api(site, "agree"), { version }, token);
+  if (r.ok) return { ok: true };
+  return { ok: false, message: typeof r.message === "string" && r.message ? r.message : "We couldn't save that. Please try again." };
+}
+
 export async function requestNewsOptOuts(site: string, token: string, post: Post = fetchPost): Promise<Set<string> | null> {
   const r = await call<{ ok: boolean; charityIds?: unknown }>(post, api(site, "news-opt-outs"), {}, token);
   if (!r.ok || !Array.isArray(r.charityIds) || !r.charityIds.every((id) => typeof id === "string")) return null;

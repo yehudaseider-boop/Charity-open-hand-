@@ -357,14 +357,10 @@ describe("signing in from the app", () => {
     });
   });
 
-  it("keeps one agreement per person and version: a second press counts as already recorded; signed-out callers are refused", async () => {
+  it("lets no browser or app record an agreement itself (our server does, with the current version), and keeps one per person and version", async () => {
     await tx(async () => {
       await as(ids.donorUser);
-      // The phone app still calls this with the donor's own sign-in (24/11/2026); twice is harmless.
-      await run("select public.agree_to_policy('v-twice')");
-      await run("select public.agree_to_policy('v-twice')");
-      await run("reset role");
-      expect((await run("select count(*)::int as n from public.consents where kind = 'account' and policy_version = 'v-twice' and user_id = $1", [ids.donorUser])).rows[0].n).toBe(1);
+      await denied("select public.agree_to_policy('2026-10-08-draft')");
       await as("anon");
       await denied("select public.agree_to_policy('2026-10-08-draft')");
       await denied("select public.link_my_donations()");

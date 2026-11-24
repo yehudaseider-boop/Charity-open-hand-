@@ -74,7 +74,9 @@ vi.mock("@/lib/supabase/admin", () => ({
       const filters: Record<string, unknown> = {};
       let patch: Record<string, unknown> | null = null;
       let deleting = false;
-      for (const m of ["select", "gte", "lt", "order"]) b[m] = () => b;
+      let counting = false;
+      for (const m of ["gte", "lt", "order"]) b[m] = () => b;
+      b.select = (_cols?: string, o?: { count?: string; head?: boolean }) => ((counting = Boolean(o?.count)), b);
       b.delete = () => ((deleting = true), b);
       b.eq = (col: string, val: unknown) => ((filters[col] = val), b);
       b.update = (p: Record<string, unknown>) => ((patch = p), b);
@@ -106,6 +108,11 @@ vi.mock("@/lib/supabase/admin", () => ({
         };
       };
       b.then = (ok: (v: unknown) => unknown) => {
+        // An exact count of this thank-you's claims, optionally of one status.
+        if (counting && table === "charity_thank_you_recipients") {
+          const n = [...recipients.values()].filter((st) => filters.status === undefined || st === filters.status).length;
+          return Promise.resolve({ data: null, count: n, error: null }).then(ok);
+        }
         if (deleting && table === "charity_thank_you_recipients") recipients.delete(filters.email_hash as string);
         // Handing the month back deletes it, and its claims with it (on delete cascade).
         if (deleting && table === "charity_thank_yous") {
