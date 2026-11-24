@@ -100,8 +100,11 @@ export async function proxy(request: NextRequest) {
       },
     );
 
-    // Do not remove: this call refreshes an expired session.
-    await supabase.auth.getUser();
+    // Do not remove: this call renews a session that has expired or is within 90 seconds of it (it writes the new
+    // cookies above). The token's signature is checked here, with no trip to Supabase's sign-in service (24/11/2026:
+    // was getUser, about 170 ms on every signed-in request). The proxy decides nothing about access; every page and
+    // action still asks Supabase whether the sign-in is live (getViewer), so a revoked session is refused there.
+    await supabase.auth.getClaims();
   }
 
   // A person signed in before the sign-in cookies went httpOnly has no "signed in" marker yet (and one whose sign-in

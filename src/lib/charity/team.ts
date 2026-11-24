@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { logAudit } from "@/lib/audit";
-import { getViewer } from "@/lib/auth";
+import { claimedUserId, getViewer } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { can, isRole, refusedFor, type Permission, type Role } from "./permissions";
 
@@ -18,10 +18,15 @@ export type Member = { userId: string; email: string; role: Role; since: string 
 /** The signed-in person's role at this charity ("owner" for a platform admin), or null. */
 // Shared by the dashboard frame and the page within one page open (React's cache; a server action always reads afresh).
 export const viewerRole = cache(async function viewerRole(charityId: string): Promise<Role | null> {
+  // The person's role is read while Supabase confirms the sign-in, not after it (24/11/2026), for the person the
+  // verified token names; it is used only if getViewer confirms that same person, else read again for who it is.
+  const claimed = await claimedUserId();
+  const early = claimed ? memberRole(charityId, claimed) : null;
+  early?.catch(() => {});
   const viewer = await getViewer();
   if (!viewer) return null;
   if (viewer.isPlatformAdmin) return "owner";
-  return memberRole(charityId, viewer.userId);
+  return early && claimed === viewer.userId ? early : memberRole(charityId, viewer.userId);
 });
 
 export async function memberRole(charityId: string, userId: string): Promise<Role | null> {

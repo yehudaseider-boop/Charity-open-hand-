@@ -20,6 +20,7 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: async () => fakeDb }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => fakeDb }));
 // Already known by the time a page reads its charity (the frame and requireViewer asked first, once per request).
 vi.mock("@/lib/auth", () => ({
+  claimedUserId: async () => "u1",
   getViewer: async () => ({ userId: "u1", email: "me@x.test", isPlatformAdmin: false, charities: [], managedCharityIds: [ID], agreedToCurrentPolicy: true }),
 }));
 

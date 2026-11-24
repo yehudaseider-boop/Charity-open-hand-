@@ -47,15 +47,36 @@ function viewerRows(supabase: Awaited<ReturnType<typeof createClient>>, userId: 
   return reads;
 }
 
+type Claims = { sub?: string; email?: string; amr?: { method?: string }[] };
+
+/**
+ * The signed sign-in token, its signature checked where the page runs (the project signs with an asymmetric key,
+ * so this is normally no trip to Supabase), once per request. A session about to expire is renewed here.
+ */
+const verifiedSession = cache(async function verifiedSession() {
+  const supabase = await createClient();
+  const { data: verified, error } = await supabase.auth.getClaims();
+  return { supabase, claims: error ? undefined : (verified?.claims as Claims | undefined) };
+});
+
+const usedPassword = (claims: Claims | undefined) => (claims?.amr ?? []).some((a) => a.method === "password");
+
+/**
+ * The person the verified token names, known without any trip, or null (nobody, or a password sign-in, which is
+ * refused). NOT proof the session is still live: callers may start reads for this person early, but must not use
+ * what they read until `getViewer` has confirmed the same person.
+ */
+export async function claimedUserId(): Promise<string | null> {
+  const { claims } = await verifiedSession();
+  return typeof claims?.sub === "string" && !usedPassword(claims) ? claims.sub : null;
+}
+
 /** The signed-in person and their roles, or null for a visitor. Looked up once per request. */
 export const getViewer = cache(async function getViewer(): Promise<Viewer | null> {
-  const supabase = await createClient();
-  // The signed sign-in token first: its signature is checked here, normally without a trip to Supabase. Its person
-  // lets their role, charities and agreement be read at the same time as Supabase confirms the sign-in, instead of
-  // after it (24/11/2026: two trips before every signed-in page, now one). Nothing read is used until getUser has
+  const { supabase, claims } = await verifiedSession();
+  // The signed sign-in token first: its person lets their role, charities and agreement be read at the same time as
+  // Supabase confirms the sign-in, instead of after it (24/11/2026). Nothing read is used until getUser has
   // confirmed the same person; the reads go through row-level security as that person either way.
-  const { data: verified, error: claimsError } = await supabase.auth.getClaims();
-  const claims = claimsError ? undefined : (verified?.claims as { sub?: string; amr?: { method?: string }[] } | undefined);
   const early = typeof claims?.sub === "string" ? viewerRows(supabase, claims.sub) : null;
   const {
     data: { user },
@@ -63,7 +84,7 @@ export const getViewer = cache(async function getViewer(): Promise<Viewer | null
   if (!user) return null;
   // Givezy signs people in with an emailed code only: a session started with a password is refused
   // (someone could have registered another person's email with a password before they ever signed in).
-  if ((claims?.amr ?? []).some((a) => a.method === "password")) return null;
+  if (usedPassword(claims)) return null;
 
   const [{ data: profile }, { data: memberships }, { data: agreement }] = early && claims?.sub === user.id ? await early : await viewerRows(supabase, user.id);
 
@@ -80,6 +101,21 @@ export const getViewer = cache(async function getViewer(): Promise<Viewer | null
     agreedToCurrentPolicy: Boolean(agreement),
   };
 });
+
+/**
+ * Only what the site header shows (which work areas to link to), for /api/viewer (24/11/2026). Decides nothing and
+ * returns no data: every page still confirms the sign-in with Supabase itself (`getViewer`). So the token is trusted
+ * here until it expires (normally an hour) and no trip to the sign-in service is made; two small reads, side by side.
+ */
+export async function getHeaderViewer(): Promise<Pick<Viewer, "managedCharityIds" | "isPlatformAdmin"> | null> {
+  const { supabase, claims } = await verifiedSession();
+  if (typeof claims?.sub !== "string" || usedPassword(claims)) return null;
+  const [{ data: profile }, { data: memberships }] = await Promise.all([
+    supabase.from("profiles").select("role").eq("id", claims.sub).single(),
+    supabase.from("charity_admins").select("charity_id").eq("user_id", claims.sub),
+  ]);
+  return { isPlatformAdmin: profile?.role === "platform_admin", managedCharityIds: (memberships ?? []).map((m) => m.charity_id as string) };
+}
 
 export async function requireViewer(next = "/account"): Promise<Viewer> {
   next = await currentNext(next);

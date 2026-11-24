@@ -45,23 +45,26 @@ export type CharityDocument = {
  */
 export const loadCharityForManager = cache(async function loadCharityForManager(id: string) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
-  // Admins prove their second step first: until then the database shows them nothing.
+  const supabase = await createClient();
+  const admin = createAdminClient();
+  // The access checks and the person's role start at once, while Supabase confirms the sign-in (24/11/2026: one
+  // trip for all three, where the sign-in and then the checks were two, on every dashboard page). They run as the
+  // person the verified sign-in token names (the database checks that signature itself), and nothing about the
+  // charity is read, and none of their answers used, until the sign-in is confirmed, the second step passed (admins
+  // prove it first: until then the database shows them nothing) and the check says they may manage it.
+  const access = Promise.all([supabase.rpc("is_charity_admin", { target: id }), supabase.rpc("is_platform_admin")]);
+  access.catch(() => {});
+  const roleStarted = viewerRole(id).then((role) => ({ role }), (error: unknown) => ({ error }));
   const viewer = await getViewer();
   if (viewer && (viewer.isPlatformAdmin || viewer.managedCharityIds.includes(id))) {
     // Back to the page asked for (not just the overview) once the code is in.
     await requireSecondStep(await currentNext(`/charity-admin/${id}`));
   }
-  const supabase = await createClient();
-  const admin = createAdminClient();
-  // Confirm management rights before reading anything private. The person's own role here is read alongside (it is
-  // about them, not the charity) and used only once the check has passed. A failure to read it is raised after the
-  // check, so a stranger still gets "not found" (24/11/2026: one trip instead of two, on every dashboard page).
-  const [{ data: canManage }, { data: isAdmin }, roleRead] = await Promise.all([
-    supabase.rpc("is_charity_admin", { target: id }),
-    supabase.rpc("is_platform_admin"),
-    viewerRole(id).then((role) => ({ role }), (error: unknown) => ({ error })),
-  ]);
-  if (!canManage && !isAdmin) notFound();
+  // Confirm management rights before reading anything private. The person's own role here is about them, not the
+  // charity, and used only once the check has passed. A failure to read it is raised after the check, so a stranger
+  // still gets "not found".
+  const [[{ data: canManage }, { data: isAdmin }], roleRead] = await Promise.all([access, roleStarted]);
+  if (!viewer || (!canManage && !isAdmin)) notFound();
   if ("error" in roleRead) throw roleRead.error;
   // The bank account: the owner and finance (and Givezy) only (team roles, 10/11/2026), read by the server after
   // that check. Everyone else gets the same shape with the bank left empty, and pages say who can see it.
