@@ -54,17 +54,18 @@ describe("who is signed in", () => {
     expect((await rounds(() => getViewer())).result).toBeNull();
   });
 
-  it("reads again as the confirmed person when the token named someone else", async () => {
+  // Changed 24/11/2026 (sign-in review): both are refused now, never let through, since the password check reads
+  // the token. Nothing the early reads found is used for anyone.
+  it("refuses a token that names someone other than the person Supabase confirms", async () => {
     session.claims = { sub: "u1", amr: [] };
     session.user = { id: "admin", email: "ops@x.test" };
     const { result } = await rounds(() => getViewer());
-    expect(result).toMatchObject({ userId: "admin", isPlatformAdmin: true, managedCharityIds: [] });
+    expect(result).toBeNull();
   });
 
-  it("works as before when the token can't be checked here: the sign-in service decides", async () => {
+  it("refuses when the token can't be checked here, even if the sign-in service knows the person", async () => {
     session.claims = null;
-    const { result, rounds: n } = await rounds(() => getViewer());
-    expect(n).toBe(2);
-    expect(result).toMatchObject({ userId: "u1" });
+    const { result } = await rounds(() => getViewer());
+    expect(result).toBeNull();
   });
 });
