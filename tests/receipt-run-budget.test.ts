@@ -15,6 +15,8 @@ import { certificateFingerprint, type StoredDecision } from "@/lib/receipts/revi
 import { supabaseReceiptStore } from "@/lib/receipts/store";
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
+const { runNeedsFinishing } = await import("@/lib/receipts/runs");
 
 const charity: PlanCharity & CharityRow = {
   id: "c1", isS18a: true, mandateSignedAt: "2026-03-09T00:00:00+02:00", s18aPeriods: [{ startedAt: "2026-03-09T00:00:00+02:00", endedAt: null }], quickgive_code: "LTC",
@@ -79,6 +81,33 @@ describe("a run that runs out of time", () => {
     // Each one is emailed before the next is issued, so a run cut off later still leaves what it got to emailed.
     expect(events.slice(0, 6)).toEqual(["issue r1", "pdf r1", "email r1", "issue r2", "pdf r2", "email r2"]);
     expect(remainingText(s)).toMatch(/^1 approved receipt is still to issue.*Press Finish again/);
+  });
+
+  it("a PDF that failed once and was made again in the same run leaves no failure on the record, so the run isn't 'not finished' (24/11/2026)", async () => {
+    const { store, events } = setup();
+    const made = new Set<string>();
+    let renders = 0;
+    // The first PDF fails (Chrome closed under it); the retry for receipts issued without a PDF works.
+    const withoutPdf: IssuedReceipt[] = [];
+    const issue = store.issue;
+    store.issue = async (r, c, d) => {
+      const x = await issue(r, c, d);
+      withoutPdf.push(x);
+      return x;
+    };
+    store.savePdf = async (r) => void (made.add(r.id), events.push(`pdf ${r.id}`));
+    store.listIssuedWithoutPdf = async () => withoutPdf.filter((r) => !made.has(r.id));
+    const s = await runReceiptsJob({ store, ...base, mailer, render: async () => { if (++renders === 1) throw new Error("browser.newPage: Target page, context or browser has been closed"); return Buffer.from("%PDF"); } });
+    expect(s).toMatchObject({ issued: 6, pdfsMade: 6, emailed: 6 });
+    expect(s.failed).toEqual([]);
+    expect(runNeedsFinishing(s)).toBe(false);
+  });
+
+  it("a PDF that fails and is never made stays on the record, and the run needs finishing", async () => {
+    const { store } = setup();
+    const s = await runReceiptsJob({ store, ...base, mailer, render: async () => { throw new Error("no Chrome"); } });
+    expect(s.failed.length).toBeGreaterThan(0);
+    expect(runNeedsFinishing(s)).toBe(true);
   });
 
   it("does nothing special without a deadline (the script that issues everything on a machine)", async () => {

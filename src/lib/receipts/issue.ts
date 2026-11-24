@@ -172,7 +172,15 @@ export async function runReceiptsJob(args: {
     checkIdentities: severalIdentities,
     failed: [],
   };
-  const fail = (what: string, e: unknown) => summary.failed.push({ what, message: e instanceof Error ? e.message : String(e) });
+  const fail = (what: string, e: unknown) => {
+    const entry = { what, message: e instanceof Error ? e.message : String(e) };
+    summary.failed.push(entry);
+    return entry;
+  };
+  // A receipt that was issued but whose PDF failed, by receipt id: if the same run makes that PDF afterwards (the retry
+  // below, on a fresh browser), the failure is taken off the record, or the run would read "not finished" for ever
+  // (24/11/2026: both test receipts were made and emailed, yet Admin said "Not everything is done yet").
+  const pdfFailures = new Map<string, { what: string; message: string }>();
   for (const s of skipped) summary.skippedByReason[s.reason] = (summary.skippedByReason[s.reason] ?? 0) + 1;
   if (args.mode === "dry-run") return summary;
   if (args.mode === "issue") args.checkPlan?.(decided);
@@ -233,6 +241,7 @@ export async function runReceiptsJob(args: {
       break;
     }
     const what = `receipt for donor ${r.donorId} (donations ${r.donationIds.join(", ")})`;
+    let issuedId: string | null = null;
     try {
       const charity = charityById.get(r.charityId)!;
       const rows = await store.donorDetailsFor(r.donationIds);
@@ -251,6 +260,7 @@ export async function runReceiptsJob(args: {
       const missing = missingForSars(details);
       if (missing.length) throw new Error(`Not issued: the receipt is missing ${missing.join(" and ")}`);
       const issued = await store.issue(r, charity, details);
+      issuedId = issued.id;
       summary.issued += 1;
       issuedKeys.add((r as DecidedReceipt).key);
       await store.savePdf(issued, await args.render({ details: issued.details, reference: issued.reference }));
@@ -261,7 +271,8 @@ export async function runReceiptsJob(args: {
         for (const one of ready.filter((x) => x.id === issued.id)) await emailReceipt(one);
       }
     } catch (e) {
-      fail(what, e);
+      const entry = fail(what, e);
+      if (issuedId) pdfFailures.set(issuedId, entry);
     }
   }
 
@@ -274,6 +285,8 @@ export async function runReceiptsJob(args: {
     try {
       await store.savePdf(missing, await args.render({ details: missing.details, reference: missing.reference }));
       summary.pdfsMade += 1;
+      const earlier = pdfFailures.get(missing.id);
+      if (earlier) summary.failed = summary.failed.filter((f) => f !== earlier);
     } catch (e) {
       fail(`PDF for ${missing.reference}`, e);
     }
