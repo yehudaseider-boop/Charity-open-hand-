@@ -11,7 +11,7 @@ import { checkS18aCompletion } from "@/lib/donations/s18a-details";
 import { parseDedication } from "@/lib/donations/dedication";
 import { toCheckoutInput } from "@/lib/donations/app-api";
 import { checkDonorDetails } from "@/lib/donations/validation";
-import { checkReady, noReplyMessage, recordAgreement, requestNewCardPage, SERVER_BUSY, signInWithCode, type ReviewerAnswer } from "../apps/mobile/src/lib/pay-api";
+import { checkReady, isNetworkError, newCardNoReplyMessage, noReplyMessage, recordAgreement, requestNewCardPage, SERVER_BUSY, signInWithCode, type ReviewerAnswer } from "../apps/mobile/src/lib/pay-api";
 
 /** A valid test ID: date + sequence + citizenship + 8 + Luhn digit (as in sa-id.test.ts). */
 function makeId(first12: string): string {
@@ -104,7 +104,16 @@ describe("the app's sign-in when Supabase is busy or down", () => {
     expect(busy.r).toEqual({ ok: false, message: expect.stringMatching(/couldn't check yours/) });
     const down = await run({ name: "AuthApiError", status: 500 });
     expect(down.r).toEqual({ ok: false, message: expect.stringMatching(/Nothing is wrong with it/) });
-    expect([...busy.asked, ...down.asked]).toEqual([]);
+    // What @supabase/auth-js really throws for a 500 to 504 answer: AuthRetryableFetchError carrying the status.
+    const outage = await run({ name: "AuthRetryableFetchError", status: 503 });
+    expect(outage.r).toEqual({ ok: false, message: expect.stringMatching(/Nothing is wrong with it/) });
+    expect([...busy.asked, ...down.asked, ...outage.asked]).toEqual([]);
+  });
+  it("only a missing answer (status 0 or none) is the phone's connection", () => {
+    expect(isNetworkError({ name: "AuthRetryableFetchError", status: 0 })).toBe(true);
+    expect(isNetworkError({ name: "TypeError" })).toBe(true);
+    expect(isNetworkError({ name: "AuthRetryableFetchError", status: 503 })).toBe(false);
+    expect(isNetworkError({ name: "AuthApiError", status: 429 })).toBe(false);
   });
   it("a wrong code still reads as a wrong code", async () => {
     expect((await run({ name: "AuthApiError", status: 403 })).r).toEqual({ ok: false, message: expect.stringMatching(/didn't work/) });
@@ -125,5 +134,9 @@ describe("the app when our server answers with an outage page", () => {
     expect(await checkReady(site, "demo", undefined, offline)).toEqual({ ok: false, message: expect.stringMatching(/check your connection/) });
     expect(noReplyMessage(null)).toMatch(/check your connection/);
     expect(noReplyMessage(502)).toBe(SERVER_BUSY);
+  });
+  it("a new-card gift says our server is busy, and that nothing was charged", () => {
+    expect(newCardNoReplyMessage(SERVER_BUSY)).toBe(`${SERVER_BUSY} Nothing was charged, and your details are still here.`);
+    expect(newCardNoReplyMessage(noReplyMessage(null))).toMatch(/nothing was charged.*Check your connection/);
   });
 });

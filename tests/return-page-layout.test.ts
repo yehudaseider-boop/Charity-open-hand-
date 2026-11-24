@@ -21,6 +21,7 @@ describe("the paid gift's lines", () => {
 
   it("keeps the short labels whole and lets the long text beside them wrap", () => {
     for (const label of ["Paid", "Reference", "Dedication"]) expect(table).toContain(`<dt className="shrink-0">${label}</dt>`);
-    expect(table).toMatch(/<dt className="min-w-0">Donation to <bdi>/);
+    // A very long unbroken charity name breaks anywhere rather than run over the amount at 375px.
+    expect(table).toMatch(/<dt className="min-w-0 \[overflow-wrap:anywhere\]">Donation to <bdi>/);
   });
 });

@@ -17,7 +17,7 @@ import { TEST_BUILD } from "./test-build";
 import { setDirectoryDemo } from "./directory";
 import { SITE_URL, siteUrl } from "./website";
 import { fetchCardChargeRates } from "./card-rates";
-import { recordAgreement, reviewerSignIn, signInWithCode } from "./pay-api";
+import { isNetworkError, recordAgreement, reviewerSignIn, signInWithCode } from "./pay-api";
 
 /**
  * Who is using the app, and their real giving.
@@ -68,11 +68,6 @@ type AccountValue = {
 const AccountContext = createContext<AccountValue | null>(null);
 
 const NO_CONNECTION = "We couldn't reach Givezy. Check your connection and try again.";
-
-/** No connection or no answer, as opposed to a real "no" from the sign-in service. */
-function isNetworkError(error: { name?: string; status?: number }): boolean {
-  return error.name === "AuthRetryableFetchError" || error.status === 0 || error.status === undefined;
-}
 
 export function useAccount(): AccountValue {
   const v = useContext(AccountContext);
@@ -420,8 +415,10 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         const back = siteUrl(SITE_URL, "/login/app");
         const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true, ...(back ? { emailRedirectTo: back } : {}) } });
         if (!error) return { ok: true };
-        if (isNetworkError(error)) return { ok: false, message: NO_CONNECTION };
         if (error.status === 429) return { ok: false, message: "Too many sign-in emails for now. Please use the newest code you have, or try again later." };
+        // Supabase down (an AuthRetryableFetchError with a 5xx status) is not the phone's connection (24/11/2026).
+        if (typeof error.status === "number" && error.status >= 500) return { ok: false, message: "We couldn't send the code just now. Nothing is wrong with your address. Please try again in a minute." };
+        if (isNetworkError(error)) return { ok: false, message: NO_CONNECTION };
         return { ok: false, message: "We couldn't send the code. Please check the address and try again in a minute." };
       },
       async verifyCode(email, code) {

@@ -12,6 +12,17 @@ export function isMissingFunction(error: { code?: string; message?: string } | n
 }
 
 /**
+ * "Function not found" for one named function (24/11/2026), for a fallback that must not hide another fault: the API's
+ * PGRST202 ("not in the schema cache"), or the database's 42883 only when its message names this function (a 42883
+ * about another function, such as one it calls, is a real error and is thrown).
+ */
+export function isMissingFunctionNamed(error: { code?: string; message?: string } | null | undefined, name: string): boolean {
+  if (!error) return false;
+  if (error.code === "PGRST202") return true;
+  return error.code === "42883" && new RegExp(`\\b${name}\\b`).test(error.message ?? "");
+}
+
+/**
  * Last tax year's and earlier donors for the chosen year, read as the signed-in person through
  * `charity_keeping_donors` (which checks they manage this charity). Read page by page: the database answers at
  * most 1 000 rows at a time. Throws KeepingNotSetUp when the function doesn't exist yet.

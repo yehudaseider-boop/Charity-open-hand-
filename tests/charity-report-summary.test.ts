@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { annualReport, pickReportYear, reportFromSummary, reportYears, toReportSummary, type ReportGift } from "@/lib/charity/annual-report";
 import { platformConfig } from "@/config/platform";
 import { taxYearFor } from "@/lib/dates";
+import { byId, madeUpGifts, rnd } from "./made-up-gifts";
 
 vi.mock("server-only", () => ({}));
 
@@ -78,34 +79,6 @@ function standIn(all: ReportGift[], onIssued: Set<string>, askedYear: number | n
     s18a_waiting_donors: distinct(waiting),
     s18a_waiting_cents: sum(waiting),
   };
-}
-
-let seed = 7;
-const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
-const pick = <T,>(a: T[]) => a[Math.floor(rnd() * a.length)];
-const hex = (n: number) => n.toString(16).padStart(12, "0");
-const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-
-function madeUpGifts(count: number, donors: number): ReportGift[] {
-  const edges = ["2026-02-28T21:59:59Z", "2026-02-28T22:00:00Z", "2025-02-28T21:30:00Z", "2024-02-29T22:00:01Z", "2026-03-31T22:30:00Z", "2026-11-30T22:00:00Z"];
-  return Array.from({ length: count }, (_, i) => {
-    const status = pick(["paid", "paid", "paid", "paid", "refunded", "charged_back"]);
-    const amount = pick([1_000, 5_000, 5_000, 10_000, 25_000, 123_457]);
-    const paidAt = rnd() < 0.1 ? pick(edges) : new Date(Date.UTC(2022, 0, 1) + rnd() * (Date.UTC(2026, 10, 24) - Date.UTC(2022, 0, 1))).toISOString();
-    const hasPaid = status === "paid" || rnd() < 0.8;
-    return {
-      id: `00000000-0000-4000-8000-${hex(Math.floor(rnd() * 1e12))}${i}`.slice(0, 36),
-      donor_id: `d${Math.floor(rnd() * donors)}`,
-      status,
-      amount_cents: amount,
-      refunded_cents: status === "paid" && rnd() < 0.15 ? pick([amount, Math.floor(amount / 3), 1]) : 0,
-      paid_at: hasPaid ? paidAt : null,
-      tax_year: status === "paid" ? (rnd() < 0.05 ? taxYearFor(paidAt) + pick([-1, 1]) : taxYearFor(paidAt)) : rnd() < 0.5 ? null : taxYearFor(paidAt),
-      recurring_id: rnd() < 0.3 ? pick(["r1", "r2"]) : null,
-      campaign_id: rnd() < 0.4 ? pick(["c1", "c2", "c3", "c4"]) : null,
-      wants_18a: rnd() < 0.4,
-    };
-  }).sort(byId); // The page read them in id order (charity_donations ... order by id).
 }
 
 const now = new Date("2026-11-24T10:00:00Z");
@@ -193,7 +166,7 @@ describe("loadAnnualReport", () => {
     expect(rpcCalls[0].p_asked_year).toBeNull();
   });
 
-  for (const missing of [{ code: "PGRST202", message: "Could not find the function public.charity_report_summary in the schema cache" }, { code: "42883", message: "function does not exist" }]) {
+  for (const missing of [{ code: "PGRST202", message: "Could not find the function public.charity_report_summary in the schema cache" }, { code: "42883", message: "function public.charity_report_summary(uuid, integer, integer, integer, text) does not exist" }]) {
     it(`falls back to reading the gifts, with the same answer, when the function is not there (${missing.code})`, async () => {
       rpcAnswer = { data: null, error: missing };
       const got = await loadAnnualReport("ch1", 2025, now);
@@ -209,6 +182,23 @@ describe("loadAnnualReport", () => {
   it("a refusal is an error, never 'not there yet': no gifts are read", async () => {
     rpcAnswer = { data: null, error: { code: "P0001", message: "Not allowed" } };
     await expect(loadAnnualReport("ch1", 2027, now)).rejects.toThrow("Not allowed");
+    expect(reads).not.toContain("charity_donations");
+  });
+
+  it("a year the database can't hold asks for the latest year, not an error (?year=99999999999)", async () => {
+    rpcAnswer = { data: standIn(gifts, new Set(issued), null, taxYearFor(now)), error: null };
+    for (const asked of [99_999_999_999, 2 ** 53, -5, 1999, 2201, 2.5]) await loadAnnualReport("ch1", asked, now);
+    expect(rpcCalls.map((c) => c.p_asked_year)).toEqual([null, null, null, null, null, null]);
+    await loadAnnualReport("ch1", 2000, now);
+    await loadAnnualReport("ch1", 2200, now);
+    expect(rpcCalls.slice(-2).map((c) => c.p_asked_year)).toEqual([2000, 2200]);
+  });
+
+  it("a missing function inside it (42883 naming another function) is an error, not 'not there yet'", async () => {
+    rpcAnswer = { data: null, error: { code: "42883", message: "function public.tax_year_of(timestamp with time zone) does not exist" } };
+    await expect(loadAnnualReport("ch1", 2027, now)).rejects.toThrow(/tax_year_of/);
+    rpcAnswer = { data: null, error: { code: "42883", message: "operator does not exist: text = uuid" } };
+    await expect(loadAnnualReport("ch1", 2027, now)).rejects.toThrow(/operator does not exist/);
     expect(reads).not.toContain("charity_donations");
   });
 

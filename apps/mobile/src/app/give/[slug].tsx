@@ -54,7 +54,7 @@ import { haptic } from "@/lib/haptics";
 import { celebrates, stageLabel, TICK_MS, type GiveStage } from "@/lib/give-stage";
 import { confirmThen, openSite, openUrl } from "@/lib/open-site";
 import { afterCheckAgain, afterReply, messageOutcome } from "@/lib/give-after";
-import { afterPaymentMessage, afterPaymentTone, cardLabel, centsToInput, checkReady, lastLabel, newAttemptId, paymentStatus, quickAmounts, startPayment, type MessageTone, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
+import { afterPaymentMessage, afterPaymentTone, cardLabel, centsToInput, checkReady, lastLabel, newAttemptId, newCardNoReplyMessage, paymentStatus, quickAmounts, startPayment, type MessageTone, type ReadyReply, type RememberedDetails } from "@/lib/pay-api";
 import { helpLine } from "@/lib/help";
 import { inHistory, settles, snapshotTotal, type GiftSnapshot, type PendingGift } from "@/lib/pending-gift";
 import { afterPaymentMade, leavePrompt } from "@/lib/give-leave";
@@ -255,6 +255,9 @@ export default function Give() {
   // Where each part of the form sits, so a failed tap scrolls to the first thing to fix.
   const scrollRef = useRef<ScrollViewInstance>(null);
   const amountRef = useRef<TextInputInstance>(null);
+  // The donor has opened the amount box to type their own (Other amount, or a tap on the box): an empty amount then
+  // asks them to type one, not to tap Other amount (24/11/2026).
+  const [ownAmountOpen, setOwnAmountOpen] = useState(false);
   const [sectionY, setSectionY] = useState<Record<string, number>>({});
   const at = (key: string) => (e: LayoutChangeEvent) => {
     const y = e.nativeEvent.layout.y;
@@ -559,7 +562,7 @@ export default function Give() {
   })();
   // The amount's problem, as the Give check words it (null when it can be given). The button names a total only when
   // the gift and the contribution can both be given (22/11/2026: amount 0 read "Hold to give R10").
-  const amountError = giftAmountError(amount, gift, minGift, maxGift);
+  const amountError = giftAmountError(amount, gift, minGift, maxGift, ownAmountOpen);
   const total = givableTotal(gift, amountError, contribution, cardCharge);
   // While a saved-card attempt is unresolved the gift can't become monthly: that would bypass the attempt check.
   const isMonthly = monthly && !campaignId && !heldAttempt;
@@ -844,7 +847,7 @@ export default function Give() {
         setMessage(
           payWithSaved
             ? "We couldn't hear back from Givezy, so we don't know yet whether your card was charged. Your gift is held exactly as it was. Hold to give again: we check first, and never charge twice."
-            : "We couldn't reach Givezy, so nothing was charged. Your details are still here. Check your connection and hold to give again.",
+            : newCardNoReplyMessage(r.message),
           payWithSaved ? "wait" : "error",
           true,
         );
@@ -1062,6 +1065,7 @@ export default function Give() {
                 editable={!locked}
                 value={amount}
                 onChangeText={setAmount}
+                onFocus={() => setOwnAmountOpen(true)}
                 keyboardType="decimal-pad"
                 maxLength={AMOUNT_MAX_LENGTH}
                 // Lets a sideways slide across the digits nudge the amount (AmountSwipe); iOS otherwise keeps the touch.

@@ -8,6 +8,7 @@ import pg from "pg";
 import { annualReport, pickReportYear, reportFromSummary, reportYears, toReportSummary, type ReportGift } from "@/lib/charity/annual-report";
 import { platformConfig } from "@/config/platform";
 import { taxYearFor } from "@/lib/dates";
+import { madeUpGifts } from "./made-up-gifts";
 
 const client = new pg.Client({
   connectionString: process.env.TEST_DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
@@ -110,6 +111,109 @@ describe("charity_report_summary", () => {
       }
       const r = reportFromSummary(await summary(c, 2027, now), new Map(), now);
       expect(r).toMatchObject({ totalCents: 90_000, donationCount: 3, donors: 3, newDonors: 1, refunded: { count: 3, cents: 72_000 } });
+    });
+  });
+
+  it("gives the page's own figures for made-up gifts, every year: missing and differing tax years, no payment date, monthly, campaign ties, part refunds", async () => {
+    await tx(async () => {
+      const a = await user();
+      const c = await charity(a);
+      const now = new Date("2026-11-24T10:00:00Z");
+      const made = madeUpGifts(300, 40);
+      // The cases named on their own, so they are there whatever the generator happens to make (ids sort after its own).
+      const at = (n: string) => `ffffffff-0000-4000-8000-${n.padStart(12, "0")}`;
+      const g = (id: string, o: Partial<ReportGift>): ReportGift => ({ id: at(id), donor_id: "d0", status: "paid", amount_cents: 10_000, refunded_cents: 0, paid_at: "2026-06-01T10:00:00Z", tax_year: 2027, recurring_id: null, campaign_id: null, wants_18a: false, ...o });
+      const named = [
+        g("e1", { status: "refunded", paid_at: "2025-09-10T10:00:00Z", tax_year: null }), // tax year worked out from paid_at: 2026
+        g("e2", { paid_at: "2026-01-15T10:00:00Z", tax_year: 2027, wants_18a: true }), // paid in tax year 2026, counted in 2027
+        g("e3", { status: "charged_back", paid_at: null, tax_year: 2026 }), // no payment date
+        g("e4", { status: "refunded", paid_at: null, tax_year: null }), // no payment date and no tax year: in no year
+        g("e5", { recurring_id: "r1", amount_cents: 18_000 }), // monthly
+        g("e6", { donor_id: "d41", amount_cents: 50_000, refunded_cents: 20_000, wants_18a: true }), // part refunded, asked for s18A, waiting
+        g("e7", { donor_id: "d42", amount_cents: 40_000, refunded_cents: 10_000, wants_18a: true }), // part refunded, on an issued receipt
+        g("f1", { campaign_id: "c6", amount_cents: 777_777 }), // a tie: the first gift (by id) decides the order
+        g("f2", { campaign_id: "c5", amount_cents: 777_777 }),
+      ];
+      const all = [...made, ...named];
+
+      // Real rows for the made-up donors, monthly donations and campaigns.
+      const donors = new Map<string, string>();
+      for (const d of new Set(all.map((x) => x.donor_id))) donors.set(d, await donor());
+      const recurring = new Map<string, string>();
+      for (const r of ["r1", "r2"]) {
+        const { id } = await one(
+          `insert into public.recurring_donations (donor_id, charity_id, amount_cents, contribution_cents, status, charge_day, next_charge_at, authorization_encrypted, card_last4, gateway_customer_ref)
+           values ($1, $2, 18000, 0, 'active', 15, '2026-11-15T08:00:00Z', 'secret', '4242', 'CUS_x') returning id`,
+          [donors.get("d0"), c],
+        );
+        recurring.set(r, id);
+      }
+      const campaigns = new Map<string, string>();
+      const titles = new Map<string, string>();
+      for (const k of ["c1", "c2", "c3", "c4", "c5", "c6"]) {
+        const { id } = await one("insert into public.campaigns (charity_id, slug, title) values ($1, $2, $3) returning id", [c, `camp-${k}`, `Campaign ${k}`]);
+        campaigns.set(k, id);
+        titles.set(id, `Campaign ${k}`);
+      }
+      const rowsIn = all.map((x) => ({
+        ...x,
+        donor_id: donors.get(x.donor_id),
+        recurring_id: x.recurring_id ? recurring.get(x.recurring_id) : null,
+        campaign_id: x.campaign_id ? campaigns.get(x.campaign_id) : null,
+        refunded_cents: x.refunded_cents ?? 0,
+      }));
+      await run(
+        `insert into public.donations (id, donor_id, charity_id, amount_cents, refunded_cents, platform_fee_cents, processing_charge_cents, total_charged_cents, gateway, gateway_ref, status, paid_at, tax_year, wants_18a, recurring_id, campaign_id)
+         select x.id, x.donor_id, $1, x.amount_cents, x.refunded_cents, 400, 100, x.amount_cents + 500, 'test', gen_random_uuid()::text, x.status::public.donation_status, x.paid_at, x.tax_year, x.wants_18a, x.recurring_id, x.campaign_id
+         from jsonb_to_recordset($2::jsonb) as x(id uuid, donor_id uuid, amount_cents bigint, refunded_cents bigint, status text, paid_at timestamptz, tax_year int, wants_18a boolean, recurring_id uuid, campaign_id uuid)`,
+        [c, JSON.stringify(rowsIn)],
+      );
+      await run(
+        `insert into public.donation_checkout_details (donation_id, donor_type, email, first_name, last_name, phone)
+         select id, 'individual', 'thandi@x.test', 'Thandi', 'Mokoena', '0821234567' from public.donations where charity_id = $1`,
+        [c],
+      );
+      // Some s18A gifts on issued receipts, including the part-refunded e7.
+      for (const x of [...made.filter((m) => m.status === "paid" && m.wants_18a).slice(0, 8), named[6]]) await issuedReceipt(c, donors.get(x.donor_id)!, x.id);
+
+      await asUser(a);
+      const rows: ReportGift[] = (await run(
+        "select id, donor_id, status::text, amount_cents, refunded_cents, paid_at, tax_year, recurring_id, campaign_id, wants_18a from public.charity_donations where charity_id = $1 order by id",
+        [c],
+      )).rows.map((x) => ({ ...x, amount_cents: Number(x.amount_cents), refunded_cents: Number(x.refunded_cents), paid_at: x.paid_at ? new Date(x.paid_at).toISOString() : null }));
+      expect(rows).toHaveLength(all.length);
+      const onIssued = new Set<string>((await run("select donation_id from public.charity_receipt_donations where charity_id = $1 and status = 'issued'", [c])).rows.map((r) => r.donation_id));
+      expect(onIssued.has(named[6].id)).toBe(true);
+      const years = reportYears(rows, now);
+      expect(years).toContain(2023);
+      for (const y of [null, 0, 1999, ...years]) {
+        const s = await summary(c, y, now);
+        const year = pickReportYear(years, y ?? NaN);
+        expect(s.years).toEqual(years);
+        expect(s.taxYear).toBe(year);
+        expect(reportFromSummary(s, titles, now)).toEqual(annualReport(rows, year, titles, onIssued, now));
+      }
+      // The tie: equal totals keep the order of each campaign's first gift by id (c6's f1 before c5's f2).
+      const tied = reportFromSummary(await summary(c, 2027, now), titles, now).campaigns.filter((x) => x.title === "Campaign c5" || x.title === "Campaign c6");
+      expect(tied.map((x) => x.title)).toEqual(["Campaign c6", "Campaign c5"]);
+    });
+  });
+
+  it("is open to a Givezy admin with the second step, and closed to a team member without it", async () => {
+    await tx(async () => {
+      const a = await user();
+      const c = await charity(a);
+      const d = await donor();
+      await gift(c, d, 25_000, "2026-05-01T10:00:00Z");
+      const admin = await user();
+      await run("update public.profiles set role = 'platform_admin' where id = $1", [admin]);
+      await asUser(admin);
+      expect((await summary(c, 2027, new Date("2026-11-24T10:00:00Z"))).totalCents).toBe(25_000);
+      await run("reset role");
+      // The charity's own team member, signed in but without the second step (aal1): refused.
+      await run("set local role authenticated");
+      await run("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: a, role: "authenticated", aal: "aal1", amr: [{ method: "otp" }] })]);
+      await expect(summary(c, null, new Date())).rejects.toThrow(/Not allowed/);
     });
   });
 
