@@ -27,7 +27,7 @@
  * it only at a test site with a test database, never one holding real donors.
  */
 import { randomUUID } from "node:crypto";
-import { checkTarget, judge, parseDuration, plannedRequests, rateAt, signedWebhook, summarise } from "./lib.mjs";
+import { checkTarget, judge, parseDuration, plannedRequests, rateAt, signedWebhook, summarise, verdictOf } from "./lib.mjs";
 
 const HELP = `Usage: node scripts/loadtest/run.mjs --base-url <url> --allow-host <host> [--allow-host <host> ...] [options]
 
@@ -126,7 +126,8 @@ if (uses.webhook && !secret) fail("Set TEST_GATEWAY_SECRET (the test site's own 
 
 /** What a donor does, with how often (weights only matter in the busy mix). */
 const DASHBOARD_PAGES = ["", "/donations", "/donors", "/receipts", "/monthly", "/report"].map((p) => `/charity-admin/${args["charity-id"]}${p}`);
-const RECEIPT_PAGES = [`/charity-admin/${args["charity-id"]}/receipts`, "/admin/receipts"];
+// Charity pages only: Givezy's own admin pages need an admin's cookie, which a run never uses (review 24/11/2026).
+const RECEIPT_PAGES = [`/charity-admin/${args["charity-id"]}/receipts`];
 const mix = scenario === "busy" ? [["checkout", 30], ["webhook", 20], ["dashboard", 50]] : [[scenario, 1]];
 
 const plan = plannedRequests({ targetRate, rampSec, durationSec });
@@ -157,8 +158,21 @@ async function timed(name, fn) {
   samples[name].push({ ms: performance.now() - t0, status: r.status, ok: r.ok, kind: r.kind });
 }
 
-const jsonPost = (path, body, headers = {}) =>
-  fetch(origin + path, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: typeof body === "string" ? body : JSON.stringify(body), signal: AbortSignal.timeout(TIMEOUT_MS) });
+// Never follows a redirect (review 24/11/2026): a test host that forwards to another site would otherwise get the same
+// pretend gift posted there. Any redirect stops the run.
+async function jsonPost(path, body, headers = {}) {
+  const res = await fetch(origin + path, {
+    method: "POST",
+    redirect: "manual",
+    headers: { "content-type": "application/json", ...headers },
+    body: typeof body === "string" ? body : JSON.stringify(body),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  if (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400)) {
+    halted ??= `${path} answered with a redirect (${res.status}). Run stopped: nothing is ever sent on to another address.`;
+  }
+  return res;
+}
 
 async function checkout() {
   const n = ++seq;
@@ -258,7 +272,7 @@ const drainUntil = performance.now() + TIMEOUT_MS + 1000;
 while (inFlight > 0 && performance.now() < drainUntil) await new Promise((r) => setTimeout(r, 50));
 
 const wall = (performance.now() - started) / 1000;
-const result = { target: origin, scenario, targetRate, durationSec, rampSec, wallSec: Math.round(wall * 10) / 10, dropped, halted, scenarios: {}, verdict: "pass" };
+const result = { target: origin, scenario, targetRate, durationSec, rampSec, wallSec: Math.round(wall * 10) / 10, dropped, halted, scenarios: {}, verdict: "not judged" };
 let anyFail = false;
 for (const [name, list] of Object.entries(samples)) {
   if (!list.length) continue;
@@ -267,8 +281,9 @@ for (const [name, list] of Object.entries(samples)) {
   if (checks.some((c) => c.state === "fail")) anyFail = true;
   result.scenarios[name] = { ...s, checks };
 }
-if (halted || anyFail || dropped > 0) result.verdict = "fail";
 const noThresholds = thresholds.maxErrorPct === undefined && thresholds.maxP95Ms === undefined;
+// An unset limit is never a pass, in the saved file as on screen (review 24/11/2026).
+result.verdict = verdictOf({ halted, anyFail, dropped, thresholds });
 
 console.log(`\nFinished in ${result.wallSec}s${dropped ? `, ${dropped} requests not sent (more than ${MAX_IN_FLIGHT} waiting: the site is not keeping up)` : ""}`);
 if (halted) console.log(`STOPPED: ${halted}`);
@@ -278,10 +293,16 @@ for (const [name, s] of Object.entries(result.scenarios)) {
   console.log(`  status: ${JSON.stringify(s.byStatus)}${Object.keys(s.byKind).length ? `  kinds: ${JSON.stringify(s.byKind)}` : ""}`);
   for (const c of s.checks) console.log(`  ${c.name}: ${c.state}${c.limit !== undefined ? ` (got ${c.got}, limit ${c.limit})` : ""}`);
 }
-console.log(noThresholds ? "\nNo thresholds were given, so there is no pass or fail on the numbers (Yehuda to confirm them: docs/load-test.md)." : `\nVerdict: ${result.verdict}`);
+console.log(
+  result.verdict === "not judged"
+    ? "\nNo thresholds were given, so there is no pass or fail on the numbers (Yehuda to confirm them: docs/load-test.md)."
+    : result.verdict === "partial"
+      ? `\nVerdict: partial (not set: ${thresholds.maxErrorPct === undefined ? "error rate" : "p95 time"}), so this is not a pass.`
+      : `\nVerdict: ${result.verdict}`,
+);
 console.log("Also check the database connections and the hosting dashboard for the same window (docs/load-test.md).");
 if (args.json) {
   const { writeFileSync } = await import("node:fs");
   writeFileSync(args.json, JSON.stringify(result, null, 2));
 }
-process.exit(halted ? 3 : !noThresholds && result.verdict === "fail" ? 1 : 0);
+process.exit(halted ? 3 : result.verdict === "fail" ? 1 : result.verdict === "pass" ? 0 : 2);

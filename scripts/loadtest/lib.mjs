@@ -14,6 +14,20 @@ export const LOOPBACK_HOSTS = ["localhost", "127.0.0.1", "[::1]", "::1"];
 const hostMatches = (host, rule) => host === rule || host.endsWith(`.${rule}`);
 
 /**
+ * A host as the browser would name it: lower case, every trailing dot gone ("givezy.co.za.." is givezy.co.za),
+ * and an allow-list entry put through the same parser as the base address (review 24/11/2026).
+ */
+export function normaliseHost(h) {
+  let host = String(h ?? "").trim();
+  try {
+    host = new URL(`http://${host}`).hostname;
+  } catch {
+    /* not a host: compared as typed, so it matches nothing */
+  }
+  return host.toLowerCase().replace(/\.+$/, "");
+}
+
+/**
  * Decide whether a run may start. Returns { ok: true, url, host, local } or { ok: false, reason }.
  * The base address must be passed on purpose (no default), must be on the operator's own allow list,
  * must never be the live site, and (when it is not this machine) needs a named approver.
@@ -28,12 +42,13 @@ export function checkTarget({ baseUrl, allowHosts, approvedBy }) {
     return { ok: false, reason: `"${baseUrl}" is not a web address.` };
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") return { ok: false, reason: "Only http and https addresses are allowed." };
-  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  const host = normaliseHost(url.hostname);
   if (FORBIDDEN_HOSTS.some((f) => hostMatches(host, f))) return { ok: false, reason: `${host} is the live site. This test never runs against it.` };
-  const allow = (allowHosts ?? []).map((h) => h.trim().toLowerCase()).filter(Boolean);
+  const raw = (allowHosts ?? []).map((h) => String(h).trim()).filter(Boolean);
+  if (raw.some((a) => a.includes("*"))) return { ok: false, reason: "No wildcards in the allow list. Name each host." };
+  const allow = raw.map(normaliseHost).filter(Boolean);
   if (!allow.length) return { ok: false, reason: "No allow list. Pass --allow-host <host> for each host you mean to test." };
   if (allow.some((a) => FORBIDDEN_HOSTS.some((f) => hostMatches(a, f)))) return { ok: false, reason: "The live site cannot be on the allow list." };
-  if (allow.some((a) => a.includes("*"))) return { ok: false, reason: "No wildcards in the allow list. Name each host." };
   if (!allow.includes(host)) return { ok: false, reason: `${host} is not on the allow list (${allow.join(", ")}).` };
   const local = LOOPBACK_HOSTS.includes(host) || LOOPBACK_HOSTS.includes(url.hostname);
   if (!local && !approvedBy) return { ok: false, reason: `${host} is not on this machine. Pass --approved-by "<name, date>" once Yehuda has said go.` };
@@ -115,4 +130,15 @@ export function parseDuration(text) {
   const m = /^(\d+(?:\.\d+)?)(s|m)?$/.exec(String(text ?? "").trim());
   if (!m) return null;
   return Math.round(Number(m[1]) * (m[2] === "m" ? 60 : 1));
+}
+
+/**
+ * The run's verdict (review 24/11/2026). "pass" only when both limits were given and met; one missing is "partial",
+ * none "not judged"; a stopped run, a failed check or requests not sent is "fail".
+ */
+export function verdictOf({ halted, anyFail, dropped, thresholds }) {
+  if (halted || anyFail || dropped > 0) return "fail";
+  const err = thresholds.maxErrorPct !== undefined;
+  const p95 = thresholds.maxP95Ms !== undefined;
+  return err && p95 ? "pass" : err || p95 ? "partial" : "not judged";
 }

@@ -23,6 +23,10 @@ It sends many pretend donors at a **test** site and reports how many requests fa
 - A signed-in charity user on the test site and its session cookie, plus the charity's slug and id. Use the load-test charity seed (`npm run db:seed` on the test database) so the pages have many gifts.
 - **The site's own limits will bite.** One email may start 5 gifts in 10 minutes and one address 30 in 10 minutes (`src/lib/donations/checkout.ts`). The script uses a new email each time, but one machine is one address. Expect `rate_limited` in the checkout results. Either run from several machines, or raise the address limit **on the test site only** for the run. Do not change the live limits.
 - Secrets are read from the environment, never from a file: `TEST_GATEWAY_SECRET` and `LOADTEST_COOKIE`.
+- `--base-url` must be exactly the test site's own `SITE_URL` (the stand-in payment page is built from it; any other address and every checkout stops the run, safely).
+- `EMAIL_ALLOWLIST` set on the test site, so the pretend donors' thank-you and receipt emails are skipped rather than bounced.
+- **Never** the live site's own Vercel addresses (`*.vercel.app` of the live project) either: they reach the live database just as givezy.co.za does. Only givezy.co.za is refused by the script itself; the rest rests on the allow list and the approval below.
+- The receipts scenario reads the charity's own receipt page only (a charity user's cookie cannot open Givezy's admin pages).
 
 ## How to run
 
@@ -47,7 +51,7 @@ Add `--dry-run` first: it checks everything and sends nothing. The script refuse
 
 ## Pass and fail (placeholders: Yehuda to confirm)
 
-These are starting points to talk about, **not decisions and not facts about what Givezy can handle**. Nothing passes or fails until Yehuda sets them: the script says "not set" for any limit not given.
+These are starting points to talk about, **not decisions and not facts about what Givezy can handle**. Nothing passes or fails until Yehuda sets them: the script says "not set" for any limit not given. The verdict (on screen and in the saved file) is "pass" only when both the error-rate and the p95 limits were given and met; with one missing it is "partial", with none "not judged" (exit code 2 for both), and a stopped or failed run is "fail".
 
 | Measure | Proposed placeholder | Status |
 |---|---|---|

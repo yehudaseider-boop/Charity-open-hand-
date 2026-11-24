@@ -2,7 +2,7 @@
  * The load test's safety checks and its signed test payload (scripts/loadtest/lib.mjs).
  */
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { checkTarget, judge, parseDuration, plannedRequests, rateAt, signedWebhook, summarise } from "../scripts/loadtest/lib.mjs";
+import { checkTarget, judge, verdictOf, parseDuration, plannedRequests, rateAt, signedWebhook, summarise } from "../scripts/loadtest/lib.mjs";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
@@ -70,3 +70,23 @@ describe("ramp and numbers", () => {
     expect(parseDuration("soon")).toBeNull();
   });
 });
+
+describe("load test review fixes (24/11/2026)", () => {
+  it("refuses the live site however many trailing dots, and matches allow entries written with a dot", () => {
+    for (const baseUrl of ["https://givezy.co.za../", "https://GIVEZY.co.za.../", "https://www.givezy.co.za../"]) {
+      expect(checkTarget({ baseUrl, allowHosts: ["givezy.co.za.", "givezy.co.za..", "www.givezy.co.za."], approvedBy: "x" }).ok).toBe(false);
+    }
+    expect(checkTarget({ baseUrl: "https://staging.test/", allowHosts: ["Staging.Test."], approvedBy: "x" }).ok).toBe(true);
+    expect(checkTarget({ baseUrl: "https://staging.test/", allowHosts: ["*.test."], approvedBy: "x" }).ok).toBe(false);
+  });
+
+  it("never calls a run a pass unless both limits were given and met", () => {
+    const none = {};
+    expect(verdictOf({ halted: null, anyFail: false, dropped: 0, thresholds: none })).toBe("not judged");
+    expect(verdictOf({ halted: null, anyFail: false, dropped: 0, thresholds: { maxP95Ms: 2000 } })).toBe("partial");
+    expect(verdictOf({ halted: null, anyFail: false, dropped: 0, thresholds: { maxErrorPct: 1, maxP95Ms: 2000 } })).toBe("pass");
+    expect(verdictOf({ halted: "stopped", anyFail: false, dropped: 0, thresholds: { maxErrorPct: 1, maxP95Ms: 2000 } })).toBe("fail");
+    expect(verdictOf({ halted: null, anyFail: false, dropped: 3, thresholds: none })).toBe("fail");
+  });
+});
+
