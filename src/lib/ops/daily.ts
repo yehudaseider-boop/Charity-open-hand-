@@ -292,7 +292,23 @@ export async function runDailyChecks(now = new Date(), deadline = Infinity, opts
   } catch (e) {
     console.error("[daily] could not check profile changes made outside the website", e instanceof Error ? e.message : e);
   }
+
+  // 8. Givy's draft thank-yous past their few hours (review 24/11/2026): deleted. Never stops the checks.
+  await tidyExpiredDrafts(db, now);
   return out;
+}
+
+/**
+ * Deletes every expired Givy draft (assistant_drafts), whoever kept it, with the service role. Skipped quietly before
+ * the table's migration has run; any other problem is logged and never stops the daily checks.
+ */
+export async function tidyExpiredDrafts(db: ReturnType<typeof createAdminClient>, now: Date): Promise<void> {
+  try {
+    const { error } = await db.from("assistant_drafts").delete().lt("expires_at", now.toISOString());
+    if (error && error.code !== "PGRST205" && error.code !== "42P01") console.error("[daily] could not tidy expired Givy drafts", error.message);
+  } catch (e) {
+    console.error("[daily] could not tidy expired Givy drafts", e instanceof Error ? e.message : e);
+  }
 }
 
 /** The last day's profile changes no website save accounts for, as lines for the daily email. */

@@ -114,6 +114,8 @@ export interface HelperSource {
 export interface ThankYouPreparer {
   /** `names`: who is in it (only with donors' names switched on; anonymous donors as "Anonymous donor"). */
   prepare(d: { audience: DraftAudience; subject: string; body: string }): Promise<{ count: number | null; label: string | null; draftId: string | null; names?: string[] } | { refused: string }>;
+  /** The charity's own name, which a draft may use as it is spelt (checkDraft). */
+  charityName?(): Promise<string | null>;
 }
 
 /** The donor lists Givy may read by name (24/11/2026), with what each means. */
@@ -300,7 +302,7 @@ const lastGiftOf = (v: unknown) => (typeof v === "string" && /^\d{2}\/\d{2}\/\d{
  * too, not only left out of the list: a name tool without the names switch, a draft for a role that can't email
  * donors, and a contact lookup without both switches or for a role that can't see contact details.
  */
-export function checkToolCall(name: string, input: unknown, donorData: boolean, canDraft = false, canContact = false): Checked {
+export function checkToolCall(name: string, input: unknown, donorData: boolean, canDraft = false, canContact = false, charityName: string | null = null): Checked {
   const i = (input && typeof input === "object" && !Array.isArray(input) ? input : null) as Record<string, unknown> | null;
   if (!i) return { ok: false, error: "The tool input couldn't be read. Call the tool again with valid input." };
   switch (name) {
@@ -333,7 +335,7 @@ export function checkToolCall(name: string, input: unknown, donorData: boolean, 
     case "prepare_thank_you": {
       // Refused here too, not only left out of the list: a role that can't email donors never gets a draft.
       if (!canDraft) return { ok: false, error: NO_DRAFT_FOR_ROLE };
-      const d = checkDraft(i);
+      const d = checkDraft(i, charityName);
       return d.ok ? { ok: true, name, draft: { audience: d.audience, subject: d.subject, body: d.body } } : { ok: false, error: d.error };
     }
     case "prepare_thank_you_to_donor": {
@@ -342,7 +344,7 @@ export function checkToolCall(name: string, input: unknown, donorData: boolean, 
       const search = searchOf(i.donor_name);
       if (search.length < 2) return { ok: false, error: "donor_name must be at least 2 letters." };
       // The words get the same checks as a group thank-you; who it is for is found on the server afterwards.
-      const d = checkDraft({ audience: "all", subject: i.subject, message: i.message });
+      const d = checkDraft({ audience: "all", subject: i.subject, message: i.message }, charityName);
       if (!d.ok) return { ok: false, error: d.error };
       // The audience is filled in by runPrepareForDonor once the donor is found: until then, nobody.
       return { ok: true, name, search, lastGift: lastGiftOf(i.last_gift), draft: { audience: "all", subject: d.subject, body: d.body } };

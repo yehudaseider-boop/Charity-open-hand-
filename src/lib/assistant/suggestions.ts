@@ -77,11 +77,29 @@ export function followUps(tools: string[], asked: string[], live: boolean, max =
 }
 
 /**
- * The markers the server puts at the very end of an answer: a prepared thank-you's button (24/11/2026, only when Givy
- * prepared one), then which lookups ran. Only read at the very end, after everything the model wrote, so a marker the
- * model writes itself is never taken for ours.
+ * The markers the server puts at the very end of every answer: a prepared thank-you's button (24/11/2026; empty,
+ * `[[thanks:]]`, when nothing was prepared), then which lookups ran. Only read at the very end, and the model's own
+ * words can never hold "[[" (markerGuard), so a marker the model writes itself is never taken for ours.
  */
-export const NEXT_MARK = /\n*(?:\[\[thanks:([a-z0-9:=_-]{1,80})\]\]\n)?\[\[next:([a-z_,]*)\]\]\s*$/;
+export const NEXT_MARK = /\n*\[\[thanks:([a-z0-9:=_-]{0,80})\]\]\n\[\[next:([a-z_,]*)\]\]\s*$/;
+
+/**
+ * For the model's words as they stream (review 24/11/2026): every "[[" loses its second "[", even when the two
+ * arrive in separate pieces, so nothing the model writes can ever look like one of our markers ([[thanks:...]],
+ * [[next:...]] or [[error]]). One guard per answer; the server's own markers never go through it.
+ */
+export function markerGuard(): (piece: string) => string {
+  let last = "";
+  return (piece) => {
+    let out = "";
+    for (const ch of piece) {
+      if (ch === "[" && last === "[") continue;
+      out += ch;
+      last = ch;
+    }
+    return out;
+  };
+}
 
 /** A half-arrived marker (or two), at the very end of an answer still streaming in. */
 const PARTIAL_MARK = /\n*\[(?:\[(?:t(?:h(?:a(?:n(?:k(?:s(?::[a-z0-9:=_-]*(?:\](?:\](?:\n(?:\[(?:\[(?:n(?:e(?:x(?:t(?::[a-z_,]*\]?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?|n(?:e(?:x(?:t(?::[a-z_,]*\]?)?)?)?)?)?)?$/;
@@ -92,7 +110,7 @@ const PARTIAL_MARK = /\n*\[(?:\[(?:t(?:h(?:a(?:n(?:k(?:s(?::[a-z0-9:=_-]*(?:\](?
  */
 export function splitNext(text: string): { text: string; tools: string[] | null; thanks: string | null } {
   const m = NEXT_MARK.exec(text);
-  if (m) return { text: text.slice(0, m.index), tools: m[2].split(",").filter((t) => t in AFTER), thanks: m[1] ?? null };
+  if (m) return { text: text.slice(0, m.index), tools: m[2].split(",").filter((t) => t in AFTER), thanks: m[1] || null };
   // While streaming, the markers can arrive in pieces: never show "[[ne..." or "[[thanks:..." to the reader.
   const partial = PARTIAL_MARK.exec(text);
   return { text: partial ? text.slice(0, partial.index) : text, tools: null, thanks: null };

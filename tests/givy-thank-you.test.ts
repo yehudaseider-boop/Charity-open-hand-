@@ -47,7 +47,7 @@ vi.mock("@/lib/charity/appeals", () => ({
   createAppeal: async () => void sent.count++,
 }));
 
-const { checkDraft, thanksHref, thanksMark, GIVY_AUDIENCE_KEYS } = await import("@/lib/assistant/thank-you-draft");
+const { checkDraft, thanksButtonHref, thanksHref, thanksMark, GIVY_AUDIENCE_KEYS } = await import("@/lib/assistant/thank-you-draft");
 const { parseAudience, audienceValue } = await import("@/lib/charity/appeals-rules");
 const { checkToolCall, runPrepare, runTool, toolDefinitions } = await import("@/lib/assistant/tools");
 const { splitNext } = await import("@/lib/assistant/suggestions");
@@ -82,6 +82,34 @@ describe("what Givy writes", () => {
     expect(checkDraft({ ...good, message: "Thank you. Visit www.example for more about us." })).toMatchObject({ ok: false });
     expect(checkDraft({ ...good, message: "Thank you <b>so</b> much for your gift." })).toMatchObject({ ok: false });
     expect(checkDraft({ ...good, message: "Dear friend, thank you for your gift this month." })).toMatchObject({ ok: false, error: expect.stringContaining("greeting") });
+  });
+  it("never has an @, a domain, a full-width !, other digits or numbers in words (review 24/11/2026)", () => {
+    const refused = (message: string, said: string) => expect(checkDraft({ ...good, message }), message).toMatchObject({ ok: false, error: expect.stringContaining(said) });
+    refused("Thank you. Write to thanks at us@kitchen for news.", "@");
+    for (const d of ["kitchen.net", "meals.africa", "help.ngo", "our.co.za"]) refused(`Thank you. Read more at ${d} this week.`, "web addresses");
+    refused("Thank you so much for your gift！", "exclamation");
+    refused("Your gift fed ٢٠ families this winter.", "number");
+    refused("Your gift fed ２０ families this winter.", "number");
+    for (const w of ["a hundred", "fifty", "a thousand", "a million", "Twenty", "thousands of", "dozens of"]) refused(`Your gift fed ${w} families this winter.`, "written as words");
+    // Everyday words stay allowed.
+    expect(checkDraft({ ...good, message: "You are one of the people who keep our kitchen open. No one is turned away." })).toMatchObject({ ok: true });
+  });
+  it("starts with no greeting and ends with no sign-off or name, since each email has both (review 24/11/2026)", () => {
+    for (const g of ["Good morning, thank you for your gift.", "Greetings to you all and thank you.", "Hi all, thank you for your gift.", "Hey, thank you for your gift."]) {
+      expect(checkDraft({ ...good, message: g }), g).toMatchObject({ ok: false, error: expect.stringContaining("greeting") });
+    }
+    const body = "Thank you for standing with us.\n\nYour gift keeps our kitchen running.";
+    for (const end of ["Kind regards", "Warm regards,", "Regards", "Sincerely,", "Thanks,", "With gratitude,", "Sarah", "- Sarah", "The Meals Fund team"]) {
+      expect(checkDraft({ ...good, message: `${body}\n\n${end}` }), end).toMatchObject({ ok: false, error: expect.stringContaining("sign-off") });
+    }
+    expect(checkDraft({ ...good, message: `${body}\nThanks again for being with us.` })).toMatchObject({ ok: true });
+  });
+  it("may use the charity's own name as it is spelt, digits or ! and all, and nothing more (review 24/11/2026)", () => {
+    expect(checkDraft({ ...good, message: "Everyone at Kitchen 54 thanks you for your gift." }, "Kitchen 54")).toMatchObject({ ok: true });
+    expect(checkDraft({ ...good, subject: "Yes! Trust says thank you" }, "Yes! Trust")).toMatchObject({ ok: true });
+    expect(checkDraft({ ...good, message: "Everyone at Kitchen 54 thanks you for your gift." })).toMatchObject({ ok: false });
+    expect(checkDraft({ ...good, message: "Kitchen 54 fed 20 families with your gift." }, "Kitchen 54")).toMatchObject({ ok: false, error: expect.stringContaining("number") });
+    expect(checkDraft({ ...good, message: `Thank you for standing with us.\nKitchen 54` }, "Kitchen 54")).toMatchObject({ ok: false, error: expect.stringContaining("sign-off") });
   });
   it("is the right length, and for one of our fixed audiences only", () => {
     expect(checkDraft({ ...good, message: "Thanks" })).toMatchObject({ ok: false });
@@ -128,6 +156,13 @@ describe("the panel's button", () => {
     expect(thanksHref("to=javascript:alert", BASE)).toBeNull();
     // Never on the demo.
     expect(thanksHref("to=monthly", "/demo/dashboard")).toBeNull();
+  });
+  it("shows only for someone the server says may prepare drafts (review 24/11/2026)", () => {
+    expect(thanksButtonHref(true, "to=monthly", BASE)).toBe(`${BASE}/email-donors?to=monthly`);
+    expect(thanksButtonHref(false, "to=monthly", BASE)).toBeNull();
+    expect(thanksButtonHref(true, undefined, BASE)).toBeNull();
+    // The server's empty slot is no button.
+    expect(thanksMark(null)).toBe("\n[[thanks:]]");
   });
 });
 

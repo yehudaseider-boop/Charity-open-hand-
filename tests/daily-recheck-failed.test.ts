@@ -22,16 +22,19 @@ vi.mock("@/lib/email/retry", () => ({
 }));
 
 let failedRows: { gateway_ref: string }[] = [];
+const deletes: string[] = [];
 const failedQueries: { limit?: number; failedSince?: string }[] = [];
 /** A query builder that answers every read with nothing, except the read of gifts closed as failed. */
 function builder(table: string) {
-  const state: { status?: string; limit?: number; failedSince?: string } = {};
+  const state: { status?: string; limit?: number; failedSince?: string; deleting?: boolean } = {};
   const empty = { data: [], count: 0, error: null };
   const q: Record<string, unknown> = {};
   q.select = () => q;
   q.eq = (c: string, v: unknown) => (c === "status" && (state.status = String(v)), q);
   q.gte = (c: string, v: string) => (c === "failed_at" && (state.failedSince = v), q);
   for (const m of ["neq", "lt", "lte", "in", "is", "not", "or", "order"]) q[m] = () => q;
+  q.delete = () => ((state.deleting = true), q);
+  q.lt = (c: string, v: string) => (state.deleting && deletes.push(`${table}|${c}<${v}`), q);
   q.limit = async (n: number) => {
     state.limit = n;
     if (table === "donations" && state.status === "failed") {
@@ -45,7 +48,7 @@ function builder(table: string) {
 }
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ from: builder }) }));
 
-const { runDailyChecks, RECHECK_FAILED_PER_RUN } = await import("@/lib/ops/daily");
+const { runDailyChecks, tidyExpiredDrafts, RECHECK_FAILED_PER_RUN } = await import("@/lib/ops/daily");
 const NOW = new Date("2026-11-23T04:00:00Z");
 const retries = { incomplete: false, confirmations: { resent: 0, failedAgain: 0 } };
 
@@ -83,5 +86,24 @@ describe("gifts closed as failed in the last 7 days", () => {
     const out = await runDailyChecks(NOW, Date.now() - 1, { retries });
     expect(confirmed).toEqual([]);
     expect(out.incomplete).toBe(true);
+  });
+});
+
+describe("Givy's expired drafts (review 24/11/2026)", () => {
+  it("are deleted by the daily checks, whoever kept them", async () => {
+    deletes.length = 0;
+    await runDailyChecks(NOW, Infinity, { retries });
+    expect(deletes).toEqual([`assistant_drafts|expires_at<${NOW.toISOString()}`]);
+  });
+
+  it("are skipped quietly before the table exists, and a failure never stops the checks", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fake = (result: unknown) => ({ from: () => ({ delete: () => ({ lt: async () => result }) }) }) as unknown as Parameters<typeof tidyExpiredDrafts>[0];
+    await tidyExpiredDrafts(fake({ error: { code: "PGRST205", message: "no table" } }), NOW);
+    expect(errors).not.toHaveBeenCalled();
+    await tidyExpiredDrafts(fake({ error: { code: "XX000", message: "boom" } }), NOW);
+    await tidyExpiredDrafts({ from: () => { throw new Error("down"); } } as unknown as Parameters<typeof tidyExpiredDrafts>[0], NOW);
+    expect(errors).toHaveBeenCalledTimes(2);
+    errors.mockRestore();
   });
 });

@@ -61,6 +61,13 @@ export async function loadDraft(id: string, charityId: string, userId: string, n
   return { audience: data.audience, subject: data.subject as string, body: data.body as string };
 }
 
+/** Removes a draft once it has been sent: only this person's, on this charity. Never fails the send it follows. */
+export async function deleteDraft(id: string, charityId: string, userId: string): Promise<void> {
+  if (!UUID.test(id)) return;
+  const { error } = await createAdminClient().from("assistant_drafts").delete().eq("id", id).eq("charity_id", charityId).eq("user_id", userId);
+  if (error && !isMissingTable(error)) console.error("[assistant] sent draft not removed", error.message);
+}
+
 /**
  * Givy's "prepare a thank-you" for a real charity: checks the person may email donors and the page is live, works out
  * on the server how many donors the audience reaches now, and keeps the draft. Sends nothing.
@@ -69,8 +76,9 @@ export async function loadDraft(id: string, charityId: string, userId: string, n
  * "who's in it?". A donor who gave anonymously is listed as "Anonymous donor", never by name; erased donors are never
  * in an audience. With it off, only the count comes back, as before.
  */
-export function livePreparer(args: { charityId: string; userId: string; role: Role; status: () => Promise<string | null>; withNames?: boolean }): ThankYouPreparer {
+export function livePreparer(args: { charityId: string; userId: string; role: Role; status: () => Promise<string | null>; name?: () => Promise<string | null>; withNames?: boolean }): ThankYouPreparer {
   return {
+    ...(args.name ? { charityName: args.name } : {}),
     async prepare(d) {
       if (!can(args.role, "message")) return { refused: refusedFor("message") };
       if ((await args.status()) !== "approved") return { refused: "The charity can email donors once its page is live, so nothing was prepared." };
