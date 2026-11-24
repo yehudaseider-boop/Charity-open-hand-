@@ -153,6 +153,7 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
             initialSubject={startSubject}
             initialBody={startBody}
             fromGivy={Boolean(givy)}
+            draftId={givy && typeof sp.draft === "string" ? sp.draft : undefined}
           />
         </Card>
       )}

@@ -7,7 +7,7 @@ import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore }
 import { createPortal } from "react-dom";
 import { parseAnswer, type Block, type Inline } from "@/lib/assistant/answer";
 import { followUps, splitNext, startingSuggestions } from "@/lib/assistant/suggestions";
-import { thanksHref } from "@/lib/assistant/thank-you-draft";
+import { thanksButtonHref } from "@/lib/assistant/thank-you-draft";
 import { blueAction } from "@/components/dash";
 
 /**
@@ -331,13 +331,14 @@ export function HelpAssistant({
                         Looking that up
                       </p>
                     )}
-                    {/* A thank-you Givy prepared: our own button (from the server's marker), to the Email donors page. */}
-                    {!t.failed && t.thanks && thanksHref(t.thanks, base) ? (
+                    {/* A thank-you Givy prepared: our own button (from the server's marker), to the Email donors page,
+                        only for someone the server says may prepare one. */}
+                    {!t.failed && thanksButtonHref(drafts, t.thanks, base) ? (
                       <div className="mt-3 space-y-2 rounded-[1rem] border-2 border-border bg-honey-soft/70 p-3">
                         <p className="text-[13px] leading-snug text-navy">
                           <strong className="font-semibold">Nothing has been sent.</strong> Check who it goes to and the words, then send it yourself.
                         </p>
-                        <Link href={thanksHref(t.thanks, base)!} onClick={onLink} className={`${blueAction} w-full justify-center text-[15px]`}>
+                        <Link href={thanksButtonHref(drafts, t.thanks, base)!} onClick={onLink} className={`${blueAction} w-full justify-center text-[15px]`}>
                           Check and send
                         </Link>
                       </div>

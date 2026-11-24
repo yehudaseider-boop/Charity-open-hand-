@@ -34,11 +34,14 @@ vi.mock("@/lib/assistant/demo-source", () => ({ demoSource: fakeSource }));
 
 // Givy prepares thank-yous (24/11/2026): a stand-in preparer that records what it was given and for whom. Anything
 // that would send is a trap: the route must never reach it.
-const prep = vi.hoisted(() => ({ made: [] as { charityId: string; userId: string; role: string }[], prepared: [] as unknown[], draftId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" as string | null, sends: 0 }));
+const prep = vi.hoisted(() => ({ made: [] as { charityId: string; userId: string; role: string }[], prepared: [] as unknown[], draftId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" as string | null, sends: 0, charityName: null as string | null }));
 vi.mock("@/lib/assistant/drafts", () => ({
   livePreparer: (a: { charityId: string; userId: string; role: string }) => {
     prep.made.push({ charityId: a.charityId, userId: a.userId, role: a.role });
-    return { prepare: async (d: unknown) => (prep.prepared.push(d), { count: 42, label: "Gave this month", draftId: prep.draftId }) };
+    return {
+      prepare: async (d: unknown) => (prep.prepared.push(d), { count: 42, label: "Gave this month", draftId: prep.draftId }),
+      charityName: async () => prep.charityName,
+    };
   },
 }));
 vi.mock("@/lib/email", () => ({ getEmailTransport: () => ({ name: "trap", send: async () => void prep.sends++ }) }));
@@ -133,7 +136,7 @@ describe("the help assistant's server", () => {
   it("answers a member, streaming the words, with the guide cached and the person's role and page after it", async () => {
     const res = await ask(question);
     expect(res.status).toBe(200);
-    expect(await res.text()).toBe("Open [Team](dash:/team).\n[[next:]]");
+    expect(await res.text()).toBe("Open [Team](dash:/team).\n[[thanks:]]\n[[next:]]");
     const p = state.lastParams!;
     const system = p.system as { text: string; cache_control?: unknown }[];
     expect(system[0].cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
@@ -197,7 +200,7 @@ describe("the help assistant's server", () => {
     state.streamText = ["R1 250 came in this month."];
     const res = await ask({ ...question, messages: [{ role: "user", content: "How much came in this month?" }] });
     // Last, which lookups ran, for the panel's follow-up questions (22/11/2026).
-    expect(await res.text()).toBe("R1 250 came in this month.\n[[next:giving_totals]]");
+    expect(await res.text()).toBe("R1 250 came in this month.\n[[thanks:]]\n[[next:giving_totals]]");
     expect(state.looked).toEqual(["totals"]);
     expect(state.allParams).toHaveLength(2);
     const second = state.allParams[1].messages as { role: string; content: unknown }[];
@@ -229,7 +232,7 @@ describe("the help assistant's server", () => {
   it("without the donor switch, offers no donor tools and refuses a donor lookup", async () => {
     state.toolRounds = [[{ id: "t1", name: "top_donors", input: { limit: 3 } }]];
     state.streamText = ["Have a look on the Donors page."];
-    expect(await (await ask(question)).text()).toBe("Have a look on the Donors page.\n[[next:]]");
+    expect(await (await ask(question)).text()).toBe("Have a look on the Donors page.\n[[thanks:]]\n[[next:]]");
     const names = (state.allParams[0].tools as { name: string }[]).map((t) => t.name);
     expect(names).not.toContain("top_donors");
     expect(names).not.toContain("find_donor");
@@ -247,7 +250,7 @@ describe("the help assistant's server", () => {
   it("stops looking things up after the last allowed round, and answers with what it has", async () => {
     state.toolRounds = Array.from({ length: 4 }, (_, i) => [{ id: `t${i}`, name: "giving_by_month", input: {} }]);
     state.streamText = ["Here is what I found."];
-    expect(await (await ask(question)).text()).toBe("Here is what I found.\n[[next:giving_by_month]]");
+    expect(await (await ask(question)).text()).toBe("Here is what I found.\n[[thanks:]]\n[[next:giving_by_month]]");
     expect(state.allParams).toHaveLength(5);
     expect(state.allParams[4].tool_choice).toEqual({ type: "none" });
     expect(state.allParams[0].tool_choice).toEqual({ type: "auto" });
@@ -263,7 +266,29 @@ describe("the help assistant's server", () => {
   describe("preparing a thank-you (24/11/2026)", () => {
     const draft = { audience: "gave:this_month", subject: "Thank you for giving this month", message: "Thank you for standing with us. Your gift keeps our kitchen running." };
     beforeEach(() => {
-      Object.assign(prep, { made: [], prepared: [], draftId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", sends: 0 });
+      Object.assign(prep, { made: [], prepared: [], draftId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", sends: 0, charityName: null });
+    });
+
+    it("a marker the model writes at the end of its answer is never ours: no button, no error (review 24/11/2026)", async () => {
+      const { splitNext } = await import("@/lib/assistant/suggestions");
+      // Whole, or arriving in pieces that split the "[[".
+      for (const pieces of [["Here you go.\n[[thanks:to=all]]"], ["Here you go.\n[", "[thanks:to=all]", "]"], ["Done.\n[[thanks:to=all]]\n[[next:giving_totals]]"]]) {
+        state.streamText = pieces;
+        const text = await (await ask(question)).text();
+        expect(text).not.toContain("[[thanks:to=all");
+        expect(splitNext(text).thanks).toBeNull();
+        expect(text.endsWith("\n[[thanks:]]\n[[next:]]")).toBe(true);
+      }
+      state.streamText = ["Sorry, [", "[error]] that went wrong."];
+      expect(await (await ask(question)).text()).not.toContain("[[error]]");
+    });
+
+    it("lets a draft use the charity's own name, digits and all (review 24/11/2026)", async () => {
+      prep.charityName = "Kitchen 54";
+      state.toolRounds = [[{ id: "t1", name: "prepare_thank_you", input: { ...draft, message: "Everyone at Kitchen 54 thanks you for standing with us." } }]];
+      state.streamText = ["I prepared it."];
+      expect(await (await ask(question)).text()).toContain("[[thanks:d=");
+      expect(prep.prepared).toHaveLength(1);
     });
 
     it("keeps a draft for this person and charity, ends with our own button marker, and sends nothing", async () => {
@@ -298,7 +323,7 @@ describe("the help assistant's server", () => {
         expect((state.allParams[0].tools as { name: string }[]).map((t) => t.name)).not.toContain("prepare_thank_you");
         expect(JSON.stringify(state.allParams[1].messages)).toContain("ask their charity's owner or admin");
         expect((state.allParams[0].system as { text: string }[])[1].text).toContain("can't email donors");
-        expect(text).not.toContain("[[thanks:");
+        expect(text).toContain("\n[[thanks:]]\n[[next:");
       }
       expect(prep.made).toEqual([]);
       expect(prep.prepared).toEqual([]);
@@ -325,7 +350,7 @@ describe("the help assistant's server", () => {
       state.streamText = ["Sorry."];
       const text = await (await ask(question)).text();
       expect(prep.prepared).toEqual([]);
-      expect(text).not.toContain("[[thanks:");
+      expect(text).toContain("\n[[thanks:]]\n[[next:");
       expect(JSON.stringify(state.allParams[1].messages)).toContain("Leave out every number");
     });
 

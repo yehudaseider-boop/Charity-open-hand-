@@ -5,7 +5,7 @@ import { demoSource } from "@/lib/assistant/demo-source";
 import { liveSource } from "@/lib/assistant/live-source";
 import { askerContext, stableInstructions } from "@/lib/assistant/prompt";
 import { checkQuestion, pagePath, type AssistantRequest } from "@/lib/assistant/request";
-import { nextMark } from "@/lib/assistant/suggestions";
+import { markerGuard, nextMark } from "@/lib/assistant/suggestions";
 import { ONE_CONTACT_PER_ANSWER, checkToolCall, runPrepare, runTool, toolDefinitions, type HelperSource, type ThankYouPreparer } from "@/lib/assistant/tools";
 import { livePreparer } from "@/lib/assistant/drafts";
 import { thanksMark, type DraftAudience } from "@/lib/assistant/thank-you-draft";
@@ -86,9 +86,22 @@ export async function POST(req: Request) {
     ];
     source = liveSource(charityId!);
     if (can(role, "message")) {
-      const status = async () =>
-        ((await createAdminClient().from("charities").select("status").eq("id", charityId!).maybeSingle()).data?.status as string | undefined) ?? null;
-      preparer = livePreparer({ charityId: charityId!, userId: viewer.userId, role, status, withNames: assistantDonorDataOn() });
+      // Read once, and only when a thank-you is being prepared: whether the page is live, and the charity's own name
+      // (which a draft may use as it is spelt, digits or "!" and all).
+      let row: Promise<{ status: string | null; name: string | null }> | null = null;
+      const charity = () =>
+        (row ??= (async () => {
+          const d = (await createAdminClient().from("charities").select("status, name_en").eq("id", charityId!).maybeSingle()).data;
+          return { status: (d?.status as string | undefined) ?? null, name: (d?.name_en as string | undefined) ?? null };
+        })());
+      preparer = livePreparer({
+        charityId: charityId!,
+        userId: viewer.userId,
+        role,
+        withNames: assistantDonorDataOn(),
+        status: async () => (await charity()).status,
+        name: async () => (await charity()).name,
+      });
     }
   }
 
@@ -133,6 +146,9 @@ export async function POST(req: Request) {
       const send = (text: string) => {
         if (!stopped) controller.enqueue(encoder.encode(text));
       };
+      // The model's words never hold "[[", so they can never pass for one of our markers (review 24/11/2026).
+      const guard = markerGuard();
+      const sendWords = (text: string) => send(guard(text));
       // Text written this round, and in the whole answer.
       let sent = false;
       let anySent = false;
@@ -164,7 +180,7 @@ export async function POST(req: Request) {
             if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
               sent = true;
               anySent = true;
-              send(event.delta.text);
+              sendWords(event.delta.text);
             }
           }
           const final = await stream.finalMessage().finally(() => clearTimeout(timer));
@@ -188,7 +204,9 @@ export async function POST(req: Request) {
                 results.push({ type: "tool_result", tool_use_id: block.id, content: "Too many lookups at once. Answer with what you have, or look up fewer things.", is_error: true });
                 continue;
               }
-              const call = checkToolCall(block.name, block.input, donorData, canDraft, canContact);
+              const drafting = block.name === "prepare_thank_you" || block.name === "prepare_thank_you_to_donor";
+              const charityName = drafting && preparer?.charityName ? await preparer.charityName().catch(() => null) : null;
+              const call = checkToolCall(block.name, block.input, donorData, canDraft, canContact, charityName);
               if (!call.ok) {
                 results.push({ type: "tool_result", tool_use_id: block.id, content: call.error, is_error: true });
                 continue;
@@ -229,7 +247,7 @@ export async function POST(req: Request) {
             }
             convo.push({ role: "user", content: results });
             // A blank line, so words from before and after a lookup don't run together.
-            if (sent) send("\n\n");
+            if (sent) sendWords("\n\n");
             sent = false;
             continue;
           }
@@ -244,9 +262,9 @@ export async function POST(req: Request) {
         // Never an empty answer shown as finished.
         if (!anySent && !stopped) send("I couldn't put an answer together just now. Please try again, or contact the Givezy team.");
         // Last of all, after the answer: which lookups ran (names only, from our own list). The panel hides it.
-        // A prepared thank-you's button: our own marker (a draft id or one of our fixed audiences), just before the last.
-        if (!stopped && prepared) send(thanksMark(prepared));
-        if (!stopped) send(nextMark(used));
+        // Just before it, the thank-you slot, always there and always ours: a prepared thank-you's draft id or one of our
+        // fixed audiences, or empty when nothing was prepared (review 24/11/2026).
+        if (!stopped) send(thanksMark(prepared) + nextMark(used));
         console.info(`[assistant] lookups: ${lookups}`);
       } catch (e) {
         if (!stopped) {

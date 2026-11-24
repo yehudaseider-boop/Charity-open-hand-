@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { deleteDraft, loadDraft } from "@/lib/assistant/drafts";
 import { requireViewer } from "@/lib/auth";
 import { createAppeal, pickAudience, recentSameAppeal, sendAppeal } from "@/lib/charity/appeals";
 import { appealEmail, checkAppeal, parseAudience } from "@/lib/charity/appeals-rules";
@@ -34,8 +35,7 @@ async function ready(charityId: string, formData: FormData) {
   if (!checked.ok || !audience) {
     return { refused: "Some details need fixing. Nothing was sent.", fieldErrors: { ...(checked.ok ? {} : checked.fieldErrors), ...(audience ? {} : { audience: "Choose who it goes to" }) } } as const;
   }
-  // A thank-you prepared with Givy may also show in donors' Givezy app (24/11/2026); the person can untick it.
-  return { charity, priv, subject: checked.subject, body: checked.body, audience, audienceValue: String(formData.get("audience")), inApp: formData.get("in_app") === "yes" } as const;
+  return { charity, priv, subject: checked.subject, body: checked.body, audience, audienceValue: String(formData.get("audience")) } as const;
 }
 
 /** Step 1: who it would go to. Sends nothing. */
@@ -82,8 +82,17 @@ export async function sendAppealNow(charityId: string, _prev: FormState, formDat
   const pick = await pickAudience(charityId, r.audience);
   if (!pick) return { ok: false, message: "That list, tag or campaign isn't there any more. Nothing was sent. Choose again." };
   if (!pick.donors.length) return { ok: false, message: "Nobody to send it to: everyone in this group asked not to get emails or already had a message from you this week, or there's nobody in it yet. Nothing was sent." };
-  const appealId = await createAppeal({ charityId, userId: viewer.userId, subject: r.subject, body: r.body, audience: r.audience, pick, inApp: r.inApp });
+  // Only a thank-you prepared with Givy may also show in donors' Givezy app (24/11/2026; Yehuda's default, review
+  // 24/11/2026): "in_app" counts only with a draft id that is this person's, on this charity, and not expired.
+  // Otherwise it is ignored, so an ordinary email can never be put in the app by changing the form.
+  const draftId = String(formData.get("draft") ?? "");
+  const givyDraft = draftId ? await loadDraft(draftId, charityId, viewer.userId).catch(() => null) : null;
+  const fromGivy = givyDraft !== null && givyDraft !== "gone";
+  const inApp = fromGivy && formData.get("in_app") === "yes";
+  const appealId = await createAppeal({ charityId, userId: viewer.userId, subject: r.subject, body: r.body, audience: r.audience, pick, inApp });
   const p = await sendAppeal({ charityId, appealId, charityName: r.charity.name_en, replyTo: r.priv?.contact_email ?? null, userId: viewer.userId });
+  // Sent: Givy's draft has done its job, so it isn't kept any longer.
+  if (fromGivy) await deleteDraft(draftId, charityId, viewer.userId).catch(() => undefined);
   revalidatePath(`/charity-admin/${charityId}/email-donors`);
   // Whether the rest really go out by themselves (the daily job's own rules), so the panel never promises it when they don't.
   const byItself = p?.waiting ? (await carryOnStateOf({ kind: "appeal", charityId, appealId }, { pageLive: true }).catch(() => null)) === "goes" : false;

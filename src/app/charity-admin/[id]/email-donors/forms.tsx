@@ -23,6 +23,7 @@ export function AppealForm({
   initialSubject = "",
   initialBody = "",
   fromGivy = false,
+  draftId,
 }: {
   check: (s: AppealCheck, f: FormData) => Promise<AppealCheck>;
   test: (s: FormState, f: FormData) => Promise<FormState>;
@@ -33,6 +34,8 @@ export function AppealForm({
   initialBody?: string;
   /** A thank-you Givy prepared (24/11/2026): offered in donors' Givezy app too, ticked to start with. */
   fromGivy?: boolean;
+  /** That draft's id: the server shows it in the app only with this, and removes the draft once it is sent. */
+  draftId?: string;
 }) {
   const [inApp, setInApp] = useState(fromGivy);
   const [subject, setSubject] = useState(initialSubject);
@@ -55,6 +58,7 @@ export function AppealForm({
     f.set("subject", subject);
     f.set("body", body);
     f.set("audience", audience);
+    if (fromGivy && draftId) f.set("draft", draftId);
     if (fromGivy && inApp) f.set("in_app", "yes");
   };
   const errors = preview.state === "refused" ? preview.fieldErrors ?? {} : {};
