@@ -281,7 +281,6 @@ for (const [name, list] of Object.entries(samples)) {
   if (checks.some((c) => c.state === "fail")) anyFail = true;
   result.scenarios[name] = { ...s, checks };
 }
-const noThresholds = thresholds.maxErrorPct === undefined && thresholds.maxP95Ms === undefined;
 // An unset limit is never a pass, in the saved file as on screen (review 24/11/2026).
 result.verdict = verdictOf({ halted, anyFail, dropped, thresholds });
 
