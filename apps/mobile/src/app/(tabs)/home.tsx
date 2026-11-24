@@ -280,13 +280,7 @@ export default function Home() {
 
         {raising.length ? <RaisingNowRow items={raising} /> : null}
 
-        {news.length ? (
-          <View style={[styles.gutter, { gap: 12 }]}>
-            <Text variant="h2" accessibilityRole="header">News from your charities</Text>
-            {news.map((n) => <NewsCard key={n.id} item={n} />)}
-          </View>
-        ) : null}
-
+        {/* Your causes first, then their news (24/11/2026, Yehuda: "before news on the app it should be who are my causes"). */}
         <View style={{ gap: 12 }}>
           <View style={[styles.gutter, styles.sectionHead]}>
             <Text variant="h2" accessibilityRole="header">Your causes</Text>
@@ -314,6 +308,13 @@ export default function Home() {
             <View style={styles.gutter}><SkeletonBlock height={260} /></View>
           )}
         </View>
+
+        {news.length ? (
+          <View style={[styles.gutter, { gap: 12 }]}>
+            <Text variant="h2" accessibilityRole="header">News from your charities</Text>
+            {news.map((n) => <NewsCard key={n.id} item={n} />)}
+          </View>
+        ) : null}
 
         {/* The website's blue colour-block card, with a ring and a dot bleeding off its edges. */}
         <View style={styles.gutter}>
