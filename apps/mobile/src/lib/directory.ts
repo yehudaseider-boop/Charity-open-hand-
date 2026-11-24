@@ -4,7 +4,9 @@ import { causes as sampleCauses, charities as sampleCharities, findCharity, type
 import { CHARITY_COLUMNS, markFeatured, raisingNow, weekStartJhb, toCampaigns, toCauses, toCharity, toPhotos, toUpdates, type CampaignRow, type CategoryRow, type CharityRow, type RaisingNow, type PhotoRow, type ProgressRow, type UpdateRow } from "./live-charities";
 import { supabase } from "./supabase";
 import { secureStorage } from "./secure-storage";
-import { newsKey, optOutIds } from "./charity-news";
+import { newsKey } from "./charity-news";
+import { requestNewsOptOuts } from "./pay-api";
+import { SITE_URL } from "./website";
 import { toFocus, toVideo, VIDEO_COLUMNS, type VideoRow } from "./charity-extras";
 import { FOCUS_COLUMNS, type FocusRow } from "@shared/charity/focus";
 import { UPDATE_VIDEO_COLUMNS, withUpdateVideos } from "@shared/charity/video";
@@ -252,10 +254,14 @@ export function useCharity(slug: string | undefined) {
  */
 async function loadNews(slugs: string[]): Promise<Map<string, CharityUpdate[]>> {
   const db = supabase!;
-  const [charities, optOuts] = await Promise.all([db.from("charities").select("id, slug").in("slug", slugs).eq("status", "approved"), db.rpc("my_news_opt_outs")]);
+  // Asked of our server (24/11/2026): opt-outs are kept as keyed fingerprints the database can't work out.
+  const saidNoNow = async () => {
+    const token = (await db.auth.getSession()).data.session?.access_token;
+    return SITE_URL && token ? requestNewsOptOuts(SITE_URL, token).catch(() => null) : null;
+  };
+  const [charities, saidNo] = await Promise.all([db.from("charities").select("id, slug").in("slug", slugs).eq("status", "approved"), saidNoNow().catch(() => null)]);
   if (charities.error) throw charities.error;
   const out = new Map<string, CharityUpdate[]>();
-  const saidNo = optOuts.error ? null : optOutIds(optOuts.data);
   if (!saidNo) return out;
   const slugById = new Map(((charities.data ?? []) as { id: string; slug: string }[]).filter((r) => !saidNo.has(r.id)).map((r) => [r.id, r.slug]));
   if (!slugById.size) return out;

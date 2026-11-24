@@ -3,18 +3,12 @@
  * Givezy sends them, so the charity never handles donors' addresses. Pure helpers (tested).
  */
 import { cleanDedicationName } from "@/lib/donations/dedication";
-import { createHash } from "node:crypto";
 import type { EmailMessage } from "@/lib/email";
 import { oneClickStopHeaders } from "@/lib/email/headers";
 import { saDate } from "./dashboard";
 
 export const THANK_YOU_MAX = 1000;
 export const THANK_YOU_MIN = 10;
-
-/** sha256 of the address in lower case: how opt-outs are kept without storing the address. */
-export function emailHash(email: string): string {
-  return createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
-}
 
 /** "2026-10-01" -> "October 2026". */
 export function monthLabel(month: string): string {

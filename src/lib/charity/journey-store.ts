@@ -37,7 +37,8 @@ import {
 } from "./journey";
 import { findJourney, journeySteps, journeysV2, rowOf, type JourneyRow, type JourneyState } from "./journey-write";
 import { contacts, optedOutHashes } from "./s18a-reminder-send";
-import { emailHash, weekStart } from "./thank-you";
+import { weekStart } from "./thank-you";
+import { emailHash, storedEmailHash } from "@/lib/email-fingerprint";
 import { messagedThisWeek } from "./weekly-limit";
 import { readPages } from "./paged";
 import { nothingLeft } from "@/lib/donations/what-is-left";
@@ -233,8 +234,7 @@ async function enrolledDonors(charityId: string, j: Pick<Journey, "id">, donorId
 export async function planExistingDonors(charityId: string, journey: Pick<Journey, "id" | "switchedOnAt">) {
   const ids = await allDonorIds(charityId, journey.switchedOnAt ?? undefined);
   const [who, already] = await Promise.all([contacts(charityId, ids), enrolledDonors(charityId, journey)]);
-  const hashes = [...who.byDonor.values()].map((c) => emailHash(c.email));
-  const stopped = await optedOutHashes(charityId, hashes);
+  const stopped = await optedOutHashes(charityId, [...who.byDonor.values()].map((c) => c.email));
   return planExisting(
     ids.map((id) => {
       const c = who.byDonor.get(id) ?? null;
@@ -276,8 +276,7 @@ export async function planWinbackDonors(charityId: string, donorIds: string[]) {
   const who = await contacts(charityId, donorIds);
   const mine = donorIds.filter((id) => who.found.has(id));
   const already = await enrolledDonors(charityId, journey, mine);
-  const hashes = [...who.byDonor.values()].map((c) => emailHash(c.email));
-  const stopped = await optedOutHashes(charityId, hashes);
+  const stopped = await optedOutHashes(charityId, [...who.byDonor.values()].map((c) => c.email));
   return {
     journey,
     plan: planWinback(
@@ -577,9 +576,9 @@ async function sendDue(js: Live[], list: DueRow[], transport: ReturnType<typeof 
   const replyTo = (priv.data?.contact_email as string | null) ?? null;
   const withEmail = donorIds.flatMap((id) => {
     const c = who.byDonor.get(id);
-    return c ? [{ donorId: id, hash: emailHash(c.email) }] : [];
+    return c ? [{ donorId: id, email: c.email }] : [];
   });
-  const [stopped, recent] = await Promise.all([optedOutHashes(charityId, withEmail.map((d) => d.hash)), messagedThisWeek(charityId, withEmail, now)]);
+  const [stopped, recent] = await Promise.all([optedOutHashes(charityId, withEmail.map((d) => d.email)), messagedThisWeek(charityId, withEmail, now)]);
   // A win-back donor who gave again since the morning's sweep read the list: they leave it here, never emailed.
   const winbackIds = new Set(js.filter((x) => x.kind === "winback" && x.id).map((x) => x.id!));
   const gaveAgainNow = await gaveAgainRows(charityId, list.filter((r) => r.journey_id && winbackIds.has(r.journey_id)));
@@ -670,7 +669,7 @@ async function sendDue(js: Live[], list: DueRow[], transport: ReturnType<typeof 
     }
     const release = () => db().from("charity_donor_thanks").delete().eq("id", claim.data.id);
     const token = randomBytes(32).toString("base64url");
-    const saved = await db().from("charity_email_stop_tokens").insert({ token_hash: sha(token), charity_id: charityId, email_hash: emailHash(contact!.email) });
+    const saved = await db().from("charity_email_stop_tokens").insert({ token_hash: sha(token), charity_id: charityId, ...storedEmailHash(contact!.email) });
     if (saved.error) {
       await release();
       await notSent();

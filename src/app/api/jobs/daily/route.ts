@@ -7,6 +7,7 @@ import { collectMonthlyWithin, dailyDigest, payoutsAlertLines, runDailyChecks, r
 import { runJourneys } from "@/lib/charity/journey-store";
 import { runCarryOnSends, type CarryOnSummary } from "@/lib/charity/carry-on-sends";
 import { withGatewayTimeout } from "@/lib/gateway/timeout";
+import { convertEmailFingerprints, type ConvertSummary } from "@/lib/email-fingerprint-convert";
 
 /** Each call to the payment provider inside this job waits at most this long, so one slow call can't push the job past its minute. */
 export const DAILY_GATEWAY_TIMEOUT_MS = 10_000;
@@ -19,6 +20,10 @@ export const DAILY_GATEWAY_TIMEOUT_MS = 10_000;
 export const CARRY_ON_START_BY_MS = 40_000;
 export const CARRY_ON_MAX_MS = 12_000;
 export const CARRY_ON_END_BY_MS = 44_000;
+
+/** Keying email fingerprints left at the plain hash (24/11/2026): started only in the first 36 seconds, for at most 3. */
+export const FINGERPRINTS_START_BY_MS = 36_000;
+export const FINGERPRINTS_MAX_MS = 3_000;
 
 /**
  * Everything that runs once a day, in order: collect the monthly donations that are due, the safety net (pending
@@ -82,6 +87,17 @@ async function run(request: NextRequest) {
   // already gone out). Before anything slower (21/11/2026), so carrying on charities' emails, the payouts or the
   // journeys can never use up its time.
   if (monthly !== null) await pingHeartbeat().catch(() => undefined);
+  // Email fingerprints still at the plain hash become keyed (24/11/2026), in a small time budget: started only in the
+  // first FINGERPRINTS_START_BY_MS, for at most FINGERPRINTS_MAX_MS, so charities' emails keep their time. What isn't
+  // reached is done tomorrow; once nothing is left it is a few quick reads. Counts only in the log, never a fingerprint.
+  const fingerprints: ConvertSummary | null | undefined = Date.now() < started + FINGERPRINTS_START_BY_MS
+    ? await convertEmailFingerprints(Math.min(Date.now() + FINGERPRINTS_MAX_MS, started + FINGERPRINTS_START_BY_MS + FINGERPRINTS_MAX_MS)).catch((e) => {
+        console.error("[daily] converting email fingerprints failed", e instanceof Error ? e.message : e);
+        return null;
+      })
+    : undefined;
+  const fingerprintsLeft = fingerprints ? Object.values(fingerprints.left).reduce((a, b) => a + b, 0) : null;
+  if (fingerprints && (fingerprints.converted || fingerprintsLeft)) console.log("[daily] email fingerprints", { converted: fingerprints.converted, left: fingerprintsLeft, cutOff: fingerprints.cutOff });
   // Charities' unfinished emails to donors carry on by themselves, after the day's email and the check-in (review
   // 21/11/2026: before them, a slow email service could hold both up). The same send functions as "Send the rest":
   // nobody is emailed twice and the one-a-week rule holds. No new email starts after 44 seconds and each has an
@@ -133,6 +149,8 @@ async function run(request: NextRequest) {
       // Counts only. Undefined: no time left to start it today (it carries on tomorrow).
       sends: sends === undefined ? { notStarted: true } : sends,
       journeys,
+      // Counts only: rows keyed this run and still left at the plain hash (null: it failed; undefined: no time today).
+      fingerprints: fingerprints === undefined ? { notStarted: true } : fingerprints && { converted: fingerprints.converted, left: fingerprintsLeft, cutOff: fingerprints.cutOff },
       attention: lines.length,
     },
     { headers: { "Cache-Control": "no-store" } },

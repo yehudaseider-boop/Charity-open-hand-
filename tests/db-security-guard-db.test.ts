@@ -36,7 +36,6 @@ const SIGNED_IN_MAY_RUN = [
   "document_is_bank_letter",
   "link_my_donations",
   "my_donor_ids",
-  "my_news_opt_outs",
   "set_my_recurring_status",
 ];
 

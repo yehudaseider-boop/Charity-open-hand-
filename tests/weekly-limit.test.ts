@@ -4,7 +4,7 @@
  * one goes. Against an in-memory database.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { emailHash } from "@/lib/charity/thank-you";
+import { emailHash } from "@/lib/email-fingerprint";
 
 vi.mock("server-only", () => ({}));
 const sent: { to: string }[] = [];
@@ -54,7 +54,7 @@ const { pickAudience, sendAppeal } = await import("@/lib/charity/appeals");
 const NOW = new Date("2026-11-10T10:00:00+02:00");
 const THIS_WEEK = "2026-11-09T09:00:00+02:00";
 const LAST_WEEK = "2026-11-08T23:00:00+02:00";
-const pairs = (ids: string[]) => ids.map((id) => ({ donorId: id, hash: emailHash(`${id}@x.co`) }));
+const pairs = (ids: string[]) => ids.map((id) => ({ donorId: id, email: `${id}@x.co` }));
 
 beforeEach(() => {
   sent.length = 0;
@@ -116,7 +116,7 @@ describe("one inbox, two donor records (20/11/2026)", () => {
     tables.charity_donor_thanks = [{ charity_id: "c1", donor_id: "sarah-co", week_start: "2026-11-09" }];
     expect([...(await messagedThisWeek("c1", pairs(["sarah", "david"]), NOW))]).toEqual(["sarah"]);
     // Asked about both records at once: both are counted, by their own ids.
-    expect([...(await messagedThisWeek("c1", [...pairs(["sarah"]), { donorId: "sarah-co", hash: emailHash("sarah@x.co") }], NOW))].sort()).toEqual(["sarah", "sarah-co"]);
+    expect([...(await messagedThisWeek("c1", [...pairs(["sarah"]), { donorId: "sarah-co", email: "sarah@x.co" }], NOW))].sort()).toEqual(["sarah", "sarah-co"]);
   });
 
   it("a news email or appeal to the other record counts, this week and this charity only", async () => {

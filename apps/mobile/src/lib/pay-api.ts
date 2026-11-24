@@ -281,6 +281,17 @@ export async function requestS18aWaiting(site: string, token: string, post: Post
 }
 
 /**
+ * The charities the signed-in donor asked for "No news or appeals from this charity", from our server (24/11/2026:
+ * opt-outs are kept as keyed fingerprints, which only the server can work out). null when there is no usable answer
+ * (offline, an error): Home then shows no news at all, never news they said no to.
+ */
+export async function requestNewsOptOuts(site: string, token: string, post: Post = fetchPost): Promise<Set<string> | null> {
+  const r = await call<{ ok: boolean; charityIds?: unknown }>(post, api(site, "news-opt-outs"), {}, token);
+  if (!r.ok || !Array.isArray(r.charityIds) || !r.charityIds.every((id) => typeof id === "string")) return null;
+  return new Set(r.charityIds as string[]);
+}
+
+/**
  * "expired" (23/11/2026): the gift's check link is past its 30 days (the website's rule), so our server won't say
  * anything more about it. Only the phone that holds the link hears that; anyone else still gets "not found".
  */

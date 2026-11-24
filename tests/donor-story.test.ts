@@ -180,7 +180,7 @@ function from(table: string) {
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ from }) }));
 
 const { loadDonorStory } = await import("@/lib/charity/donor-story-store");
-const { emailHash } = await import("@/lib/charity/thank-you");
+const { emailHashesToMatch } = await import("@/lib/email-fingerprint");
 
 beforeEach(() => {
   calls.length = 0;
@@ -215,7 +215,8 @@ describe("loading a donor's story", () => {
     expect(calls.find((x) => x.table === "charity_thank_yous")!.filters).toEqual([["charity_id", "eq", "c1"]]);
     expect(calls.find((x) => x.table === "charity_thank_you_recipients")!.filters).toEqual([
       ["thank_you_id", "in", ["t1"]],
-      ["email_hash", "in", [emailHash("ann.account@example.org"), emailHash("ann@example.org")]],
+      // Keyed, and the plain hash for rows not converted yet (24/11/2026).
+      ["email_hash", "in", emailHashesToMatch(["ann.account@example.org", "ann@example.org"])],
     ]);
     for (const c of calls) {
       expect(c.select).not.toMatch(/\bbody\b|\bdetails\b|\bnote\b|id_number|tax_number/);

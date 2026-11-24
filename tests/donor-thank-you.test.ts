@@ -1,7 +1,8 @@
 /** A charity thanking one donor personally: their first name, replies to the charity, at most once a week. */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { describeDone, describeUndone, pageOf, ASK_FIRST } from "@/lib/charity/done";
-import { emailHash, oneDonorThankYouEmail, weekStart } from "@/lib/charity/thank-you";
+import { oneDonorThankYouEmail, weekStart } from "@/lib/charity/thank-you";
+import { emailHash } from "@/lib/email-fingerprint";
 
 describe("the personal thank-you email", () => {
   it("greets by first name, signs with the charity, and says replies reach the charity", () => {
@@ -72,7 +73,12 @@ vi.mock("@/lib/supabase/admin", () => ({
       const b: Record<string, unknown> = {};
       for (const m of ["select", "eq", "order", "limit", "in", "gte"]) b[m] = () => b;
       // Lists (the one-a-week check): an appeal this week when asked for, nothing else.
-      b.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data: table === "charity_appeal_recipients" && appealThisWeek ? [{ donor_id: "d1" }] : [], error: null }).then(ok);
+      // And "no thank-you emails from any charity" when asked for (kept as the address's keyed fingerprint).
+      b.then = (ok: (v: unknown) => unknown) =>
+        Promise.resolve({
+          data: table === "charity_appeal_recipients" && appealThisWeek ? [{ donor_id: "d1" }] : table === "thank_you_opt_outs" && stopped ? [{ email_hash: emailHash("sarah@x.co"), email_hash_v: 2 }] : [],
+          error: null,
+        }).then(ok);
       // Gifts the charity recorded itself are left out: "recordedOnly" means this donor has no other.
       let noGivezyGift = false;
       b.neq = (col: string, val: string) => {

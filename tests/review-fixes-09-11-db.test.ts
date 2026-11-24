@@ -1,9 +1,8 @@
 /**
  * Review fixes, database (09/11/2026): erasure keeps what SARS needs for issued s18A receipts, the receipt
  * locks its donations, the ciphertext check covers card authorisations, storage paths, a suspended charity's
- * rename, and the app's news opt-outs. Needs the local Supabase, seeded.
+ * rename. (The app's news opt-outs moved to the server on 24/11/2026: tests/email-fingerprints-db.test.ts.) Needs the local Supabase, seeded.
  */
-import { createHash } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 
@@ -221,49 +220,6 @@ describe("a suspended charity renaming itself", () => {
       await run("reset role");
       const rows = (await run("select details from public.audit_log where action = 'charity.public_name_changed' and entity_id = $1", [ids.meals])).rows;
       expect(rows.map((r) => r.details.name_to)).toContain("Renamed While Suspended");
-    });
-  });
-});
-
-describe("my_news_opt_outs", () => {
-  const hash = (email: string) => createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
-
-  it("lists the charities the signed-in person said no news to, matched the way the opt-out was written", async () => {
-    await tx(async () => {
-      await run("reset role");
-      await run("insert into public.charity_email_opt_outs (charity_id, email_hash, source) values ($1, $2, 'checkout')", [ids.meals, hash(" Donor@NedivLev.test ")]);
-      await as(ids.donorUser);
-      const rows = (await run("select * from public.my_news_opt_outs() as charity_id")).rows;
-      expect(rows.map((r) => r.charity_id)).toEqual([ids.meals]);
-      // Someone else sees nothing of theirs.
-      await as(ids.mealsAdmin);
-      expect((await run("select * from public.my_news_opt_outs()")).rows).toEqual([]);
-      // A password session gets nothing, like my_donor_ids().
-      await as(ids.donorUser, "password");
-      expect((await run("select * from public.my_news_opt_outs()")).rows).toEqual([]);
-    });
-  });
-
-  it("also matches the other addresses on the person's own donor records", async () => {
-    await tx(async () => {
-      await run("reset role");
-      // A donor record of theirs under another address (as when they gave with a work address before signing in).
-      await run(
-        "insert into public.donors (user_id, email, donor_type, first_name, last_name) values ($1, 'work.address@nedivlev.test', 'individual', 'Test', 'Donor')",
-        [ids.donorUser],
-      );
-      await run("insert into public.charity_email_opt_outs (charity_id, email_hash, source) values ($1, $2, 'checkout')", [ids.meals, hash("Work.Address@nedivlev.test")]);
-      await as(ids.donorUser);
-      expect((await run("select * from public.my_news_opt_outs() as charity_id")).rows.map((r) => r.charity_id)).toEqual([ids.meals]);
-      await as(ids.mealsAdmin);
-      expect((await run("select * from public.my_news_opt_outs()")).rows).toEqual([]);
-    });
-  });
-
-  it("is not for visitors who are not signed in", async () => {
-    await tx(async () => {
-      await as("anon");
-      await refused("select * from public.my_news_opt_outs()", [], /permission denied/);
     });
   });
 });

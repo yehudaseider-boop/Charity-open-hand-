@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { logAudit } from "@/lib/audit";
 import { decrypt } from "@/lib/crypto";
-import { emailHash } from "@/lib/charity/thank-you";
+import { emailHashesToMatch } from "@/lib/email-fingerprint";
 import { loadSavedCardInfo } from "@/lib/donations/saved-card";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { signedInWithPassword } from "@/lib/auth";
@@ -163,7 +163,8 @@ export async function GET(request: Request) {
   // Kept by a hash of the address, never the address, so found by the hashes of the account's and their donor
   // records' addresses: only this person's own addresses, so never someone else's choices.
   const ownAddresses = [accountEmailForCharities, ...((donors.data ?? []) as { email?: string | null }[]).map((d) => d.email ?? null)].filter((e): e is string => Boolean(e?.trim()));
-  const hashes = [...new Set(ownAddresses.map(emailHash))];
+  // Keyed and, until every row is converted, the plain hash too (24/11/2026).
+  const hashes = emailHashesToMatch(ownAddresses);
   const choices = hashes.length
     ? await Promise.all([
         admin.from("thank_you_opt_outs").select("created_at").in("email_hash", hashes),

@@ -4,7 +4,8 @@
  * in-memory database, with the real claims and the real one-message-a-week check.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { emailHash, weekStart } from "@/lib/charity/thank-you";
+import { weekStart } from "@/lib/charity/thank-you";
+import { emailHash } from "@/lib/email-fingerprint";
 
 type Row = Record<string, unknown>;
 let tables: Record<string, Row[]> = {};

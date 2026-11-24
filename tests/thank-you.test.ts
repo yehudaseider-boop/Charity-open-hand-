@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkThankYou, emailHash, monthLabel, monthPeriod, recentMonths, thankYouEmail } from "@/lib/charity/thank-you";
+import { checkThankYou, monthLabel, monthPeriod, recentMonths, thankYouEmail } from "@/lib/charity/thank-you";
 
 describe("thank-you emails", () => {
   it("names the month and the charity, greets by first name, and shows nothing else about the gift", () => {
@@ -27,9 +27,5 @@ describe("thank-you emails", () => {
     expect(checkThankYou("  thanks ").ok).toBe(false);
     expect(checkThankYou("a".repeat(1001)).ok).toBe(false);
     expect(checkThankYou("  Thank you for your gift.  ")).toEqual({ ok: true, body: "Thank you for your gift." });
-  });
-  it("keeps opt-outs by a hash of the address, the same whatever the case", () => {
-    expect(emailHash("Sarah@X.co ")).toBe(emailHash("sarah@x.co"));
-    expect(emailHash("sarah@x.co")).toMatch(/^[0-9a-f]{64}$/);
   });
 });

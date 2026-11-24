@@ -17,7 +17,7 @@ import {
   type ReminderCandidate,
 } from "@/lib/charity/s18a-reminder";
 import { describeDone, describeUndone, pageOf, ASK_FIRST } from "@/lib/charity/done";
-import { emailHash } from "@/lib/charity/thank-you";
+import { emailHash } from "@/lib/email-fingerprint";
 import type { MissingDetail } from "@/lib/donations/s18a-details";
 
 const missing = new Map<string, MissingDetail[]>([
@@ -277,10 +277,10 @@ describe("who has turned off a charity's emails (review of 19/11/2026)", () => {
     const { optedOutHashes } = await import("@/lib/charity/s18a-reminder-send");
     const sarah = emailHash("sarah@x.co");
     const stop = emailHash("stop@x.co");
-    const all = await optedOutHashes("c1", [sarah, stop]);
+    const all = await optedOutHashes("c1", ["sarah@x.co", "Stop@X.co "]);
     expect(all.has(sarah)).toBe(true);
     expect(all.has(stop)).toBe(true);
-    const forReminder = await optedOutHashes("c1", [sarah, stop], { forDetailsReminder: true });
+    const forReminder = await optedOutHashes("c1", ["sarah@x.co", "stop@x.co"], { forDetailsReminder: true });
     expect(forReminder.has(sarah)).toBe(false);
     expect(forReminder.has(stop)).toBe(true);
   });
