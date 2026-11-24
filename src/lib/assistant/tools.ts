@@ -192,7 +192,7 @@ export function toolDefinitions(donorData: boolean, canDraft = false, canContact
       ),
       tool(
         "donor_giving",
-        "Everything about ONE named donor's giving to this charity: total given, number of gifts, first and last gift, what they gave this tax year, their most recent gifts (date, amount, monthly or not), whether their monthly donation is running, paused or stopped, whether they asked for an s18A receipt and what is still missing for it. Use for 'when did Moshe last give', 'how much has she given this year', 'does he give monthly'. If several donors match, it lists them so you can ask which one; then call again with that donor's last_gift. Never returns contact details.",
+        "Everything about ONE named donor's giving to this charity: total given, number of gifts, first and last gift, what they gave this tax year, their most recent gifts (date, amount, monthly or not), whether their monthly donation is running, paused or stopped, whether they asked for an s18A receipt and what is still missing for it. Use for 'when did Moshe last give', 'how much has she given this year', 'does he give monthly'. If several donors match, it lists them: ask which one, then look it up in your next answer with that donor's last_gift. Never returns contact details.",
         {
           name: { type: "string", description: "The donor's name or part of it, at least 2 letters" },
           last_gift: { type: "string", description: "Only to choose between donors with the same name: that donor's last gift date as dd/mm/yyyy, exactly as a list gave it. Otherwise an empty string." },
@@ -211,7 +211,7 @@ export function toolDefinitions(donorData: boolean, canDraft = false, canContact
     tools.push(
       tool(
         "donor_contact",
-        "The email address and phone number of ONE named donor, for this person to contact them. Use only when they ask for that donor's email or phone. One donor at a time, never a list. If several donors match, it lists them (without contact details) so you can ask which one; then call again with that donor's last_gift. Nothing else about the donor: never an ID number, address, card or bank details.",
+        "The email address and phone number of ONE named donor, for this person to contact them. Use only when they ask for that donor's email or phone. One donor at a time, never a list. If several donors match, it lists them (without contact details): ask which one, then look it up in your next answer with that donor's last_gift (a second contact lookup in the same answer is refused). Nothing else about the donor: never an ID number, address, card or bank details.",
         {
           name: { type: "string", description: "The donor's name or part of it, at least 2 letters" },
           last_gift: { type: "string", description: "Only to choose between donors with the same name: that donor's last gift date as dd/mm/yyyy, exactly as a list gave it. Otherwise an empty string." },
@@ -237,7 +237,7 @@ export function toolDefinitions(donorData: boolean, canDraft = false, canContact
       tools.push(
         tool(
           "prepare_thank_you_to_donor",
-          `Prepare (never send) a thank-you email to ONE named donor. The donor is found by name in this charity's list; if several match, nothing is prepared and you get the list so you can ask which one, then call again with that donor's last_gift. It adds a button under your answer that opens the Email donors page with only that donor chosen and your words filled in; the person checks it and presses Send themselves, and every usual limit and opt-out applies. Write as for prepare_thank_you: warm, short (2 to 5 sentences), plain, no guilt or pressure, no exclamation marks, no numbers, no links, no greeting or sign-off (the email adds "Dear" and their first name).`,
+          `Prepare (never send) a thank-you email to ONE named donor. The donor is found by name in this charity's list; if several match, nothing is prepared and you get the list: ask which one, then prepare it in your next answer with that donor's last_gift. It adds a button under your answer that opens the Email donors page with only that donor chosen and your words filled in; the person checks it and presses Send themselves, and every usual limit and opt-out applies. Write as for prepare_thank_you: warm, short (2 to 5 sentences), plain, no guilt or pressure, no exclamation marks, no numbers, no links, no greeting or sign-off (the email adds "Dear" and their first name).`,
           {
             donor_name: { type: "string", description: "The donor's name or part of it, at least 2 letters" },
             last_gift: { type: "string", description: "Only to choose between donors with the same name: that donor's last gift date as dd/mm/yyyy, exactly as a list gave it. Otherwise an empty string." },
@@ -285,6 +285,12 @@ type Checked =
 export const NO_DRAFT_FOR_ROLE = "This person's role can't email donors, so you can't prepare a thank-you for them. Tell them plainly to ask their charity's owner or admin.";
 
 /** A second contact lookup in one answer is refused: one donor at a time. */
+/**
+ * A lookup refused on purpose (not a failure), for example over the daily limit of contact lookups (review 24/11/2026):
+ * its message goes to the model as the lookup's result, for it to pass on plainly.
+ */
+export class ToolRefusal extends Error {}
+
 export const ONE_CONTACT_PER_ANSWER = "One donor's contact details per answer. Answer with the one you have; they can ask about another donor next.";
 
 /** What Givy is told when donors' names are switched off. */
@@ -494,7 +500,7 @@ function notOne(r: Exclude<Resolved, { one: DonorSummary }>) {
     found: r.several.length + r.more,
     several_match: r.several.map((d) => ({ name: cap(d.name), last_gift: d.lastGift, total_given: rand(d.totalCents) })),
     ...(r.more ? { and_more: r.more } : {}),
-    note: "Several donors match, so nothing else was looked up. Ask which one they mean (you may show these names and last gift dates), then call again with that donor's full name and last_gift. If two have the same name and last gift, ask them to open the donor on the Donors page.",
+    note: "Several donors match, so nothing else was looked up. Ask which one they mean (you may show these names and last gift dates), then look it up in your next answer with that donor's full name and last_gift. If two have the same name and last gift, ask them to open the donor on the Donors page.",
   };
 }
 
@@ -639,7 +645,10 @@ const ERASED_NAME = ERASED_DONOR;
 const cap = (raw: string) => {
   const name = raw
     .replace(/\S+@\S+/g, "[email removed]")
-    .replace(/\+?\d[\d\s()-]{5,}\d/g, "[number removed]")
+    // Spelt out too (review 24/11/2026): "john at gmail dot com", "john (at) gmail (dot) co (dot) za".
+    .replace(/\S+\s*(?:\(at\)|\[at\]|\bat\b)\s*\S+(?:\s*(?:\(dot\)|\[dot\]|\bdot\b)\s*\S+)+/gi, "[email removed]")
+    // Any run of 5 or more digits, with spaces, dots, dashes or brackets between them ("082.123.4567", "12345").
+    .replace(/\+?\(?\d(?:[\s.()-]*\d){4,}\)?/g, "[number removed]")
     .replace(/\s+/g, " ")
     .trim();
   return name.length > 80 ? `${name.slice(0, 80)}…` : name;

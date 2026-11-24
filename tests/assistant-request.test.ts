@@ -67,3 +67,22 @@ describe("the page the person is on", () => {
     expect(r.messages[0].content).toContain("11");
   });
 });
+
+describe("contact details in earlier answers (review 24/11/2026)", () => {
+  it("takes emails and phone numbers out of earlier answers, keeps the person's own words, amounts and dates", () => {
+    const r = checkQuestion({
+      charityId: id,
+      messages: [
+        q("What is moshe@x.co's total? Call 082 123 4567"),
+        a("Moshe Katz: moshe.katz+gifts@mail.co.za, 082 123 4567, (011) 123-4567, 0821234567, +27 82 123 4567, 0044 20 7946 0958. He gave R1 250 000 on 20/11/2026."),
+        q("Thanks"),
+      ],
+    });
+    if (!r.ok) throw new Error(r.message);
+    const answer = r.messages[1].content;
+    expect(answer).not.toMatch(/@|123 4567|123-4567|0821234567|\+27|7946/);
+    expect(answer.match(/\[contact details removed\]/g)).toHaveLength(6);
+    expect(answer).toContain("R1 250 000 on 20/11/2026");
+    expect(r.messages[0].content).toBe("What is moshe@x.co's total? Call 082 123 4567");
+  });
+});

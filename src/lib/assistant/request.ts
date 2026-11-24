@@ -27,7 +27,11 @@ export function checkQuestion(body: AssistantRequest, limits = assistantConfig):
     if ((role !== "user" && role !== "assistant") || typeof content !== "string") return { ok: false, message: "We couldn't read that question. Please try again." };
     const text = content.trim();
     if (!text) continue;
-    turns.push({ role, content: text.slice(0, role === "user" ? limits.maxQuestionChars : limits.maxAnswerChars) });
+    // Earlier answers come back from the browser with every question: an email or phone number Givy gave once is taken
+    // out before it goes to the model again (review 24/11/2026), so it can't be re-sent or gathered into a list. The
+    // panel keeps its own copy for the person. The person's own questions are kept as they typed them.
+    const kept = role === "assistant" ? withoutContactDetails(text) : text;
+    turns.push({ role, content: kept.slice(0, role === "user" ? limits.maxQuestionChars : limits.maxAnswerChars) });
   }
   const last = turns[turns.length - 1];
   if (!last || last.role !== "user") return { ok: false, message: "Type a question first." };
@@ -57,6 +61,20 @@ export function checkQuestion(body: AssistantRequest, limits = assistantConfig):
     if (merged[0]?.role === "assistant") total -= merged.shift()!.content.length;
   }
   return { ok: true, charityId, demo, page: typeof body.page === "string" ? body.page.slice(0, 200) : null, messages: merged };
+}
+
+export const CONTACT_REMOVED = "[contact details removed]";
+
+/**
+ * Anything that looks like an email address or a phone number, replaced by CONTACT_REMOVED (review 24/11/2026). Phone
+ * numbers: South African ("082 123 4567", "(011) 123-4567", "0821234567") and international ("+27 82 123 4567",
+ * "0044 20 7946 0958"). Rand amounts ("R1 250 000") and dates ("20/11/2026") are left alone.
+ */
+export function withoutContactDetails(text: string): string {
+  return text
+    .replace(/[^\s@<>()[\]"',;:]+@[^\s@<>()[\]"',;:]+\.[a-z]{2,24}/gi, CONTACT_REMOVED)
+    .replace(/(?<![\w+])(?:\+|00)\d(?:[\s.()-]{0,2}\d){7,14}(?!\d)/g, CONTACT_REMOVED)
+    .replace(/(?<![\w.,/])\(?0\d{2}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?![\d/])/g, CONTACT_REMOVED);
 }
 
 /**

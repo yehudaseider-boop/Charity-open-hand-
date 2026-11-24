@@ -132,25 +132,27 @@ export function liveSource(charityId: string, now: Date = new Date()): HelperSou
       const { data, error } = await supabase
         .from("charity_donations")
         // The email only to tell an erased donor (whose name is kept for SARS) from the rest: it never goes further.
-        .select("status, amount_cents, refunded_cents, paid_at, created_at, is_anonymous, recurring_id, donor_type, first_name, last_name, organisation_name, email")
+        .select("status, amount_cents, refunded_cents, paid_at, created_at, is_anonymous, recurring_id, donor_id, donor_type, first_name, last_name, organisation_name, email")
         .eq("charity_id", charityId)
         .order("paid_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
         .limit(limit);
       if (error) throw new Error(error.message);
+      // A donor who gave anonymously even once is anonymous on the Donors page (review 24/11/2026): never named on
+      // any of their gifts here either, as donors() hides them.
+      const hidden = withNames ? new Set((await readDonors())[0].filter((d) => d.is_anonymous).map((d) => d.donor_id)) : new Set<string>();
       return (data ?? []).map((g) => ({
         date: formatDate((g.paid_at ?? g.created_at) as string),
         amountCents: giftCents(g as { amount_cents: number; refunded_cents: number }),
         status: g.status === "charged_back" ? "charged back" : String(g.status),
         donor: withNames ? donorName(g as Parameters<typeof donorName>[0]) : null,
         monthly: Boolean(g.recurring_id),
-        anonymous: Boolean(g.is_anonymous),
+        anonymous: Boolean(g.is_anonymous) || (g.donor_id != null && hidden.has(g.donor_id as string)),
       }));
     },
 
     async donors() {
       const [rows, monthlyGifts, monthlyRows] = await readDonors();
-      const monthly = new Set(monthlyGifts.map((g) => g.donor_id));
       const states = monthlyStates(monthlyGifts, monthlyRows);
       const flags = newFlags(now);
       return rows.map((d) => {
@@ -163,7 +165,8 @@ export function liveSource(charityId: string, now: Date = new Date()): HelperSou
           totalCents: d.total_cents,
           firstGift: d.first_paid_at ? formatDate(d.first_paid_at) : null,
           lastGift: d.last_paid_at ? formatDate(d.last_paid_at) : null,
-          monthly: monthly.has(d.donor_id),
+          // Only while a monthly donation is running, as the Donors page's "Gives monthly" badge (review 24/11/2026).
+          monthly: s?.state === "running",
           // For the name tools (24/11/2026). The id stays on the server; contact details are never put here.
           id: d.donor_id,
           monthlyState: s?.state ?? "none",

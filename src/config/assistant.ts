@@ -50,6 +50,8 @@ export const assistantConfig = {
   /** Questions allowed: per signed-in person per hour, per charity per day. */
   perPersonPerHour: 30,
   perCharityPerDay: 200,
+  /** One donor's email and phone (donor_contact): lookups per signed-in person per day (review 24/11/2026). */
+  contactLookupsPerPersonPerDay: 10,
   /** The public demo: per visitor per hour, and for all demo visitors together per day. */
   demoPerVisitorPerHour: 10,
   demoPerDay: 300,

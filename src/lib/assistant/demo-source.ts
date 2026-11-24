@@ -96,14 +96,13 @@ export function demoSource(now: Date = new Date()): HelperSource {
     },
 
     async donors() {
-      const by = new Map<string, { gifts: number; totalCents: number; first: string; last: string; monthly: boolean }>();
+      const by = new Map<string, { gifts: number; totalCents: number; first: string; last: string }>();
       for (const g of paid) {
-        const d = by.get(g.donorId) ?? { gifts: 0, totalCents: 0, first: g.paidAt, last: g.paidAt, monthly: false };
+        const d = by.get(g.donorId) ?? { gifts: 0, totalCents: 0, first: g.paidAt, last: g.paidAt };
         d.gifts += 1;
         d.totalCents += g.amountCents;
         if (g.paidAt < d.first) d.first = g.paidAt;
         if (g.paidAt > d.last) d.last = g.paidAt;
-        if (g.recurringId) d.monthly = true;
         by.set(g.donorId, d);
       }
       const states = monthlyStates(
@@ -121,7 +120,8 @@ export function demoSource(now: Date = new Date()): HelperSource {
             totalCents: d.totalCents,
             firstGift: formatDate(d.first),
             lastGift: formatDate(d.last),
-            monthly: d.monthly,
+            // Only while a monthly donation is running, as the Donors page shows it (review 24/11/2026).
+            monthly: s?.state === "running",
             id,
             monthlyState: s?.state ?? "none",
             monthlyCents: s?.perMonthCents ?? 0,

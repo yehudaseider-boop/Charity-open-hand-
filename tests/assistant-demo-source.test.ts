@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
 import { storageKey } from "@/lib/assistant/storage-key";
 
 describe("Givy's demo and saved chats (review 24/11/2026)", () => {
@@ -11,6 +13,13 @@ describe("Givy's demo and saved chats (review 24/11/2026)", () => {
     // From the live source it takes only the month-name helper, never a reader.
     const fromLive = /import\s*\{([^}]*)\}\s*from\s*["']\.\/live-source["']/.exec(text);
     if (fromLive) expect(fromLive[1].split(",").map((s) => s.trim())).toEqual(["monthName"]);
+  });
+
+  it("says a donor gives monthly only while a monthly donation is running (review 24/11/2026)", async () => {
+    const { demoSource } = await import("@/lib/assistant/demo-source");
+    const donors = await demoSource(new Date("2026-11-24T10:00:00+02:00")).donors();
+    expect(donors.length).toBeGreaterThan(0);
+    for (const d of donors) expect(d.monthly).toBe(d.monthlyState === "running");
   });
 
   it("a chat saved while Givy could see donors' names is kept apart from one made without", () => {

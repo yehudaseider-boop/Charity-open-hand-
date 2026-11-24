@@ -18,7 +18,10 @@ const state = vi.hoisted(() => ({
   refuseBucket: "",
   forgotten: [] as string[],
   donors: [] as unknown[],
+  audits: [] as Record<string, unknown>[],
+  limitCalls: [] as { bucket: string; keys: string[]; limit: number; minutes: number }[],
 }));
+vi.mock("@/lib/audit", () => ({ logAudit: async (e: Record<string, unknown>) => void state.audits.push(e) }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/mfa", () => ({ hasSecondStep: async () => state.secondStep }));
@@ -54,7 +57,8 @@ vi.mock("@/lib/charity/appeals", () => ({
 vi.mock("@/lib/auth", () => ({ getViewer: async () => state.viewer }));
 vi.mock("@/lib/charity/team", () => ({ viewerRole: async () => state.role }));
 vi.mock("@/lib/rate-limit", () => ({
-  hitRateLimit: async (bucket: string, _k: string[], _l: number, _m: number, options: { recorded?: string[] }) => {
+  hitRateLimit: async (bucket: string, keys: string[], limit: number, minutes: number, options: { recorded?: string[] } = {}) => {
+    state.limitCalls.push({ bucket, keys, limit, minutes });
     state.limitOptions.push(options);
     const refused = state.limited || state.refuseBucket === bucket;
     if (!refused) options.recorded?.push(`${bucket}-row`);
@@ -111,6 +115,7 @@ beforeEach(() => {
   Object.assign(state, {
     viewer: { userId: "u1" }, role: "admin", limited: false, streamText: ["Open ", "[Team](dash:/team)."], streamFails: false, stopReason: "end_turn",
     lastParams: null, allParams: [], secondStep: true, ipKnown: true, limitOptions: [], toolRounds: [], looked: [], refuseBucket: "", forgotten: [],
+    audits: [], limitCalls: [],
   });
 });
 
@@ -434,6 +439,47 @@ describe("names and contact details on the server (24/11/2026)", () => {
     expect(results()).toMatch(/moshe@x\.co/);
     expect(results()).toMatch(/One donor's contact details per answer/);
     expect(state.looked.filter((l) => l.startsWith("contact"))).toHaveLength(1);
+  });
+
+  it("has its own daily limit per person, and an audit row per lookup without the details themselves (review 24/11/2026)", async () => {
+    vi.stubEnv("ASSISTANT_DONOR_DATA", "yes");
+    vi.stubEnv("ASSISTANT_CONTACT_DATA", "yes");
+    state.donors = [MOSHE];
+    state.role = "owner";
+    state.toolRounds = [[{ id: "t1", name: "donor_contact", input: { name: "Moshe", last_gift: "" } }]];
+    await (await ask(question)).text();
+    expect(state.limitCalls).toContainEqual({ bucket: "assistant-contact", keys: ["user#u1"], limit: 10, minutes: 24 * 60 });
+    expect(state.audits).toEqual([{ actorUserId: "u1", action: "charity.assistant_contact_lookup", entityType: "donor", entityId: MOSHE.id, details: { charity_id: id } }]);
+    expect(JSON.stringify(state.audits)).not.toMatch(/moshe@x\.co|082 123 4567/);
+
+    // Over the limit: refused plainly, nothing read, no audit row.
+    state.allParams = [];
+    state.looked = [];
+    state.audits = [];
+    state.refuseBucket = "assistant-contact";
+    state.toolRounds = [[{ id: "t1", name: "donor_contact", input: { name: "Moshe", last_gift: "" } }]];
+    await (await ask(question)).text();
+    expect(results()).toMatch(/can't look up more contact details until tomorrow/);
+    expect(results()).not.toMatch(/moshe@x\.co/);
+    expect(state.looked.filter((l) => l.startsWith("contact"))).toEqual([]);
+    expect(state.audits).toEqual([]);
+  });
+
+  it("takes an email or phone Givy gave earlier out of the history sent back to the model (review 24/11/2026)", async () => {
+    vi.stubEnv("ASSISTANT_CONTACT_DATA", "");
+    const history = {
+      ...question,
+      messages: [
+        { role: "user", content: "What is Moshe's email?" },
+        { role: "assistant", content: "Moshe Katz: moshe@x.co, phone 082 123 4567 (or +27 82 123 4567)." },
+        { role: "user", content: "And how much did he give?" },
+      ],
+    };
+    await (await ask(history)).text();
+    const sent = JSON.stringify(state.allParams[0].messages);
+    expect(sent).not.toMatch(/moshe@x\.co|082 123 4567|\+27 82/);
+    expect(sent).toContain("[contact details removed]");
+    expect(sent).toContain("What is Moshe's email?");
   });
 
   it("never offers contact details on the public demo", async () => {

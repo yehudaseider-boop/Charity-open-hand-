@@ -6,7 +6,7 @@ import { liveSource } from "@/lib/assistant/live-source";
 import { askerContext, stableInstructions } from "@/lib/assistant/prompt";
 import { checkQuestion, pagePath, type AssistantRequest } from "@/lib/assistant/request";
 import { markerGuard, nextMark } from "@/lib/assistant/suggestions";
-import { ONE_CONTACT_PER_ANSWER, checkToolCall, runPrepare, runTool, toolDefinitions, type HelperSource, type ThankYouPreparer } from "@/lib/assistant/tools";
+import { ONE_CONTACT_PER_ANSWER, ToolRefusal, checkToolCall, runPrepare, runTool, toolDefinitions, type HelperSource, type ThankYouPreparer } from "@/lib/assistant/tools";
 import { livePreparer } from "@/lib/assistant/drafts";
 import { thanksMark, type DraftAudience } from "@/lib/assistant/thank-you-draft";
 import { can } from "@/lib/charity/permissions";
@@ -17,6 +17,7 @@ import { clientIp } from "@/lib/client-ip";
 import { hasSecondStep } from "@/lib/mfa";
 import { forgetAttempts, hitRateLimit, ipKeys } from "@/lib/rate-limit";
 import { fromThisSite } from "@/lib/same-site";
+import { logAudit } from "@/lib/audit";
 
 /**
  * The dashboard helper (21/11/2026; looks things up since 22/11/2026). A signed-in member of the charity who has
@@ -62,6 +63,7 @@ export async function POST(req: Request) {
   let source: HelperSource;
   // Preparing a thank-you (24/11/2026): only for a role that may email donors, never on the demo. Givy never sends.
   let preparer: ThankYouPreparer | null = null;
+  let userId: string | null = null;
   if (demo) {
     if (!assistantDemoOn()) return plain(404, "Givy isn't switched on for the demo.");
     const visitor = ipKeys(clientIp(req.headers));
@@ -76,6 +78,7 @@ export async function POST(req: Request) {
   } else {
     const viewer = await getViewer();
     if (!viewer) return plain(401, "Please sign in again to ask a question.");
+    userId = viewer.userId;
     role = charityId ? await viewerRole(charityId) : null;
     if (!role) return plain(403, "You're not part of this charity's team, so Givy isn't available here.");
     // The dashboard itself needs the second step; so does its helper (review 21/11/2026).
@@ -128,6 +131,31 @@ export async function POST(req: Request) {
   const contactOn = !demo && assistantContactDataOn();
   const canContact = contactOn && donorData && role !== "demo" && can(role, "contact");
   const tools = toolDefinitions(donorData, canDraft, canContact);
+  if (canContact && source.donorContact) {
+    // Each contact lookup (review 24/11/2026): its own daily limit per person, then an audit row (who asked, which
+    // charity, which donor; never the email or phone), and only then the details are read. Counted once the donor is
+    // known, so a name that matches several isn't counted.
+    const read = source.donorContact.bind(source);
+    source = {
+      ...source,
+      donorContact: async (donorId) => {
+        let over: boolean;
+        try {
+          over = await hitRateLimit("assistant-contact", [`user#${userId}`], assistantConfig.contactLookupsPerPersonPerDay, 24 * 60, { forgetRefused: true });
+        } catch (e) {
+          console.error("[assistant] contact limit check failed", e instanceof Error ? e.message : e);
+          throw new ToolRefusal("Contact details can't be looked up just now. Say so plainly: they can find them on the Donors page.");
+        }
+        if (over) {
+          throw new ToolRefusal(
+            `This person has looked up ${assistantConfig.contactLookupsPerPersonPerDay} donors' contact details today, the most allowed in a day. Tell them plainly that Givy can't look up more contact details until tomorrow, and that they can find a donor's details on the Donors page.`,
+          );
+        }
+        await logAudit({ actorUserId: userId, action: "charity.assistant_contact_lookup", entityType: "donor", entityId: donorId, details: { charity_id: charityId } });
+        return read(donorId);
+      },
+    };
+  }
   const system: Anthropic.Beta.BetaTextBlockParam[] = [
     // The tools, rules and whole guide: identical for everyone with the same switches, so cached for an hour.
     { type: "text", text: stableInstructions(contact, donorData, contactOn), cache_control: { type: "ephemeral", ttl: "1h" } },
@@ -241,6 +269,10 @@ export async function POST(req: Request) {
                 results.push({ type: "tool_result", tool_use_id: block.id, content: await runTool(call, source, donorData) });
                 used.push(block.name);
               } catch (e) {
+                if (e instanceof ToolRefusal) {
+                  results.push({ type: "tool_result", tool_use_id: block.id, content: e.message, is_error: true });
+                  continue;
+                }
                 console.error("[assistant] lookup failed", block.name, e instanceof Error ? e.message : e);
                 results.push({ type: "tool_result", tool_use_id: block.id, content: "That couldn't be looked up just now.", is_error: true });
               }

@@ -279,6 +279,32 @@ describe("questions by name", () => {
   });
 });
 
+describe("review 24/11/2026", () => {
+  it("cuts spelt-out emails and runs of 5 or more digits out of a name", async () => {
+    const odd = [
+      donor({ name: "John at gmail dot com", id: "c1" }),
+      donor({ name: "Sipho 082.123.4567", id: "c2" }),
+      donor({ name: "Lerato ref 12345", id: "c3" }),
+      donor({ name: "Ann (at) mail (dot) co (dot) za", id: "c4" }),
+      donor({ name: "Friends at Home", id: "c5" }),
+    ];
+    const out = JSON.stringify(JSON.parse(await run("top_donors", { limit: 10 }, source({ donors: async () => odd }))));
+    expect(out).not.toMatch(/gmail|082|123|4567|12345|mail \(dot\)/);
+    expect(out).toMatch(/Sipho \[number removed\]/);
+    expect(out).toMatch(/Lerato ref \[number removed\]/);
+    expect(out).toContain("Friends at Home");
+  });
+
+  it("tells the model to ask which donor, then look them up in its next answer", () => {
+    const defs = toolDefinitions(true, true, true);
+    for (const t of ["donor_contact", "donor_giving", "prepare_thank_you_to_donor"]) {
+      const d = defs.find((x) => x.name === t)!.description!;
+      expect(d).not.toMatch(/call again/);
+      expect(d).toMatch(/ask which one, then (look it up|prepare it) in your next answer/);
+    }
+  });
+});
+
 describe("monthly states and first gifts, as the Donors page shows them", () => {
   it("running beats paused beats stopped; a stopped one says when and how", () => {
     const s = monthlyStates(

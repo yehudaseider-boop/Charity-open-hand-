@@ -8,9 +8,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 let donorReads = 0;
 const recent = [
-  { status: "paid", amount_cents: 50_000, refunded_cents: 0, paid_at: "2026-11-20T10:00:00Z", created_at: "2026-11-20T10:00:00Z", is_anonymous: false, recurring_id: null, donor_type: "individual", first_name: "Kept", last_name: "ForSars", organisation_name: null, email: "erased+abc@erased.invalid" },
-  { status: "paid", amount_cents: 30_000, refunded_cents: 10_000, paid_at: "2026-11-19T10:00:00Z", created_at: "2026-11-19T10:00:00Z", is_anonymous: false, recurring_id: "r1", donor_type: "individual", first_name: "Thandi", last_name: "Mokoena", organisation_name: null, email: null },
+  { status: "paid", amount_cents: 50_000, refunded_cents: 0, paid_at: "2026-11-20T10:00:00Z", created_at: "2026-11-20T10:00:00Z", is_anonymous: false, recurring_id: null, donor_id: "d1", donor_type: "individual", first_name: "Kept", last_name: "ForSars", organisation_name: null, email: "erased+abc@erased.invalid" },
+  { status: "paid", amount_cents: 30_000, refunded_cents: 10_000, paid_at: "2026-11-19T10:00:00Z", created_at: "2026-11-19T10:00:00Z", is_anonymous: false, recurring_id: "r1", donor_id: "d3", donor_type: "individual", first_name: "Thandi", last_name: "Mokoena", organisation_name: null, email: null },
+  // An open gift from a donor who gave anonymously another time: anonymous on the Donors page, so never named here.
+  { status: "paid", amount_cents: 10_000, refunded_cents: 0, paid_at: "2026-11-18T10:00:00Z", created_at: "2026-11-18T10:00:00Z", is_anonymous: false, recurring_id: null, donor_id: "d2", donor_type: "individual", first_name: "Quiet", last_name: "Giver", organisation_name: null, email: null },
 ];
+const monthlyRows = vi.hoisted(() => ({ rows: [] as { recurring_id: string; status: string; amount_cents: number; ended_at: string | null }[] }));
 const reads = vi.hoisted(() => ({ from: [] as string[], eq: [] as unknown[][] }));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
@@ -34,7 +37,7 @@ vi.mock("@/lib/charity/dashboard-queries", () => ({
   loadMonthlyGifts: async () => [{ donor_id: "d3", recurring_id: "r1" }],
   loadOverview: async () => ({}),
   loadMonthlyTotals: async () => [],
-  loadMonthlyDonations: async () => [],
+  loadMonthlyDonations: async () => monthlyRows.rows,
   loadReceiptGifts: async () => ({ gifts: [], onIssued: new Set() }),
 }));
 vi.mock("@/lib/charity/queries", () => ({
@@ -60,6 +63,7 @@ const ask = async (name: string, input: unknown) => {
 let src = liveSource("11111111-2222-3333-4444-555555555555");
 beforeEach(() => {
   donorReads = 0;
+  monthlyRows.rows = [];
   src = liveSource("11111111-2222-3333-4444-555555555555");
 });
 
@@ -79,6 +83,12 @@ describe("donors the helper may never name", () => {
     expect(await ask("find_donor", { name: "Quiet" })).toContain('"found":0');
     expect(await ask("find_donor", { name: "anon" })).toContain('"found":0');
     expect(await ask("find_donor", { name: "thandi" })).toContain("Thandi Mokoena");
+  });
+
+  it("never names a donor on an open gift when that donor gave anonymously another time (review 24/11/2026)", async () => {
+    const gifts = JSON.parse(await ask("recent_gifts", { limit: 5 }));
+    expect(JSON.stringify(gifts)).not.toMatch(/Quiet|Giver/);
+    expect(gifts[2]).toMatchObject({ amount: "R100", donor: "Anonymous" });
   });
 
   it("a part refund shows what is left of the gift", async () => {
@@ -122,6 +132,18 @@ describe("names, one donor at a time (24/11/2026)", () => {
   it("lists who still has s18A details missing, by what is missing, in words", async () => {
     const out = JSON.parse(await ask("donor_list", { list: "s18a_details_missing" }));
     expect(out.donors).toEqual([{ name: "Thandi Mokoena", still_needed: ["address", "SA ID number"] }]);
+  });
+});
+
+describe("gives monthly, as the Donors page's badge (review 24/11/2026)", () => {
+  const thandi = async () => (JSON.parse(await ask("top_donors", { limit: 5 })) as { name: string; gives_monthly?: boolean }[]).find((d) => d.name === "Thandi Mokoena");
+  it("is false when their monthly donation has ended, though they once gave monthly", async () => {
+    monthlyRows.rows = [{ recurring_id: "r1", status: "cancelled", amount_cents: 10_000, ended_at: "2026-11-01T10:00:00Z" }];
+    expect(await thandi()).toMatchObject({ gives_monthly: false });
+  });
+  it("is true while one is running", async () => {
+    monthlyRows.rows = [{ recurring_id: "r1", status: "active", amount_cents: 10_000, ended_at: null }];
+    expect(await thandi()).toMatchObject({ gives_monthly: true });
   });
 });
 
