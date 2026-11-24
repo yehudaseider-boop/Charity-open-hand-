@@ -639,7 +639,7 @@ From Photos and updates, "Email this to your donors" starts an email from that u
     roles: "Everyone sees it; owner, admin and fundraiser write and switch it; adding existing donors is the owner's",
     body: `A few short emails from you, so a gift turns into a relationship. You write them once; Givezy sends each in your name with the donor's first name. Donors can stop them with one link.
 
-Journeys: the "Welcome journey" (everyone's first gift), the "Win-back journey" (donors you add), and one per campaign ("Give a campaign its own journey").
+Journeys: the "Welcome journey" (everyone's first gift), the "Win-back journey" (donors you add), and one per campaign ("Give a campaign its own journey"). A donor whose first gift is to a campaign with its own journey switched on gets that journey only, not the Welcome journey as well.
 
 To set one up (Donor journeys, then the "Journeys" tab):
 1. Under "Your emails", the journey starts where the donor joins and asks "What would you like to happen first?". Press "Add the first email", choose how many days to wait, and write it; every box starts empty with a grey hint, and "Show me an example" fills in sample wording you can change. Each email can have one picture (optional, once pictures are switched on for journeys), with a few words saying what it shows. Then "What would you like next?" has "Add another email" for the next one. Up to five emails. For each, set the days: the first goes 0 to 30 days after someone joins, each next one 7 to 180 days after the one before. Plain words, no web addresses: Givezy adds a button to your page and the stop link. Use "Preview this email" to check it.

@@ -1,6 +1,6 @@
 /**
  * The daily run with campaign and win-back journeys (CRM steps 6b and 7, 10/11/2026), against a small in-memory stand-in
- * for the database: a first gift to a campaign joins that campaign's journey (and the general one, as before), a gift
+ * for the database: a first gift to a campaign joins that campaign's journey only (not the welcome journey too, 24/11/2026), a gift
  * to the campaign before its journey was switched on keeps the donor out of it, the win-back journey takes nobody on its
  * own, and a win-back donor who gives again leaves it. Email is off here, so nothing is sent.
  */
@@ -118,13 +118,23 @@ describe("a campaign's journey follows the campaign's dates (23/11/2026)", () =>
 
   it("a campaign that can't be found brings nobody on, and the other journeys still run", async () => {
     tables.campaigns = [];
-    tables.donations.push(gift("new", "2026-11-05T08:00:00Z", K));
+    tables.donations.push(gift("new", "2026-11-05T08:00:00Z", K), gift("plain", "2026-11-05T09:00:00Z"));
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     await runJourneys(new Date("2026-11-10T06:00:00Z"), Date.now() + 10_000);
     err.mockRestore();
     const on = (j: string) => tables.charity_journey_enrolments.filter((e) => e.journey_id === j).map((e) => e.donor_id);
     expect(on(CAMP)).toEqual([]);
-    expect(on(GEN)).toEqual(["new"]);
+    // The campaign's donor waits for its own journey (a later run) instead of getting the welcome journey meanwhile.
+    expect(on(GEN)).toEqual(["plain"]);
+  });
+
+  it("a gift tagged to the campaign but started before it ran: the campaign's journey doesn't take them, so the welcome journey does", async () => {
+    tables.campaigns = [{ id: K, charity_id: C, starts_at: "2026-11-04T00:00:00Z", ends_at: null, status: "active" }];
+    tables.donations.push({ ...gift("early", "2026-11-05T08:00:00Z", K), created_at: "2026-11-03T12:00:00Z" });
+    await runJourneys(new Date("2026-11-10T06:00:00Z"), Date.now() + 10_000);
+    const on = (j: string) => tables.charity_journey_enrolments.filter((e) => e.journey_id === j).map((e) => e.donor_id);
+    expect(on(CAMP)).toEqual([]);
+    expect(on(GEN)).toEqual(["early"]);
   });
 });
 
@@ -140,7 +150,8 @@ describe("the daily run with campaign and win-back journeys", () => {
     expect(run.emailOff).toBe(true);
     const on = (j: string) => tables.charity_journey_enrolments.filter((e) => e.journey_id === j).map((e) => e.donor_id).sort();
     expect(on(CAMP)).toEqual(["new"]);
-    expect(on(GEN)).toEqual(["new", "plain"]);
+    // One thank-you for one gift: the campaign's donor isn't on the welcome journey too (24/11/2026).
+    expect(on(GEN)).toEqual(["plain"]);
     expect(on(WIN)).toEqual([]);
     expect(tables.charity_journey_enrolments.every((e) => e.charity_id === C && e.source === "new_gift")).toBe(true);
     // Every switched-on journey's emails come in one read, not one per journey.
@@ -184,3 +195,12 @@ describe("new donors are found however many new gifts there are (review 23/11/20
   }, 60_000);
 });
 
+describe("campaign's journey only, never the welcome journey as well (24/11/2026)", () => {
+  it("a donor on a campaign's journey isn't added to the welcome journey by a later gift that isn't to the campaign", async () => {
+    tables.charity_journey_enrolments.push({ id: "e-old", charity_id: C, journey_id: CAMP, donor_id: "camp", status: "finished", source: "new_gift" });
+    // Their campaign gift is now older than the look-back; the next gift isn't to the campaign.
+    tables.donations.push(gift("camp", "2026-11-08T08:00:00Z"));
+    await runJourneys(new Date("2026-11-10T06:00:00Z"), Date.now() + 10_000);
+    expect(tables.charity_journey_enrolments.filter((e) => e.journey_id === GEN).map((e) => e.donor_id)).toEqual([]);
+  });
+});

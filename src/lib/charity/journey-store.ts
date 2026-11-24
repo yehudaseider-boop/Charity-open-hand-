@@ -492,8 +492,15 @@ async function stopGaveAgain(winbacks: Live[], now: Date, deadline: number): Pro
 async function enrolNewDonors(live: Live[], now: Date, deadline: number): Promise<number> {
   let room = JOURNEY_ENROL_CAP;
   let enrolled = 0;
+  // A donor whose first gift is to a campaign with its own journey gets that journey, not the welcome journey as well
+  // (24/11/2026, Yehuda: "Campaign's only"). So campaign journeys take their donors first, and the welcome journey then
+  // leaves out anyone on a campaign's journey, and anyone whose first gift is to a campaign whose journey couldn't be
+  // checked this run (it takes them on a later run).
+  const campaignJourneyIds = live.filter((x) => x.kind === "campaign" && x.id).map((x) => x.id!);
+  const unchecked = new Set<string>();
+  const order = [...live.filter((x) => x.kind === "campaign"), ...live.filter((x) => x.kind === "general")];
   // The win-back journey has no automatic joiners: the owner adds them.
-  for (const j of live.filter((x) => x.kind !== "winback")) {
+  for (const j of order) {
     if (room <= 0 || Date.now() >= deadline) break;
     const since = new Date(Math.max(j.switchedOnAt.getTime(), now.getTime() - 35 * 86_400_000)).toISOString();
     // A campaign's journey: only gifts started while the campaign ran (its dates; 23/11/2026). A campaign that can't be
@@ -503,16 +510,18 @@ async function enrolNewDonors(live: Live[], now: Date, deadline: number): Promis
       const { data: c, error: ce } = await db().from("campaigns").select("starts_at, ends_at").eq("id", j.campaignId).eq("charity_id", j.charityId).maybeSingle();
       if (ce || !c) {
         if (ce) console.error("[journeys] could not read a campaign's dates", ce.message);
+        unchecked.add(j.campaignId);
         continue;
       }
       dates = { startsAt: c.starts_at as string, endsAt: (c.ends_at as string | null) ?? null };
     }
     const first = new Map<string, Date>();
+    const firstCampaign = new Map<string, string | null>();
     // Until a short page: a busy charity's new gifts must not be cut off after the first 5 000 (review 23/11/2026).
     for (let from = 0; ; from += 1000) {
       let q = db()
         .from("donations")
-        .select("donor_id, paid_at, created_at, amount_cents, refunded_cents")
+        .select("donor_id, paid_at, created_at, amount_cents, refunded_cents, campaign_id")
         .eq("charity_id", j.charityId)
         .eq("status", "paid")
         .neq("gateway", "recorded")
@@ -527,6 +536,7 @@ async function enrolNewDonors(live: Live[], now: Date, deadline: number): Promis
         if (nothingLeft(r) || first.has(r.donor_id as string)) continue;
         if (dates && !startedInCampaign(r as { created_at?: string; paid_at?: string }, dates)) continue;
         first.set(r.donor_id as string, new Date(r.paid_at as string));
+        firstCampaign.set(r.donor_id as string, (r.campaign_id as string | null) ?? null);
       }
       if (!data || data.length < 1000) break;
     }
@@ -552,6 +562,12 @@ async function enrolNewDonors(live: Live[], now: Date, deadline: number): Promis
       for (const r of data) earlier.add(r.donor_id);
     }
     for (const id of earlier) first.delete(id);
+    if (j.kind === "general") {
+      for (const [id, campaignId] of firstCampaign) if (campaignId && unchecked.has(campaignId)) first.delete(id);
+      if (first.size && campaignJourneyIds.length) {
+        for (const id of await onCampaignJourneys(j.charityId, campaignJourneyIds, [...first.keys()])) first.delete(id);
+      }
+    }
     if (!first.size) continue;
     // Erased donors (their gifts stay, without their details) never join, even within the look-back.
     const who = await contacts(j.charityId, [...first.keys()]);
@@ -565,6 +581,18 @@ async function enrolNewDonors(live: Live[], now: Date, deadline: number): Promis
     room -= data?.length ?? 0;
   }
   return enrolled;
+}
+
+/** Of these donors, the ones on any of these campaign journeys (taken on, finished or stopped). */
+async function onCampaignJourneys(charityId: string, journeyIds: string[], donorIds: string[]): Promise<Set<string>> {
+  const on = new Set<string>();
+  for (let i = 0; i < donorIds.length; i += 200) {
+    const data = await readPages<{ donor_id: string }>((from, to) =>
+      db().from("charity_journey_enrolments").select("donor_id").eq("charity_id", charityId).in("journey_id", journeyIds).in("donor_id", donorIds.slice(i, i + 200)).order("id").range(from, to),
+    );
+    for (const r of data) on.add(r.donor_id);
+  }
+  return on;
 }
 
 async function sendDue(js: Live[], list: DueRow[], transport: ReturnType<typeof getEmailTransport>, now: Date, deadline: number, out: JourneyRun): Promise<void> {

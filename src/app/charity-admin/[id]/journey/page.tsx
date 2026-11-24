@@ -93,7 +93,7 @@ export default async function JourneyPage({ params, searchParams }: PageProps<"/
       ? "Donors join when you add them from your stopped monthly donors or keeping-donors lists. Anyone who gives again leaves it."
       : ref.kind === "campaign"
         ? "Each donor joins on their first gift to this campaign, from when you switch it on. People who gave to it before aren't added."
-        : "Each new donor joins on their first gift.";
+        : "Each new donor joins on their first gift. Someone whose first gift is to a campaign with its own journey gets that journey instead, so one gift brings one thank-you.";
 
   return (
     <div className="space-y-5">
