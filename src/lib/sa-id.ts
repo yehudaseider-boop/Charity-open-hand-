@@ -33,9 +33,14 @@ export function isValidSaIdNumber(raw: string): boolean {
   return sum % 10 === 0;
 }
 
-/** The ID number as kept: spaces and dashes taken out. Use it wherever an ID number checked above is stored. */
+/**
+ * The ID number as kept: spaces and dashes taken out. Use it wherever an ID number checked above is stored.
+ * Also the invisible marks a number copied from a message or a notes app can carry, and full-width digits from some
+ * phone keyboards (24/11/2026: "8501015009087" pasted with a hidden mark was refused as "digits only", with nothing
+ * to see on screen).
+ */
 export function saIdDigits(raw: string): string {
-  return raw.replace(/[\s-]/g, "");
+  return raw.normalize("NFKC").replace(/[\s\-‐-―−]|\p{Cf}/gu, "");
 }
 
 /** What to say when no SA ID number was typed (the website and the app say the same, 23/11/2026). */

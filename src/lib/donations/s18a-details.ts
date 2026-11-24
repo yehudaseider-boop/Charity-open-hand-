@@ -13,6 +13,7 @@ import { taxYearFor, zonedParts } from "@/lib/dates";
 import { isValidCompanyRegistration } from "@/lib/sars-numbers";
 import { plainPunctuation } from "@/lib/plain-text";
 import { cleanDedicationName } from "./dedication";
+import { saIdDigits } from "@/lib/sa-id";
 import { cleanSaIdNumber } from "./monthly-id-nudge";
 import { ADDRESS_MESSAGES, postalCodeProblem, sarsAddressProblems, trustNumberProblem } from "./s18a-rules";
 
@@ -186,7 +187,7 @@ export function checkS18aCompletion(
   const e: Record<string, string> = {};
   const value: S18aCompletion = {};
   if (donorType === "individual") {
-    const typed = typeof raw.id_number === "string" ? raw.id_number.replace(/[\s-]/g, "") : "";
+    const typed = typeof raw.id_number === "string" ? saIdDigits(raw.id_number) : "";
     if (missing.includes("id_number") || typed) {
       const id = cleanSaIdNumber(raw.id_number);
       if (!id.ok) e.id_number = id.message;

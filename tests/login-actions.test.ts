@@ -46,11 +46,18 @@ vi.mock("@/lib/rate-limit", () => ({
 
 const sentTo: string[] = [];
 let codeIsRight = false;
+/** What Supabase answers instead (24/11/2026): busy, down, or an address it won't send to. */
+let supabaseError: { status?: number; code?: string } | null = null;
+const codesChecked: string[] = [];
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
     auth: {
-      signInWithOtp: async ({ email }: { email: string }) => (sentTo.push(email), { error: null }),
-      verifyOtp: async () => (codeIsRight ? { data: { user: { id: "u1", email: "dana@example.com" } }, error: null } : { data: { user: null }, error: new Error("bad") }),
+      signInWithOtp: async ({ email }: { email: string }) => (supabaseError ? { error: supabaseError } : (sentTo.push(email), { error: null })),
+      verifyOtp: async ({ token }: { token: string }) => {
+        codesChecked.push(token);
+        if (supabaseError) return { data: { user: null }, error: supabaseError };
+        return codeIsRight ? { data: { user: { id: "u1", email: "dana@example.com" } }, error: null } : { data: { user: null }, error: new Error("bad") };
+      },
     },
   }),
 }));
@@ -79,6 +86,8 @@ beforeEach(() => {
   events.length = 0;
   sentTo.length = 0;
   codeIsRight = false;
+  supabaseError = null;
+  codesChecked.length = 0;
   ip = "198.51.100.1";
   process.env.ENCRYPTION_KEY = Buffer.alloc(32, 3).toString("base64");
 });
@@ -155,6 +164,38 @@ describe("typing the code", () => {
     expect(url.searchParams.has("s")).toBe(false);
     const bad = new URL(await tryCode("someone@example.com", "not-a-code", sentProof("dana@example.com")!), "https://x.test");
     expect(bad.searchParams.has("s")).toBe(false);
+  });
+});
+
+describe("trying to break sign-in (24/11/2026)", () => {
+  it("takes a code pasted with a dash, a hidden mark or full-width digits, as the app does", async () => {
+    codeIsRight = true;
+    for (const typed of ["1234-5678", "1234 5678", "​12345678", "１２３４５６７８"]) {
+      expect(await tryCode("dana@example.com", typed)).toBe("/account");
+    }
+    expect(codesChecked).toEqual(["12345678", "12345678", "12345678", "12345678"]);
+  });
+
+  it("still turns down letters and too few digits without asking Supabase", async () => {
+    for (const typed of ["1234567a", "12345", ""]) expect(await tryCode("dana@example.com", typed)).toContain("error=code");
+    expect(codesChecked).toEqual([]);
+  });
+
+  it("Supabase busy or down is said plainly, not 'that code didn't work', and isn't counted as a wrong code", async () => {
+    supabaseError = { status: 429, code: "over_request_rate_limit" };
+    expect(await tryCode("dana@example.com", "12345678")).toContain("error=code-busy");
+    supabaseError = { status: 500, code: "unexpected_failure" };
+    expect(await tryCode("dana@example.com", "12345678")).toContain("error=code-down");
+    expect(events.filter((e) => e.bucket.startsWith("login-code"))).toEqual([]);
+    expect(signInMessages["code-busy"]).toMatch(/couldn't check yours/);
+    expect(signInMessages["code-down"]).toMatch(/Nothing is wrong with it/);
+  });
+
+  it("an address Supabase won't send to asks to check the address, not to try again in a minute", async () => {
+    supabaseError = { status: 400, code: "email_address_invalid" };
+    expect(await askLink("dana@example..com")).toContain("error=email");
+    supabaseError = { status: 429, code: "over_email_send_rate_limit" };
+    expect(await askLink("dana@example.com")).toContain("error=send");
   });
 });
 
