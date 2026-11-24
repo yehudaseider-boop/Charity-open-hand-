@@ -43,6 +43,9 @@ export async function loadS18aMissing(charityId: string, now = new Date(), earli
   // Only the tax years whose details can still be added (23/11/2026: last year's gifts were read and then all dropped
   // once its late window had closed, half the rows for nothing). Read four batches of 1 000 at a time.
   const years = window.closedYearOpen ? [window.taxYear, window.taxYear - 1] : [window.taxYear];
+  // The gifts already on an issued receipt are read at the same time (24/11/2026: they waited for the gifts, one trip
+  // after another). A failure there only counts when some gift needs the answer, as before.
+  const issuedRead = issuedReceiptGifts(charityId, years).then((ids) => ({ ids }), (error: unknown) => ({ error }));
   const gifts = await readAllPages<Gift>((from, to, count) =>
     db()
       .from("donations")
@@ -66,7 +69,12 @@ export async function loadS18aMissing(charityId: string, now = new Date(), earli
   // Gifts already on an issued receipt: the charity's issued receipts for those years, in one read (23/11/2026: was
   // checked 200 gifts at a time, about 28 trips for 5 500 gifts). A gift is only ever on its own charity's receipt for
   // its own tax year, so this is the same answer; before a year's receipts are issued there are none to read.
-  const issued = rows.length ? await issuedReceiptGifts(charityId, years) : new Set<string>();
+  let issued = new Set<string>();
+  if (rows.length) {
+    const read = await issuedRead;
+    if ("error" in read) throw read.error;
+    issued = read.ids;
+  }
   const out = new Map<string, MissingDetail[]>();
   for (const r of rows) {
     if (!canCompleteS18a(r, r.details, { window, onIssuedReceipt: issued })) continue;

@@ -52,17 +52,28 @@ export const loadCharityForManager = cache(async function loadCharityForManager(
     await requireSecondStep(await currentNext(`/charity-admin/${id}`));
   }
   const supabase = await createClient();
-  // Confirm management rights before reading anything private.
-  const [{ data: canManage }, { data: isAdmin }] = await Promise.all([
+  const admin = createAdminClient();
+  // Confirm management rights before reading anything private. The person's own role here is read alongside (it is
+  // about them, not the charity) and used only once the check has passed. A failure to read it is raised after the
+  // check, so a stranger still gets "not found" (24/11/2026: one trip instead of two, on every dashboard page).
+  const [{ data: canManage }, { data: isAdmin }, roleRead] = await Promise.all([
     supabase.rpc("is_charity_admin", { target: id }),
     supabase.rpc("is_platform_admin"),
+    viewerRole(id).then((role) => ({ role }), (error: unknown) => ({ error })),
   ]);
   if (!canManage && !isAdmin) notFound();
+  if ("error" in roleRead) throw roleRead.error;
+  // The bank account: the owner and finance (and Givezy) only (team roles, 10/11/2026), read by the server after
+  // that check. Everyone else gets the same shape with the bank left empty, and pages say who can see it.
+  // Whether a bank account is saved (for the application's checklist) is known to everyone; the account itself isn't.
+  const canBank = can(roleRead.role, "bank_view");
 
-  const [charity, priv, docs, cats] = await Promise.all([
+  // The rest in one trip, side by side (24/11/2026: the bank row and the bank letter used to wait for the others and
+  // then for each other, three trips where one does).
+  const [charity, priv, docs, cats, bankRow, letter] = await Promise.all([
     // Gateway and mandate fields are closed to every client, so the server reads
     // the charity row itself, now that it knows this person manages it.
-    createAdminClient().from("charities").select(CHARITY_FIELDS).eq("id", id).maybeSingle(),
+    admin.from("charities").select(CHARITY_FIELDS).eq("id", id).maybeSingle(),
     supabase.from("charity_private").select(MEMBER_PRIVATE_FIELDS).eq("charity_id", id).maybeSingle(),
     supabase
       .from("charity_documents")
@@ -70,31 +81,28 @@ export const loadCharityForManager = cache(async function loadCharityForManager(
       .eq("charity_id", id)
       .order("uploaded_at"),
     supabase.from("charity_categories").select("category_id").eq("charity_id", id),
+    admin.from("charity_private").select(BANK_FIELDS).eq("charity_id", id).maybeSingle(),
+    // Which documents are uploaded, for the application's checklist: the bank confirmation letter is only shown to
+    // the owner and finance (team roles), but everyone who may submit needs to know it's there.
+    canBank ? null : admin.from("charity_documents").select("id").eq("charity_id", id).eq("document_type", "bank_confirmation").limit(1),
   ]);
   if (charity.error) throw charity.error;
   if (!charity.data) notFound();
 
-  // The bank account: the owner and finance (and Givezy) only (team roles, 10/11/2026), read by the server after
-  // that check. Everyone else gets the same shape with the bank left empty, and pages say who can see it.
-  // Whether a bank account is saved (for the application's checklist) is known to everyone; the account itself isn't.
-  const canBank = can(await viewerRole(id), "bank_view");
   let bank: Record<string, unknown> = NO_BANK;
   let bankSet = false;
   if (priv.data) {
-    const { data, error } = await createAdminClient().from("charity_private").select(BANK_FIELDS).eq("charity_id", id).maybeSingle();
-    if (error) throw error;
+    if (bankRow.error) throw bankRow.error;
+    const data = bankRow.data as Record<string, unknown> | null;
     bankSet = Boolean(data?.bank_account_last4 && data?.bank_branch_code);
     if (canBank) bank = data ?? NO_BANK;
   }
 
-  // Which documents are uploaded, for the application's checklist: the bank confirmation letter is only shown to
-  // the owner and finance (team roles), but everyone who may submit needs to know it's there.
   const documents = (docs.data ?? []) as CharityDocument[];
   let documentTypes = documents.map((d) => d.document_type);
-  if (!canBank) {
-    const { data: letter, error: letterError } = await createAdminClient().from("charity_documents").select("id").eq("charity_id", id).eq("document_type", "bank_confirmation").limit(1);
-    if (letterError) throw letterError;
-    if (letter?.length && !documentTypes.includes("bank_confirmation")) documentTypes = [...documentTypes, "bank_confirmation"];
+  if (letter) {
+    if (letter.error) throw letter.error;
+    if (letter.data?.length && !documentTypes.includes("bank_confirmation")) documentTypes = [...documentTypes, "bank_confirmation"];
   }
 
   return {

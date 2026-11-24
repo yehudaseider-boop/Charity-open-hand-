@@ -25,31 +25,47 @@ export async function signedInWithPassword(supabase: Awaited<ReturnType<typeof c
   return amr.some((a) => a.method === "password");
 }
 
-/** The signed-in person and their roles, or null for a visitor. Looked up once per request. */
-export const getViewer = cache(async function getViewer(): Promise<Viewer | null> {
-  const supabase = await createClient();
-  // Both checks at once (19/11/2026: one after the other, they made every signed-in page wait twice).
-  const [{ data: { user } }, password] = await Promise.all([supabase.auth.getUser(), signedInWithPassword(supabase)]);
-  if (!user) return null;
-  // Givezy signs people in with an emailed code only: a session started with a password is refused
-  // (someone could have registered another person's email with a password before they ever signed in).
-  if (password) return null;
-
-  const [{ data: profile }, { data: memberships }, { data: agreement }] = await Promise.all([
-    supabase.from("profiles").select("role").eq("id", user.id).single(),
+/** A person's role, the charities they manage and whether they agreed to the current policy, read as themselves. */
+function viewerRows(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  const reads = Promise.all([
+    supabase.from("profiles").select("role").eq("id", userId).single(),
     supabase
       .from("charity_admins")
       .select("charity_id, charities(id, name_en, status)")
-      .eq("user_id", user.id),
+      .eq("user_id", userId),
     supabase
       .from("consents")
       .select("id")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("kind", "account")
       .eq("policy_version", legalConfig.policyVersion)
       .limit(1)
       .maybeSingle(),
   ]);
+  // Read early and then not needed (signed out): never an unhandled failure.
+  reads.catch(() => {});
+  return reads;
+}
+
+/** The signed-in person and their roles, or null for a visitor. Looked up once per request. */
+export const getViewer = cache(async function getViewer(): Promise<Viewer | null> {
+  const supabase = await createClient();
+  // The signed sign-in token first: its signature is checked here, normally without a trip to Supabase. Its person
+  // lets their role, charities and agreement be read at the same time as Supabase confirms the sign-in, instead of
+  // after it (24/11/2026: two trips before every signed-in page, now one). Nothing read is used until getUser has
+  // confirmed the same person; the reads go through row-level security as that person either way.
+  const { data: verified, error: claimsError } = await supabase.auth.getClaims();
+  const claims = claimsError ? undefined : (verified?.claims as { sub?: string; amr?: { method?: string }[] } | undefined);
+  const early = typeof claims?.sub === "string" ? viewerRows(supabase, claims.sub) : null;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  // Givezy signs people in with an emailed code only: a session started with a password is refused
+  // (someone could have registered another person's email with a password before they ever signed in).
+  if ((claims?.amr ?? []).some((a) => a.method === "password")) return null;
+
+  const [{ data: profile }, { data: memberships }, { data: agreement }] = early && claims?.sub === user.id ? await early : await viewerRows(supabase, user.id);
 
   const charities = (memberships ?? [])
     .map((m) => m.charities as unknown as Viewer["charities"][number] | null)

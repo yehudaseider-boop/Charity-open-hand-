@@ -375,8 +375,9 @@ export async function optedOut(emails: string[], charityId?: string): Promise<Se
   const byHash = new Map(list.map((e) => [emailHash(e), e.trim().toLowerCase()]));
   const out = new Set<string>();
   if (!byHash.size) return out;
-  const stopped = charityId ? await stoppedThisCharity(charityId, list) : new Set<string>();
-  for (const h of await stoppedEverywhere(list)) stopped.add(h);
+  // Both lists at once (24/11/2026: one after the other, the Donors list waited twice).
+  const [stopped, everywhere] = await Promise.all([charityId ? stoppedThisCharity(charityId, list) : new Set<string>(), stoppedEverywhere(list)]);
+  for (const h of everywhere) stopped.add(h);
   for (const h of stopped) {
     const e = byHash.get(h);
     if (e) out.add(e);
