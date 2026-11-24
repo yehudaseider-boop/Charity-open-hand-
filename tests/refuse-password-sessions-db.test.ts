@@ -33,6 +33,11 @@ describe("refusing password sessions at the source", () => {
     expect(await run(noAmr)).toEqual(noAmr);
   });
 
+  it("Supabase's sign-in service can reach the schema the hook lives in", async () => {
+    const { rows } = await client.query("select has_schema_privilege('supabase_auth_admin', 'public', 'usage') as ok");
+    expect(rows[0].ok).toBe(true);
+  });
+
   it("only Supabase's sign-in service may run it", async () => {
     const { rows } = await client.query(
       `select r.rolname, has_function_privilege(r.rolname, 'public.refuse_password_sessions(jsonb)', 'execute') as can

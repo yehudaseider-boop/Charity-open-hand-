@@ -17,7 +17,7 @@ import { TEST_BUILD } from "./test-build";
 import { setDirectoryDemo } from "./directory";
 import { SITE_URL, siteUrl } from "./website";
 import { fetchCardChargeRates } from "./card-rates";
-import { isNetworkError, recordAgreement, reviewerSignIn, signInWithCode } from "./pay-api";
+import { isNetworkError, recordAgreement, reviewerSignIn, signInWithCode, unreadableAnswer } from "./pay-api";
 
 /**
  * Who is using the app, and their real giving.
@@ -419,6 +419,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         // Supabase down (an AuthRetryableFetchError with a 5xx status) is not the phone's connection (24/11/2026).
         if (typeof error.status === "number" && error.status >= 500) return { ok: false, message: "We couldn't send the code just now. Nothing is wrong with your address. Please try again in a minute." };
         if (isNetworkError(error)) return { ok: false, message: NO_CONNECTION };
+        if (unreadableAnswer(error)) return { ok: false, message: "We couldn't send the code just now. Nothing is wrong with your address. Please try again in a minute." };
         return { ok: false, message: "We couldn't send the code. Please check the address and try again in a minute." };
       },
       async verifyCode(email, code) {

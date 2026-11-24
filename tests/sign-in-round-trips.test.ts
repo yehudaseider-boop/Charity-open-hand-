@@ -89,6 +89,17 @@ describe("a charity dashboard page, from sign-in to the charity's data", () => {
   });
 });
 
+describe("a token that can't be checked (review 24/11/2026)", () => {
+  it("is refused, never let through as \"no password\"", async () => {
+    session.claims = null; // getClaims errors, while Supabase still knows the person
+    expect((await rounds(() => getViewer())).result).toBeNull();
+  });
+  it("is refused when it names someone other than the person Supabase confirms", async () => {
+    session.claims = { sub: "someone-else", amr: [{ method: "otp" }], aal: "aal2" };
+    expect((await rounds(() => getViewer())).result).toBeNull();
+  });
+});
+
 describe("the header's question (/api/viewer)", () => {
   it("is one round of reads and no trip to the sign-in service, not a sign-in trip plus reads", async () => {
     const { result, rounds: n } = await rounds(() => getHeaderViewer());

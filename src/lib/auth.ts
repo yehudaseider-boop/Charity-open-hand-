@@ -18,10 +18,15 @@ export type Viewer = {
   agreedToCurrentPolicy: boolean;
 };
 
-/** True when the session's sign-in methods include a password (read from the verified token). */
+/**
+ * True when the session's sign-in methods include a password (read from the verified token), and also when the token
+ * can't be checked at all: refused, never let through (review 24/11/2026: an unreadable token used to count as "no
+ * password").
+ */
 export async function signedInWithPassword(supabase: Awaited<ReturnType<typeof createClient>>): Promise<boolean> {
-  const { data } = await supabase.auth.getClaims();
-  const amr = (data?.claims as { amr?: { method?: string }[] } | undefined)?.amr ?? [];
+  const { data, error } = await supabase.auth.getClaims();
+  if (error || !data?.claims) return true;
+  const amr = (data.claims as { amr?: { method?: string }[] }).amr ?? [];
   return amr.some((a) => a.method === "password");
 }
 
@@ -83,8 +88,9 @@ export const getViewer = cache(async function getViewer(): Promise<Viewer | null
   } = await supabase.auth.getUser();
   if (!user) return null;
   // Givezy signs people in with an emailed code only: a session started with a password is refused
-  // (someone could have registered another person's email with a password before they ever signed in).
-  if (usedPassword(claims)) return null;
+  // (someone could have registered another person's email with a password before they ever signed in). A token that
+  // can't be checked, or names someone else, is refused too: never let through on a failed check (review 24/11/2026).
+  if (!claims || claims.sub !== user.id || usedPassword(claims)) return null;
 
   const [{ data: profile }, { data: memberships }, { data: agreement }] = early && claims?.sub === user.id ? await early : await viewerRows(supabase, user.id);
 

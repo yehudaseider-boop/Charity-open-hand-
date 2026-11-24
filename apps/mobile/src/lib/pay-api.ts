@@ -471,8 +471,14 @@ export async function reviewerSignIn(site: string, email: string, code: string, 
  * also stands for a 5xx answer (with that status), so only a missing status (0 or none) counts as no connection.
  */
 export function isNetworkError(error: { name?: string; status?: number }): boolean {
-  return error.status === 0 || error.status === undefined;
+  return error.status === 0;
 }
+
+/**
+ * An answer came but it wasn't one Supabase's sign-in service would give (no status: an HTML page from something in
+ * front of it, say): treated as the sign-in service being down, never as "check your connection" (review 24/11/2026).
+ */
+export const unreadableAnswer = (error: { status?: number }): boolean => error.status === undefined;
 
 /**
  * Signing in with a typed code (pure, so it can be tested): Supabase first; only a plain "wrong code" (not a lost
@@ -492,6 +498,7 @@ export async function signInWithCode(steps: {
   if (error.status === 429) return { ok: false, message: CODE_CHECK_BUSY };
   if (typeof error.status === "number" && error.status >= 500) return { ok: false, message: CODE_CHECK_DOWN };
   if (steps.isNetworkError(error)) return { ok: false, message: steps.offline };
+  if (unreadableAnswer(error)) return { ok: false, message: CODE_CHECK_DOWN };
   const answer = await steps.reviewer();
   if (answer && "message" in answer) return { ok: false, message: answer.message };
   if (answer) {

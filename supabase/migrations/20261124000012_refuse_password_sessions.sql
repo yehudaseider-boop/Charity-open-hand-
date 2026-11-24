@@ -43,3 +43,6 @@ $$;
 -- Only Supabase's sign-in service may run it.
 revoke execute on function public.refuse_password_sessions(jsonb) from public, anon, authenticated;
 grant execute on function public.refuse_password_sessions(jsonb) to supabase_auth_admin;
+-- Supabase's sign-in service must also be able to reach the schema, or every token (and every refresh) fails once the
+-- hook is switched on (review 24/11/2026). Already so on the test project; stated here so a new project gets it too.
+grant usage on schema public to supabase_auth_admin;

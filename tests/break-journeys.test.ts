@@ -93,7 +93,7 @@ describe("the app's sign-in when Supabase is busy or down", () => {
     const asked: string[] = [];
     return signInWithCode({
       verifyCode: async () => ({ error }),
-      isNetworkError: (e) => e.name === "AuthRetryableFetchError",
+      isNetworkError,
       offline: "offline",
       reviewer: async (): Promise<ReviewerAnswer> => (asked.push("reviewer"), null),
       verifyToken: async () => ({ error: null }),
@@ -109,9 +109,15 @@ describe("the app's sign-in when Supabase is busy or down", () => {
     expect(outage.r).toEqual({ ok: false, message: expect.stringMatching(/Nothing is wrong with it/) });
     expect([...busy.asked, ...down.asked, ...outage.asked]).toEqual([]);
   });
-  it("only a missing answer (status 0 or none) is the phone's connection", () => {
+  it("an answer Supabase wouldn't give (no status) says sign-in is down, not \"check your connection\" (review 24/11/2026)", async () => {
+    const odd = await run({ name: "AuthUnknownError" });
+    expect(odd.r).toEqual({ ok: false, message: expect.stringMatching(/Nothing is wrong with it/) });
+    expect(odd.asked).toEqual([]);
+    expect((await run({ name: "AuthRetryableFetchError", status: 0 })).r).toEqual({ ok: false, message: "offline" });
+  });
+  it("only no answer at all (status 0) is the phone's connection", () => {
     expect(isNetworkError({ name: "AuthRetryableFetchError", status: 0 })).toBe(true);
-    expect(isNetworkError({ name: "TypeError" })).toBe(true);
+    expect(isNetworkError({ name: "AuthUnknownError" })).toBe(false);
     expect(isNetworkError({ name: "AuthRetryableFetchError", status: 503 })).toBe(false);
     expect(isNetworkError({ name: "AuthApiError", status: 429 })).toBe(false);
   });
