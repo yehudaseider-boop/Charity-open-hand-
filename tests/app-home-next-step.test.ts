@@ -1,6 +1,16 @@
 /** Home's top card asks for one thing (22/11/2026): a first cause, or giving again to the last charity given to. */
 import { describe, expect, it } from "vitest";
-import { homeNextStep } from "../apps/mobile/src/lib/home-next-step";
+import { heroLineFitsBesideArt, homeNextStep } from "../apps/mobile/src/lib/home-next-step";
+
+describe("Home's top card with a long charity name (24/11/2026)", () => {
+  it("keeps the picture beside a usual line", () => {
+    expect(heroLineFitsBesideArt("Find a checked charity you care about and give in a few taps.")).toBe(true);
+    expect(heroLineFitsBesideArt("You gave R500 to Linksfield Evening Learning Centre on 01/10/2026.")).toBe(true);
+  });
+  it("drops the picture so a long name gets the full width, not eight short lines", () => {
+    expect(heroLineFitsBesideArt("You gave R360 to The Greater Johannesburg Northern Suburbs Community Feeding and Welfare Association on 02/10/2026.")).toBe(false);
+  });
+});
 
 const g = (slug: string, name: string, cents: number, day: number) => ({ charitySlug: slug, charityName: name, cents, date: new Date(2026, 9, day) });
 

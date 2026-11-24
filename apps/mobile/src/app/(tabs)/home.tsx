@@ -25,7 +25,7 @@ import { charitiesGivenTo, newsFeed } from "@/lib/charity-news";
 import { ddmmyyyy, rand, jhbToday } from "@/lib/format";
 import { taxYearFor, taxYearName } from "@/lib/tax-year";
 import { openGiveScreen } from "@/lib/give-entry";
-import { homeNextStep } from "@/lib/home-next-step";
+import { heroLineFitsBesideArt, homeNextStep } from "@/lib/home-next-step";
 import { counts, goalProgress, type Goal } from "@/lib/goals";
 import { loadGoals } from "@/lib/goals-store";
 import { loadIncome } from "@/lib/income-store";
@@ -110,6 +110,10 @@ export default function Home() {
   // "Your first gift" only when we know there are none (firstGift); "give again" once their gifts are here; otherwise
   // a plain way to a cause, never a wrong claim while their giving loads.
   const next = firstGift ? ({ kind: "first" } as const) : homeNextStep(gifts, givingState === "ready" && gifts.length > 0);
+  const heroLine =
+    next.kind !== "again"
+      ? "Find a checked charity you care about and give in a few taps."
+      : `You gave ${rand(next.cents)} to ${next.charityName} on ${ddmmyyyy(next.date)}.`;
   const charityNews = useCharityNews(gaveTo.map((c) => c.slug));
   const news = charityNews.news && !(preview && demoState !== "ready") ? newsFeed(gaveTo, charityNews.news, jhbToday(), charityNews.live ? undefined : Infinity) : [];
   // Live campaign bars from the charities they gave to or saved (11/11/2026): real campaigns only, and only when there are some.
@@ -161,13 +165,12 @@ export default function Home() {
             </Text>
             <View style={styles.heroRow}>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={styles.heroLine}>
-                  {next.kind !== "again"
-                    ? "Find a checked charity you care about and give in a few taps."
-                    : `You gave ${rand(next.cents)} to ${next.charityName} on ${ddmmyyyy(next.date)}.`}
-                </Text>
+                <Text style={styles.heroLine}>{heroLine}</Text>
               </View>
-              <People name="workingTogether" width={Math.min(120, Math.round(width * 0.3))} float={false} style={styles.heroArt} />
+              {/* A long charity name gets the card's full width rather than a narrow column beside the picture. */}
+              {heroLineFitsBesideArt(heroLine) ? (
+                <People name="workingTogether" width={Math.min(120, Math.round(width * 0.3))} float={false} style={styles.heroArt} />
+              ) : null}
             </View>
             {next.kind !== "again" ? (
               <Button variant="cta" label="Find a cause" onPress={() => router.push("/discover")} />

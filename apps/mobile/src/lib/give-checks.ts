@@ -13,7 +13,14 @@ import { ddmmyyyy, hhmm, jhbDay, rand } from "./format";
 /** A Rand amount that never breaks over two lines ("R1 / 000 000"): its spaces don't break. */
 const keepTogether = (cents: number) => rand(cents).replace(/ /g, "\u00A0");
 
+/**
+ * Nothing chosen yet (24/11/2026): the screen shows amount buttons and "Other amount", not a box, so "Enter an amount
+ * in Rand" pointed at a field the donor couldn't see.
+ */
+export const CHOOSE_AN_AMOUNT = "Choose an amount, or tap Other amount to type your own";
+
 export function giftAmountError(text: string, cents: number | null, minCents: number, maxCents: number | null): string | null {
+  if (!text.trim()) return CHOOSE_AN_AMOUNT;
   if (cents === null || (cents === 0 && !minCents)) return amountProblem(text, "180 or 180.50") ?? "Enter an amount in Rand, for example 180 or 180.50";
   if (cents < minCents) return `The minimum donation is ${keepTogether(minCents)}`;
   if (maxCents !== null && cents > maxCents) return `The largest donation in the app is ${keepTogether(maxCents)}. For a bigger gift, please contact the charity directly.`;

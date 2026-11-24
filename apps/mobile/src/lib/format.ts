@@ -5,6 +5,18 @@ export function rand(cents: number): string {
   return formatRand(cents);
 }
 
+/**
+ * A small line of facts joined with " · " ("02/10/2026 · Family · Monthly"), 24/11/2026. When it wraps, the dot
+ * stays at the end of a line rather than starting the next one ("· Monthly"), and a short fact such as
+ * "No s18A receipt" stays whole. Empty parts are left out.
+ */
+export function metaLine(parts: (string | null | undefined | false)[]): string {
+  return parts
+    .filter((p): p is string => typeof p === "string" && p.trim() !== "")
+    .map((p) => (p.length <= 16 ? p.replace(/ /g, " ") : p))
+    .join(" · ");
+}
+
 /** South Africa is UTC+2 all year (no daylight saving), so Johannesburg time needs no time-zone database. */
 const SAST_MS = 2 * 3_600_000;
 

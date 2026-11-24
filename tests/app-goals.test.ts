@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanGoals, counts, goalProgress, goalWindow, goalsFromOldTarget, knownLabels, ppmToPercentText, type Goal } from "../apps/mobile/src/lib/goals";
+import { cleanGoals, counts, goalInSentence, goalProgress, goalWindow, goalsFromOldTarget, knownLabels, ppmToPercentText, type Goal } from "../apps/mobile/src/lib/goals";
 
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day);
 const goal = (over: Partial<Goal> = {}): Goal => ({ id: "g", name: "Giving goal", basis: "fixed", percentPpm: null, fixedCents: 1_200_000, period: "year", year: "tax", counts: null, ...over });
@@ -56,5 +56,17 @@ describe("giving goals", () => {
     expect(ppmToPercentText(100_000)).toBe("10%");
     expect(ppmToPercentText(125_000)).toBe("12.5%");
     expect(knownLabels([{ label: "Family" }, { label: "family" }, { label: "Work" }, { label: null }], ["Gifts"])).toEqual(["Family", "Work", "Gifts"]);
+  });
+});
+
+describe("a goal's name in a sentence (24/11/2026)", () => {
+  it("the default name reads 'your giving goal', never 'towards Giving goal'", () => {
+    expect(goalInSentence("Giving goal")).toBe("your giving goal");
+    expect(goalInSentence("  giving   GOAL ")).toBe("your giving goal");
+    expect(goalInSentence("")).toBe("your giving goal");
+  });
+  it("a name the donor chose is quoted as theirs", () => {
+    expect(goalInSentence("Family")).toBe("your “Family” goal");
+    expect(goalInSentence("Work giving goal")).toBe("your “Work giving goal”");
   });
 });

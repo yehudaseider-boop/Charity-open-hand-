@@ -21,7 +21,7 @@ import { ElsewhereForm, IncomeForm } from "@/components/log-sheets";
 import { GoalEditor } from "@/components/goal-editor";
 import { Text } from "@/components/text";
 import { gifts, givenElsewhere as sampleElsewhere, recurring as sampleRecurring, sampleGoals, type Gift, type Recurring } from "@/data/giving";
-import { ddmmyyyy, hhmm, jhbDay, jhbToday, rand } from "@/lib/format";
+import { ddmmyyyy, hhmm, jhbDay, jhbToday, metaLine, rand } from "@/lib/format";
 import { openGiveScreen } from "@/lib/give-entry";
 import { helpLine } from "@/lib/help";
 import { byCharity, groupByMonth, percentOf, taxYearsGiven } from "@/lib/giving";
@@ -351,7 +351,7 @@ export default function Giving() {
                     <View key={g.id} style={styles.monthGift}>
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text numberOfLines={2} style={{ fontSize: 16, lineHeight: 21 }}>{g.name}</Text>
-                        <Text variant="label">{[ddmmyyyy(g.date), g.label, g.elsewhere ? "Given elsewhere" : null].filter(Boolean).join(" · ")}</Text>
+                        <Text variant="label">{metaLine([ddmmyyyy(g.date), g.label, g.elsewhere && "Given elsewhere"])}</Text>
                       </View>
                       <Text style={styles.monthGiftAmount}>{rand(g.cents)}</Text>
                     </View>
@@ -702,7 +702,7 @@ export default function Giving() {
                           <View style={{ flex: 1, gap: 2 }}>
                             <Text style={{ fontSize: 17 }}>{gift.charityName}</Text>
                             <Text variant="bodyMuted" style={{ fontSize: 16 }}>
-                              {ddmmyyyy(gift.date)}{gift.label ? ` · ${gift.label}` : ""}{gift.monthly ? " · Monthly" : ""}{gift.with18a ? "" : " · No s18A receipt"}
+                              {metaLine([ddmmyyyy(gift.date), gift.label, gift.monthly && "Monthly", !gift.with18a && "No s18A receipt"])}
                             </Text>
                           </View>
                           <Text style={{ fontSize: 17 }}>{rand(gift.cents)}</Text>

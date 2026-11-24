@@ -30,6 +30,20 @@ export type Goal = {
 };
 
 export const MAX_GOALS = 3;
+
+/** The name a new goal starts with. */
+export const DEFAULT_GOAL_NAME = "Giving goal";
+
+/**
+ * A goal's name inside a sentence ("counts towards ..."), 24/11/2026. The default name reads "your giving goal",
+ * never "towards Giving goal"; a name the donor chose is theirs and is quoted: "your “Family” goal" (or
+ * "your “Family goal”" when it already ends in "goal").
+ */
+export function goalInSentence(name: string): string {
+  const n = name.trim().replace(/\s+/g, " ");
+  if (!n || n.toLowerCase() === DEFAULT_GOAL_NAME.toLowerCase() || n.toLowerCase() === "goal") return "your giving goal";
+  return /\bgoal$/i.test(n) ? `your “${n}”` : `your “${n}” goal`;
+}
 export const PPM = 1_000_000;
 
 const okPpm = (v: unknown) => Number.isSafeInteger(v) && (v as number) > 0 && (v as number) < PPM;
