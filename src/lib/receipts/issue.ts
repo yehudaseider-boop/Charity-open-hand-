@@ -22,7 +22,8 @@ export interface ReceiptStore {
   /** Paid s18A donations of the tax year; one charity's only, when given. */
   listDonations(taxYear: number, charityId?: string): Promise<PlanDonation[]>;
   listCharities(ids: string[]): Promise<(PlanCharity & CharityRow)[]>;
-  receiptedDonationIds(taxYear: number): Promise<Set<string>>;
+  /** Donations already on an issued receipt that year; with `charityId`, only that charity's (a receipt never covers another charity's gift). */
+  receiptedDonationIds(taxYear: number, charityId?: string): Promise<Set<string>>;
   /** The charity's decision on each planned certificate (09/11/2026); one charity's only, when given. */
   listDecisions(taxYear: number, charityId?: string): Promise<StoredDecision[]>;
   /** The donor details typed with a donation, plus when it was paid. */

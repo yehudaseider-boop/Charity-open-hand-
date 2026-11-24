@@ -57,8 +57,9 @@ export async function thankYouRecipients(charityId: string, month: string): Prom
   const all = [...byEmail.values()];
   if (!all.length) return [];
   const emails = all.map((r) => r.email);
-  const stopped = await stoppedThisCharity(charityId, emails);
-  for (const h of await stoppedEverywhere(emails)) stopped.add(h);
+  // The two opt-out lists don't depend on each other: asked together (24/11/2026).
+  const [stopped, everywhere] = await Promise.all([stoppedThisCharity(charityId, emails), stoppedEverywhere(emails)]);
+  for (const h of everywhere) stopped.add(h);
   return all.filter((r) => !stopped.has(emailHash(r.email)));
 }
 

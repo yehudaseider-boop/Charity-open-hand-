@@ -99,16 +99,17 @@ export function supabaseReceiptStore(db: SupabaseClient): ReceiptStore {
       return (data ?? []).map((c) => ({ ...(c as unknown as CharityRow), id: c.id, isS18a: c.is_s18a, mandateSignedAt: c.mandate_signed_at, s18aPeriods: periodsOf(c.id) }) as PlanCharity & CharityRow);
     },
 
-    async receiptedDonationIds(taxYear) {
-      const rows = await all<{ donation_id: string }>((from, to) =>
-        db
+    async receiptedDonationIds(taxYear, charityId) {
+      const rows = await all<{ donation_id: string }>((from, to) => {
+        const q = db
           .from("s18a_receipt_donations")
           .select("donation_id, s18a_receipts!inner(tax_year, status)")
           .eq("s18a_receipts.tax_year", taxYear)
-          .eq("s18a_receipts.status", "issued")
-          .order("donation_id")
-          .range(from, to),
-      );
+          .eq("s18a_receipts.status", "issued");
+        // One charity's page only needs that charity's (24/11/2026): without this, every charity waiting for a sign-off
+        // read every receipted gift of every charity again.
+        return (charityId ? q.eq("s18a_receipts.charity_id", charityId) : q).order("donation_id").range(from, to);
+      });
       return new Set(rows.map((r) => r.donation_id));
     },
 

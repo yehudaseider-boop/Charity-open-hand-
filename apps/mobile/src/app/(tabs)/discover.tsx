@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
+import { FlatList, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
 import { pullToRefresh, RefreshDrops } from "@/components/refresh-drops";
 import { StoryDeck } from "@/components/story-deck";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -77,18 +77,55 @@ export default function Discover() {
   // Swipeable stories first (when not searching and there are enough to swipe through); the list carries on after them.
   const deck = !searching && cause === "all" && rest.length >= 3 ? rest.slice(0, 8) : [];
   const list = deck.length ? rest.slice(deck.length) : rest;
+  // The last branch of the states below: a list with at least one charity.
+  const showList = state === "ready" && !noneYet && results.length > 0;
 
   return (
     <>
       <RefreshDrops active={directory.refreshing} top={insets.top + 6} />
-      <ScrollView
+      <FlatList
         style={styles.screen}
+        // Recycling list (24/11/2026): only the cards on screen (and a little either side) are drawn, so 500 charities cost no more than 20.
+        data={showList ? list : []}
+        keyExtractor={(c) => c.slug}
+        renderItem={({ item, index }) => (
+          <View style={styles.cardRow}>
+            <FadeUp index={index < 7 ? index + 1 : 0}>
+              <CharityPhotoCard charity={item} live={live} onGive={onGive} />
+            </FadeUp>
+          </View>
+        )}
+        initialNumToRender={4}
+        maxToRenderPerBatch={4}
+        windowSize={7}
         onScroll={status.onScroll}
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 40 }}
         keyboardShouldPersistTaps="handled"
         refreshControl={live ? pullToRefresh(directory.refreshing, directory.refresh) : undefined}
-      >
+        ListFooterComponent={
+          <>
+            {showList ? (
+              <View style={[styles.gutter, { gap: space.block, marginTop: space.block }]}>
+                {requestsOpen ? (
+                  <Pressable onPress={askToAdd} accessibilityRole="button" accessibilityLabel="Can't find your charity? Ask us to add it" style={({ pressed }) => [styles.askRow, pressed && { opacity: 0.85 }]}>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={styles.askTitle}>Can&apos;t find your charity?</Text>
+                      <Text style={styles.askLink}>Ask us to add it</Text>
+                    </View>
+                    <View style={styles.askPlus}><Text style={styles.askPlusText}>+</Text></View>
+                  </Pressable>
+                ) : null}
+                {live ? null : <Text variant="label" style={{ textAlign: "center", marginTop: 8 }}>Sample charities (demo data)</Text>}
+              </View>
+            ) : null}
+            <Sheet visible={giveTo !== null} onClose={() => setGiveTo(null)}>
+              {giveTo ? <GiveSheet charityName={giveTo.nameEn} slug={giveTo.slug} onDone={() => setGiveTo(null)} /> : null}
+            </Sheet>
+          </>
+        }
+        ListHeaderComponent={
+          <>
         <View style={[styles.gutter, { gap: 14 }]}>
           <View style={styles.hero}>
             <Bubbles
@@ -172,29 +209,13 @@ export default function Discover() {
               ) : null}
               <View style={{ gap: 14 }}>
                 {list.length ? <Text style={styles.listHead} accessibilityRole="header">{cause === "all" && !searching ? (sortedByCauses && !deck.length ? "Charities for the causes you chose, first" : deck.length ? "More charities" : "More charities") : `${rest.length} ${rest.length === 1 ? "charity" : "charities"}`}</Text> : null}
-                {list.map((c, i) => (
-                  <FadeUp key={c.slug} index={i + 1}>
-                    <CharityPhotoCard charity={c} live={live} onGive={onGive} />
-                  </FadeUp>
-                ))}
               </View>
-              {requestsOpen ? (
-                <Pressable onPress={askToAdd} accessibilityRole="button" accessibilityLabel="Can't find your charity? Ask us to add it" style={({ pressed }) => [styles.askRow, pressed && { opacity: 0.85 }]}>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={styles.askTitle}>Can&apos;t find your charity?</Text>
-                    <Text style={styles.askLink}>Ask us to add it</Text>
-                  </View>
-                  <View style={styles.askPlus}><Text style={styles.askPlusText}>+</Text></View>
-                </Pressable>
-              ) : null}
-              {live ? null : <Text variant="label" style={{ textAlign: "center", marginTop: 8 }}>Sample charities (demo data)</Text>}
             </View>
           )}
         </View>
-        <Sheet visible={giveTo !== null} onClose={() => setGiveTo(null)}>
-          {giveTo ? <GiveSheet charityName={giveTo.nameEn} slug={giveTo.slug} onDone={() => setGiveTo(null)} /> : null}
-        </Sheet>
-      </ScrollView>
+          </>
+        }
+      />
       {status.cover}
     </>
   );
@@ -238,6 +259,7 @@ const styles = StyleSheet.create({
   askPlus: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center", borderBottomWidth: 3, borderBottomColor: colors.blueEdge },
   askPlusText: { fontFamily: fonts.displayBold, fontSize: 24, lineHeight: 28, color: colors.onInk },
   gutter: { paddingHorizontal: space.gutter },
+  cardRow: { paddingHorizontal: space.gutter, marginTop: 14 },
   hero: { backgroundColor: colors.lilacSoft, borderRadius: radius.card, padding: 16, paddingTop: 20, gap: 14, overflow: "hidden" },
   heroTop: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 12, paddingHorizontal: 4 },
   heroArt: { marginBottom: -6 },

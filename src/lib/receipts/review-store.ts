@@ -65,11 +65,15 @@ export async function loadCertificate(charityId: string, taxYear: number, key: s
   const receipt = receipts.find((r) => r.key === key);
   if (!receipt) return null;
   const store = supabaseReceiptStore(createAdminClient());
-  const [charities, rows, gifts, run] = await Promise.all([
+  // The next one to check, in the list's order (by name), for "what next": its gifts are read in the same round as the
+  // rest (24/11/2026: they used to wait for it).
+  const others = receipts.filter((r) => r.status === "to_check" && r.key !== key);
+  const [charities, rows, gifts, run, latestOf] = await Promise.all([
     store.listCharities([charityId]),
     store.donorDetailsFor(receipt.donationIds),
     giftDetails(receipt.donationIds),
     openRun(charityId, taxYear),
+    others.length ? giftDetails(others.flatMap((r) => r.donationIds)) : Promise.resolve([] as Awaited<ReturnType<typeof giftDetails>>),
   ]);
   const charity = charities[0];
   if (!charity || !rows.length || !gifts.length) return null;
@@ -79,9 +83,7 @@ export async function loadCertificate(charityId: string, taxYear: number, key: s
 
   // The next one to check, in the list's order (by name), for "what next".
   const names = new Map<string, string>();
-  const others = receipts.filter((r) => r.status === "to_check" && r.key !== key);
   if (others.length) {
-    const latestOf = await giftDetails(others.flatMap((r) => r.donationIds));
     for (const r of others) {
       const g = latestOf.find((x) => r.donationIds.includes(x.donationId));
       if (g) names.set(r.key, receiptDonorName({ donor_type: g.donorType, ...g.current }) || "Name missing");

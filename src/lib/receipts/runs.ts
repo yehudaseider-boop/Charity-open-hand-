@@ -163,9 +163,9 @@ export async function loadPlan(charityId: string, taxYear: number, now: Date = n
  */
 export async function decidedPlan(charityId: string, taxYear: number): Promise<{ receipts: DecidedReceipt[]; skipped: Skipped[]; donations: PlanDonation[]; charities: (PlanCharity & CharityRow)[] }> {
   const s = store();
-  const donations = await s.listDonations(taxYear, charityId);
+  // The three reads don't depend on each other: side by side (24/11/2026), then the charities of the gifts found.
+  const [donations, receipted, decisions] = await Promise.all([s.listDonations(taxYear, charityId), s.receiptedDonationIds(taxYear, charityId), s.listDecisions(taxYear, charityId)]);
   const charities = await s.listCharities([...new Set(donations.map((d) => d.charityId))]);
-  const [receipted, decisions] = await Promise.all([s.receiptedDonationIds(taxYear), s.listDecisions(taxYear, charityId)]);
   const { receipts, skipped } = planReceipts({ taxYear, donations, charities, alreadyReceipted: receipted });
   return { receipts: applyDecisions(receipts, decisions), skipped, donations, charities };
 }
