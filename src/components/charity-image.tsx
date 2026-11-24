@@ -33,7 +33,10 @@ export function CharityImage({
   /** The first big picture on the page: fetched first. */
   priority?: boolean;
 }) {
-  const { props } = getImageProps({ src, alt, width, height, sizes, quality: 90, priority, unoptimized: !src.startsWith("https://") });
+  // Vercel's image service is billed by use, so it stays off until Yehuda says yes (CHARITY_IMAGE_SERVICE=yes,
+  // 24/11/2026). Off, the picture is shown as it is stored, exactly as before.
+  const service = process.env.CHARITY_IMAGE_SERVICE === "yes" && src.startsWith("https://");
+  const { props } = getImageProps({ src, alt, width, height, sizes, quality: 90, priority, unoptimized: !service });
   // eslint-disable-next-line @next/next/no-img-element
   return <img {...props} alt={alt} className={className} />;
 }
