@@ -2346,3 +2346,12 @@ Every donor screen of the app was opened in the design preview at phone size and
   - Activity: the audit log has had no index except its id, so reading one charity's latest 100 entries read the whole log. Migration `20261124000010_audit_log_entity_index.sql` adds one (applied on TEST 24/11/2026 with Yehuda's "go"; live on the go-live list). On a local copy with 500 000 made-up entries: 71 ms before, 0.2 ms after. How big the log is on TEST isn't known from here, so the Activity page now has a timing note to show whether this was its slow part.
   - Expected: roughly 0.3 to 0.6 s off every dashboard page, a little more on Donors. That alone may not bring Donors and Report to 2.5 s. The real numbers come from the speed check after the push; the timing notes stay on Donors, Donations and Report until then.
   - Not changed, for a later look: the Annual report still reads every gift (20 000 rows, in about five rounds of four requests) to count new donors; a database summary would be faster but is a bigger change. The proxy in front of every page also asks Supabase to confirm the sign-in, a second trip to the sign-in service per page; changing that is a security decision, not a speed one. The load-test charity has exactly 3 000 donors, so the donor list reads one extra, empty page to be sure nothing was added while reading (on purpose; a real charity rarely has an exact thousand).
+
+## Load test script built, not yet run (24/11/2026)
+
+- `scripts/loadtest/run.mjs` (plain Node, no packages) ramps pretend donors to a target rate against checkout start, signed test-gateway webhook receipts and the charity dashboard and receipt pages. Runbook: `docs/load-test.md`.
+- Safety: no default address; the base URL must be on an explicit `--allow-host` list; givezy.co.za is always refused; any host not on this machine needs `--approved-by`; checkout stops before the payment page and the run halts if the returned address is not the stand-in test page; secrets come from `TEST_GATEWAY_SECRET` and `LOADTEST_COOKIE` only.
+- The s18A receipt run itself is a person's sign-off plus `npm run receipts`, not a web address, so it is timed by hand (the runbook says how).
+- Thresholds in the runbook are placeholders, marked "Yehuda to confirm". The Vercel cost and the Rand conversion could not be verified from the build environment and are left as open questions; the Supabase figures are cited.
+- Checked only against a stand-in server written for the test. Not run against any real or test site.
+
