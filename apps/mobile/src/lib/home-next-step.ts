@@ -12,6 +12,16 @@ export type NextStep =
   | { kind: "first" }
   | { kind: "again"; slug: string; charityName: string; cents: number; date: Date };
 
+/**
+ * Whether the top card's line has room beside the small picture (24/11/2026). With a long charity name the line was
+ * squeezed into a narrow column, one or two words a line, eight lines deep; past this length the picture is left out
+ * and the line takes the card's full width.
+ */
+export const HERO_LINE_BESIDE_ART_MAX = 70;
+export function heroLineFitsBesideArt(line: string): boolean {
+  return line.length <= HERO_LINE_BESIDE_ART_MAX;
+}
+
 export function homeNextStep(gifts: Pick<Gift, "charitySlug" | "charityName" | "cents" | "date">[], known = true): NextStep {
   if (!known) return { kind: "browse" };
   if (gifts.length === 0) return { kind: "first" };

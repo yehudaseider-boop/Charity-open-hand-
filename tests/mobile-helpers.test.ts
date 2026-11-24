@@ -1,8 +1,21 @@
 /** The phone app's pure helpers (apps/mobile/src/lib). */
 import { describe, expect, it } from "vitest";
 import { donateUrl } from "../apps/mobile/src/lib/website";
-import { rand, ddmmyyyy } from "../apps/mobile/src/lib/format";
+import { rand, ddmmyyyy, metaLine } from "../apps/mobile/src/lib/format";
 import { taxYearFor, taxYearRangeLabel } from "../apps/mobile/src/lib/tax-year";
+
+describe("a line of small facts (24/11/2026)", () => {
+  const NB = " ";
+  it("joins with a dot that never starts a line, and leaves out empty parts", () => {
+    expect(metaLine(["01/10/2026", "Work giving", "Monthly"])).toBe(`01/10/2026${NB}· Work${NB}giving${NB}· Monthly`);
+    expect(metaLine(["02/10/2026", null, false, "", undefined])).toBe("02/10/2026");
+    // Read aloud and copied, it is still the same words.
+    expect(metaLine(["28/08/2026", "No s18A receipt"]).replace(/ /g, " ")).toBe("28/08/2026 · No s18A receipt");
+  });
+  it("lets a long part (a label someone typed) still wrap inside itself", () => {
+    expect(metaLine(["01/10/2026", "Giving at work through the year"])).toBe(`01/10/2026${NB}· Giving at work through the year`);
+  });
+});
 
 describe("app Rand format", () => {
   it("drops cents on whole Rand, keeps them otherwise", () => {

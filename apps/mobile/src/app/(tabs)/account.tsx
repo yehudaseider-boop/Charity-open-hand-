@@ -110,7 +110,9 @@ export default function Account() {
                   <Text style={styles.avatarText}>{preview ? initials(sampleDonor.name) : (account.email ?? "?").slice(0, 1).toUpperCase()}</Text>
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.headTitle} accessibilityRole="header" numberOfLines={1}>{preview ? sampleDonor.name : "Your account"}</Text>
+                  {/* Beside the picture there is room for about ten letters at headline size: a name (or "Your account") wraps
+                      onto a second line at a smaller size rather than being cut off ("Sarah Du…", 24/11/2026). */}
+                  <Text style={styles.profileTitle} accessibilityRole="header" numberOfLines={2}>{preview ? sampleDonor.name : "Your account"}</Text>
                   <Text style={styles.headLine} numberOfLines={1}>{preview ? sampleDonor.email : account.email}</Text>
                 </View>
               </View>
@@ -214,6 +216,7 @@ const styles = StyleSheet.create({
   avatar: { width: 68, height: 68, borderRadius: 34, backgroundColor: colors.blue, borderWidth: 4, borderColor: colors.surface, alignItems: "center", justifyContent: "center" },
   avatarText: { fontFamily: fonts.displayBold, fontSize: 26, color: colors.onInk },
   headTitle: { fontFamily: fonts.displayBold, fontSize: 32, lineHeight: 37, letterSpacing: -0.4, color: colors.navy },
+  profileTitle: { fontFamily: fonts.displayBold, fontSize: 26, lineHeight: 30, letterSpacing: -0.3, color: colors.navy },
   headLine: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 23, color: colors.muted },
   tiles: { flexDirection: "row", gap: 12 },
   tile: { flex: 1, minHeight: 132, borderRadius: radius.card, padding: 16, justifyContent: "space-between", gap: 14, overflow: "hidden" },

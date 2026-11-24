@@ -38,7 +38,7 @@ import { useCharity } from "@/lib/directory";
 import { loadDetails, saveDetails, forgetDetails } from "@/lib/donor-details";
 import { rememberOffer, SIGN_IN_TO_REMEMBER, SIGN_IN_TO_REMEMBER_NOTE } from "@/lib/give-remember";
 import { jhbToday, rand } from "@/lib/format";
-import { counts, goalProgress, type Goal } from "@/lib/goals";
+import { counts, goalInSentence, goalProgress, type Goal } from "@/lib/goals";
 import { loadGoals, saveGoals } from "@/lib/goals-store";
 import { goalInvited, isFirstGift, isNewDonor, markGoalInvited, shouldInviteGoal } from "@/lib/first-run";
 import { loadIncome } from "@/lib/income-store";
@@ -595,7 +595,7 @@ export default function Give() {
       first ? "First gift on Givezy" : null,
       wasMonthly ? "Monthly giver" : null,
       s18aAvailable && want18a ? (detailsLater ? "s18A details still to add, from your account on our website" : "s18A receipt at tax time") : null,
-      pr && goal ? `Counts towards ${goal.name}` : null,
+      pr && goal ? `Counts towards ${goalInSentence(goal.name)}` : null,
     ].filter((b): b is string => Boolean(b));
     const inviteNow = (demo === "invite" && !site) || shouldInviteGoal({ goalsReady: goals.status === "ready", goalCount: goals.value.length, firstGift: firstHere, confirming });
     const invite: GoalInvite | null = inviteNow
@@ -1157,7 +1157,7 @@ export default function Give() {
 
           {goal && goalLabel ? (
             <View style={{ gap: 10 }}>
-              <Text style={styles.question}>Count this gift towards {goal.name}?</Text>
+              <Text style={styles.question}>Count this gift towards {goalInSentence(goal.name)}?</Text>
               <View style={styles.chips} accessibilityRole="radiogroup">
                 {([true, false] as const).map((yes) => {
                   const on = counting === yes;
@@ -1171,7 +1171,7 @@ export default function Give() {
               </View>
             </View>
           ) : goal ? (
-            <Text variant="bodyMuted">Every gift counts towards {goal.name}.</Text>
+            <Text variant="bodyMuted">Every gift counts towards {goalInSentence(goal.name)}.</Text>
           ) : null}
           {/* Cover the card charge: only once the server sent the provider's rates. */}
           {rates ? (
