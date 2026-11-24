@@ -2,6 +2,8 @@ import "server-only";
 import { can } from "@/lib/charity/permissions";
 import { applicationChecklist, gettingStarted } from "@/lib/charity/checklist";
 import { allTime, donorName, ERASED_DONOR, isErasedEmail, lastMonth, monthlySummary, thisMonth, thisTaxYear, type Period } from "@/lib/charity/dashboard";
+import { loadS18aMissing } from "@/lib/charity/s18a-reminder-send";
+import type { MissingDetail } from "@/lib/donations/s18a-details";
 import { loadDonors, loadMonthlyDonations, loadMonthlyGifts, loadMonthlyTotals, loadOverview, loadReceiptGifts } from "@/lib/charity/dashboard-queries";
 import { loadCharityForManager, loadStories } from "@/lib/charity/queries";
 import { loadStartFacts } from "@/lib/charity/start-facts";
@@ -11,6 +13,7 @@ import { formatDate, taxYearLabel } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import { linkTarget } from "./prompt";
 import { giftCents, type HelperSource, type MonthTotal, type PeriodKey } from "./tools";
+import { monthlyStates, newFlags } from "./donor-states";
 
 /**
  * The dashboard helper's facts for a real charity (22/11/2026). Read as the signed-in person (their own session), by
@@ -42,7 +45,7 @@ function pageLink(href: string | null, base: string): string | null {
 
 export function liveSource(charityId: string, now: Date = new Date()): HelperSource {
   const base = `/charity-admin/${charityId}`;
-  let donorList: Promise<[Awaited<ReturnType<typeof loadDonors>>, Awaited<ReturnType<typeof loadMonthlyGifts>>]> | undefined;
+  let donorList: Promise<[Awaited<ReturnType<typeof loadDonors>>, Awaited<ReturnType<typeof loadMonthlyGifts>>, Awaited<ReturnType<typeof loadMonthlyDonations>>]> | undefined;
   return {
     async totals(key) {
       const { period: p, label } = period(key, now);
@@ -146,20 +149,87 @@ export function liveSource(charityId: string, now: Date = new Date()): HelperSou
     },
 
     async donors() {
-      // Read once per question, however many lookups need it (the list can be long).
-      donorList ??= Promise.all([loadDonors(charityId), loadMonthlyGifts(charityId)]);
-      const [rows, monthlyGifts] = await donorList;
+      const [rows, monthlyGifts, monthlyRows] = await readDonors();
       const monthly = new Set(monthlyGifts.map((g) => g.donor_id));
-      return rows.map((d) => ({
-        // Someone erased at their request keeps their name only for SARS: never named here, as on every page.
-        name: isErasedEmail(d.email) ? ERASED_DONOR : d.is_anonymous ? "Anonymous donor" : d.display_name,
-        hidden: isErasedEmail(d.email) || d.is_anonymous,
-        gifts: d.donation_count,
-        totalCents: d.total_cents,
-        firstGift: d.first_paid_at ? formatDate(d.first_paid_at) : null,
-        lastGift: d.last_paid_at ? formatDate(d.last_paid_at) : null,
-        monthly: monthly.has(d.donor_id),
-      }));
+      const states = monthlyStates(monthlyGifts, monthlyRows);
+      const flags = newFlags(now);
+      return rows.map((d) => {
+        const s = states.get(d.donor_id);
+        return {
+          // Someone erased at their request keeps their name only for SARS: never named here, as on every page.
+          name: isErasedEmail(d.email) ? ERASED_DONOR : d.is_anonymous ? "Anonymous donor" : d.display_name,
+          hidden: isErasedEmail(d.email) || d.is_anonymous,
+          gifts: d.donation_count,
+          totalCents: d.total_cents,
+          firstGift: d.first_paid_at ? formatDate(d.first_paid_at) : null,
+          lastGift: d.last_paid_at ? formatDate(d.last_paid_at) : null,
+          monthly: monthly.has(d.donor_id),
+          // For the name tools (24/11/2026). The id stays on the server; contact details are never put here.
+          id: d.donor_id,
+          monthlyState: s?.state ?? "none",
+          monthlyCents: s?.perMonthCents ?? 0,
+          stopped: s?.stopped ?? null,
+          newIn: flags(d.first_paid_at),
+          firstAt: d.first_paid_at ?? null,
+          s18aAsked: Boolean(d.wants_18a),
+        };
+      });
+    },
+
+    async donorGifts(donorId) {
+      // Only a donor in this charity's own list (read as the person asking), and only this charity's gifts.
+      const [rows] = await readDonors();
+      if (!rows.some((d) => d.donor_id === donorId)) return { taxYear: taxYearLabel(thisTaxYear(now).taxYear), gifts: [] };
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from("charity_donations")
+        .select("status, amount_cents, refunded_cents, paid_at, created_at, recurring_id, tax_year")
+        .eq("charity_id", charityId)
+        .eq("donor_id", donorId)
+        .in("status", ["paid", "refunded", "charged_back"])
+        .order("paid_at", { ascending: false, nullsFirst: false })
+        .limit(200);
+      if (error) throw new Error(error.message);
+      const year = thisTaxYear(now).taxYear;
+      return {
+        taxYear: taxYearLabel(year),
+        gifts: (data ?? []).map((g) => ({
+          date: formatDate((g.paid_at ?? g.created_at) as string),
+          amountCents: giftCents(g as { amount_cents: number; refunded_cents: number }),
+          status: g.status === "charged_back" ? "charged back" : String(g.status),
+          monthly: Boolean(g.recurring_id),
+          thisTaxYear: Number(g.tax_year) === year,
+        })),
+      };
+    },
+
+    async s18aMissing() {
+      // As the Donors page reads it (service role, after the route checked the person is on the team): only which
+      // details are missing, never a number or an address.
+      const missing = await loadS18aMissing(charityId, now).catch((e: unknown) => {
+        console.error("[assistant] s18A details check failed", e instanceof Error ? e.message : e);
+        return null;
+      });
+      if (!missing) return null;
+      return new Map([...missing.entries()].map(([id, kinds]) => [id, kinds.map((k) => MISSING_WORDS[k])]));
+    },
+
+    async donorContact(donorId) {
+      // From this charity's own list, read as the person asking: a role that can't see contact details gets nulls
+      // from the database itself (charity_contact_or_null). An erased donor's placeholder address goes back as is,
+      // for the tool to show as erased.
+      const [rows] = await readDonors();
+      const d = rows.find((r) => r.donor_id === donorId);
+      if (!d || d.is_anonymous) return { email: null, phone: null };
+      return { email: d.email ?? null, phone: d.phone ?? null };
     },
   };
+
+  // Read once per question, however many lookups need it (the list can be long).
+  function readDonors() {
+    donorList ??= Promise.all([loadDonors(charityId), loadMonthlyGifts(charityId), loadMonthlyDonations(charityId)]);
+    return donorList;
+  }
 }
+
+const MISSING_WORDS: Record<MissingDetail, string> = { id_number: "SA ID number", registration_number: "registration number", address: "address" };

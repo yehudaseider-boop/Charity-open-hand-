@@ -7,7 +7,7 @@
  * it can also look up the charity's own figures and setup steps, read-only and as the person asking
  * (src/lib/assistant/tools.ts).
  *
- * Three switches, all off by default:
+ * Four switches, all off by default (the fourth, ASSISTANT_CONTACT_DATA, is described at assistantContactDataOn):
  * - ASSISTANT=yes (and ANTHROPIC_API_KEY set) turns it on in the real charity dashboard.
  * - ASSISTANT_DEMO=yes also shows it on the public demo dashboard (/demo/dashboard), with tighter limits.
  * - ASSISTANT_DONOR_DATA=yes lets it look up donors by name (top donors, find a donor, names on recent gifts). Their
@@ -70,4 +70,15 @@ export function assistantDemoOn(env: Record<string, string | undefined> = proces
 /** Whether the helper may look up donors by name (see the third switch above). */
 export function assistantDonorDataOn(env: Record<string, string | undefined> = process.env): boolean {
   return assistantOn(env) && env.ASSISTANT_DONOR_DATA === "yes";
+}
+
+/**
+ * Whether the helper may give one named donor's email address and phone number (24/11/2026, Yehuda), a fourth switch,
+ * off by default: ASSISTANT_CONTACT_DATA=yes, and only with the donor-names switch on too. Each such question then
+ * sends that donor's email address and phone number to Anthropic. Only for roles that see contact details on the
+ * Donors page, one donor at a time, never a list. Keep off on live until Yosef's privacy wording covers it and
+ * Yehuda signs it off (go-live list). Never an ID number, address, card or bank details either way.
+ */
+export function assistantContactDataOn(env: Record<string, string | undefined> = process.env): boolean {
+  return assistantDonorDataOn(env) && env.ASSISTANT_CONTACT_DATA === "yes";
 }

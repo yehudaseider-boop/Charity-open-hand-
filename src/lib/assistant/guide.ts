@@ -644,7 +644,23 @@ From Photos and updates, "Email this to your donors" starts an email from that u
 3. Change the words if you like. "Also show it in the Givezy app" is ticked: donors who use the Givezy app also see it there as a message from you (no phone notification). Untick it for email only.
 4. Press "Check who it goes to", then "Send to N donors" and "Yes, send it". Sent emails can't be called back.
 
-Everything on Email donors still applies: donors who asked not to get your emails are left out (of the app message too), one message a week, at most 4 emails in 30 days, one email per inbox, and the stop link in every email.`,
+Everything on Email donors still applies: donors who asked not to get your emails are left out (of the app message too), one message a week, at most 4 emails in 30 days, one email per inbox, and the stop link in every email.
+
+When Givy can see donors' names, it can also say who is in the group, and prepare a thank-you to one donor by name ("Thank Thandi Mokoena"). Email donors then opens with only that donor chosen ("Only Thandi Mokoena"); you check it and press Send as usual, and the same limits apply. If several donors have that name, Givy asks which one first.`,
+  },
+  {
+    id: "givy-donor-names",
+    title: "Ask Givy about donors by name",
+    path: "/charity-admin/[id]/donors",
+    roles: "Everyone in the team, when Givy can see donors' names (not switched on everywhere yet)",
+    body: `When Givy can see donors' names, it answers questions about one donor or a list of donors, from the same figures as the Donors page:
+
+- One donor: "When did Thandi last give?", "How much has she given this tax year?", "Does he give monthly?", "Did she ask for an s18A receipt?"
+- Lists: "Who stopped their monthly donation?", "Whose monthly donation is paused?", "Who gave for the first time this month?", "Who asked for an s18A receipt and still has details missing?" Givy names up to 25 and says how many more; the Donors page lists everyone.
+
+If several donors match a name, Givy asks which one you mean. Donors who gave anonymously are never named, and donors erased at their request can't be found. Givy never gives ID numbers, addresses, card or bank details.
+
+Email addresses and phone numbers: only where that is switched on for Givy, only for roles that see contact details on the Donors page (owner, admin, finance and fundraiser), one donor at a time, never a list. Otherwise they are on the Donors page.`,
   },
   {
     id: "donor-journey",

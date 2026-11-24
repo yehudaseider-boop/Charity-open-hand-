@@ -7,7 +7,9 @@ import { PageHeader } from "@/components/dash";
 import { requireViewer } from "@/lib/auth";
 import { appealsThisMonth, listAppeals } from "@/lib/charity/appeals";
 import { carryOnLine, carryOnState, type CarryOnState } from "@/lib/charity/carry-on-sends";
-import { WHEN_GAVE_LABELS, audienceValue, keepingAudienceLabel, parseAudience } from "@/lib/charity/appeals-rules";
+import { WHEN_GAVE_LABELS, audienceValue, keepingAudienceLabel, oneDonorLabel, parseAudience } from "@/lib/charity/appeals-rules";
+import { isErasedEmail } from "@/lib/charity/dashboard";
+import { loadDonors } from "@/lib/charity/dashboard-queries";
 import { assistantConfig } from "@/config/assistant";
 import { loadDraft } from "@/lib/assistant/drafts";
 import { loadCampaigns } from "@/lib/charity/campaign-queries";
@@ -31,6 +33,13 @@ export const metadata: Metadata = { title: "Email donors" };
  * with replies going to the charity. Donors who said no are never emailed, and nobody gets more than 4
  * a month from one charity.
  */
+/** The form's choice for one donor, from this charity's own list (read as the person); null when not there or erased. */
+async function oneDonorOption(charityId: string, donorId: string): Promise<{ value: string; label: string } | null> {
+  const d = (await loadDonors(charityId)).find((r) => r.donor_id === donorId);
+  if (!d || isErasedEmail(d.email)) return null;
+  return { value: `donor:${d.donor_id}`, label: oneDonorLabel(d.display_name) };
+}
+
 export default async function EmailDonorsPage({ params, searchParams }: PageProps<"/charity-admin/[id]/email-donors">) {
   const { id } = await params;
   const sp = await searchParams;
@@ -38,7 +47,13 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
   const { charity, priv } = await loadCharityForManager(id);
   // A thank-you Givy prepared (24/11/2026): read back only for this person on this charity, before it expires.
   const draft = typeof sp.draft === "string" ? await loadDraft(sp.draft, id, viewer.userId).catch(() => "gone" as const) : null;
-  const givy = draft && draft !== "gone" ? draft : null;
+  // One donor (24/11/2026, a thank-you Givy prepared to one named donor): looked up again here, in this charity's own
+  // list as this person sees it, so an id for another charity's donor (or one erased since) finds nobody.
+  const askedFirst = parseAudience(draft && draft !== "gone" ? draft.audience : sp.to);
+  const oneDonor = askedFirst?.kind === "donor" ? await oneDonorOption(id, askedFirst.donorId).catch(() => null) : null;
+  const donorGone = askedFirst?.kind === "donor" && !oneDonor;
+  // A one-donor draft whose donor isn't there is never shown with "All your donors" chosen instead.
+  const givy = draft && draft !== "gone" && !donorGone ? draft : null;
   const [role, appeals, recent, tags, segments, campaigns, lapsedDays] = await Promise.all([
     viewerRole(id), listAppeals(id), appealsThisMonth(id), listTags(id), listSegments(id), loadCampaigns(id), lapsedDaysFor(id),
   ]);
@@ -53,8 +68,9 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
     ),
   );
   // "Email these donors" from a list, a tag or a campaign arrives with it chosen.
-  const asked = parseAudience(givy ? givy.audience : sp.to);
+  const asked = donorGone ? null : askedFirst;
   const audiences = [
+    ...(oneDonor ? [{ group: "One donor", options: [oneDonor] }] : []),
     { group: "Everyone", options: [{ value: "all", label: "All your donors" }] },
     // When and how they give (24/11/2026), the groups Givy prepares thank-yous for.
     { group: "When and how they give", options: (Object.keys(WHEN_GAVE_LABELS) as (keyof typeof WHEN_GAVE_LABELS)[]).map((value) => ({ value, label: WHEN_GAVE_LABELS[value] })) },
@@ -114,6 +130,11 @@ export default async function EmailDonorsPage({ params, searchParams }: PageProp
           {givy ? (
             <p role="status" className="mb-3 rounded-card bg-honey-soft p-3 text-sm text-navy">
               Givy prepared this thank-you. <strong className="font-semibold">Nothing has been sent.</strong> Change the words if you like, press Check who it goes to, then send it yourself.
+            </p>
+          ) : null}
+          {donorGone ? (
+            <p role="status" className="mb-3 rounded-card bg-warning-soft p-3 text-sm text-warning">
+              The donor Givy&apos;s thank-you was for isn&apos;t on your donor list any more (or asked to be erased). Nothing was sent. Ask Givy again, or write your email below.
             </p>
           ) : null}
           {draft === "gone" ? (

@@ -46,7 +46,12 @@ export type Audience =
   /** Donors with a monthly donation running now (24/11/2026). */
   | { kind: "monthly" }
   /** Donors who asked for an s18A receipt on at least one gift (24/11/2026), as the Donors page's s18A filter. */
-  | { kind: "s18a" };
+  | { kind: "s18a" }
+  /**
+   * One donor (24/11/2026: a thank-you to one named donor that Givy prepared). Only ever resolved on the server
+   * against this charity's own donor list (pickAudience), so an id from another charity finds nobody.
+   */
+  | { kind: "donor"; donorId: string };
 
 export type GavePeriod = "this_month" | "this_tax_year";
 
@@ -57,6 +62,12 @@ export const WHEN_GAVE_LABELS = {
   monthly: "Give every month",
   "s18a:asked": "Asked for an s18A receipt",
 } as const;
+
+/** What a one-donor audience is called in the form and on the sent email's line (a typed name, kept short). */
+export function oneDonorLabel(name: string | null | undefined): string {
+  const n = (name ?? "").replace(/\s+/g, " ").trim() || "a donor";
+  return `Only ${n.length > 80 ? `${n.slice(0, 80)}…` : n}`;
+}
 
 /** Whether an email also shows in donors' Givezy app: a thank-you prepared with Givy (kept on the email's audience). */
 export function showsInApp(audience: unknown): boolean {
@@ -93,6 +104,7 @@ export function parseAudience(v: unknown): Audience | null {
   if (kind === "tag") return { kind: "tag", tagId: id.toLowerCase() };
   if (kind === "segment") return { kind: "segment", segmentId: id.toLowerCase() };
   if (kind === "campaign") return { kind: "campaign", campaignId: id.toLowerCase() };
+  if (kind === "donor" && parts.length === 2) return { kind: "donor", donorId: id.toLowerCase() };
   return null;
 }
 
@@ -107,6 +119,7 @@ export function audienceValue(a: Audience): string {
     case "gave": return `gave:${a.period}`;
     case "monthly": return "monthly";
     case "s18a": return "s18a:asked";
+    case "donor": return `donor:${a.donorId}`;
   }
 }
 

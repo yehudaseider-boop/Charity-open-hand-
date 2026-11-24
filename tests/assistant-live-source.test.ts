@@ -11,14 +11,17 @@ const recent = [
   { status: "paid", amount_cents: 50_000, refunded_cents: 0, paid_at: "2026-11-20T10:00:00Z", created_at: "2026-11-20T10:00:00Z", is_anonymous: false, recurring_id: null, donor_type: "individual", first_name: "Kept", last_name: "ForSars", organisation_name: null, email: "erased+abc@erased.invalid" },
   { status: "paid", amount_cents: 30_000, refunded_cents: 10_000, paid_at: "2026-11-19T10:00:00Z", created_at: "2026-11-19T10:00:00Z", is_anonymous: false, recurring_id: "r1", donor_type: "individual", first_name: "Thandi", last_name: "Mokoena", organisation_name: null, email: null },
 ];
+const reads = vi.hoisted(() => ({ from: [] as string[], eq: [] as unknown[][] }));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
-    from: () => {
-      const q = { select: () => q, eq: () => q, order: () => q, limit: async () => ({ data: recent, error: null }) };
+    from: (table: string) => {
+      reads.from.push(table);
+      const q = { select: () => q, eq: (...a: unknown[]) => (reads.eq.push(a), q), in: () => q, order: () => q, limit: async () => ({ data: recent, error: null }) };
       return q;
     },
   }),
 }));
+vi.mock("@/lib/charity/s18a-reminder-send", () => ({ loadS18aMissing: async () => new Map([["d3", ["address", "id_number"]]]) }));
 vi.mock("@/lib/charity/dashboard-queries", () => ({
   loadDonors: async () => {
     donorReads++;
@@ -86,6 +89,39 @@ describe("donors the helper may never name", () => {
     await ask("top_donors", { limit: 3 });
     await ask("find_donor", { name: "thandi" });
     expect(donorReads).toBe(1);
+  });
+});
+
+describe("names, one donor at a time (24/11/2026)", () => {
+  it("answers about a named donor, and never finds an erased or anonymous one", async () => {
+    expect(await ask("donor_giving", { name: "Kept", last_gift: "" })).toContain('"found":0');
+    expect(await ask("donor_giving", { name: "Quiet", last_gift: "" })).toContain('"found":0');
+    const t = JSON.parse(await ask("donor_giving", { name: "thandi", last_gift: "" }));
+    expect(t).toMatchObject({ name: "Thandi Mokoena", asked_for_an_s18a_receipt: false });
+    // The gifts are read for this charity and this donor only.
+    expect(reads.eq).toEqual(expect.arrayContaining([["charity_id", "11111111-2222-3333-4444-555555555555"], ["donor_id", "d3"]]));
+  });
+
+  it("never reads gifts or contact details for a donor outside this charity's own list", async () => {
+    reads.from = [];
+    expect(await src.donorGifts!("someone-elses-donor")).toMatchObject({ gifts: [] });
+    expect(reads.from).toEqual([]);
+    expect(await src.donorContact!("someone-elses-donor")).toEqual({ email: null, phone: null });
+  });
+
+  it("gives no contact details for an anonymous donor, and an erased one's placeholder only", async () => {
+    expect(await src.donorContact!("d2")).toEqual({ email: null, phone: null });
+    const erased = await src.donorContact!("d1");
+    expect(erased.email).toMatch(/erased\.invalid$/);
+    const call = checkToolCall("donor_contact", { name: "Kept", last_gift: "" }, true, false, true);
+    if (!call.ok) throw new Error(call.error);
+    // Not even findable by name.
+    expect(await runTool(call, src, true)).toContain('"found":0');
+  });
+
+  it("lists who still has s18A details missing, by what is missing, in words", async () => {
+    const out = JSON.parse(await ask("donor_list", { list: "s18a_details_missing" }));
+    expect(out.donors).toEqual([{ name: "Thandi Mokoena", still_needed: ["address", "SA ID number"] }]);
   });
 });
 

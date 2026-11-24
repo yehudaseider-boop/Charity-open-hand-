@@ -5,7 +5,7 @@ import { getEmailTransport, isTemporaryRefusal } from "@/lib/email";
 import { oneClickStopUrl } from "@/lib/email/headers";
 import { JOB_SEND_TIMEOUT_MS, mayHaveSent } from "@/lib/email/retry-plan";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { WHEN_GAVE_LABELS, showsInApp, appealEmail, audienceValue, greetingName, keepingAudienceLabel, type Audience } from "./appeals-rules";
+import { WHEN_GAVE_LABELS, oneDonorLabel, showsInApp, appealEmail, audienceValue, greetingName, keepingAudienceLabel, type Audience } from "./appeals-rules";
 import { keepingListRows, keepingWindow } from "./keeping-donors";
 import { loadKeepingDonors } from "./keeping-donors-queries";
 import { donorMatches, isErasedEmail, thisMonth, thisTaxYear } from "./dashboard";
@@ -45,7 +45,8 @@ export type AudiencePick = {
 /** Everyone the chosen audience means, less those who said no. Null when the choice is no longer there. */
 export async function pickAudience(charityId: string, audience: Audience, now = new Date()): Promise<AudiencePick | null> {
   // Only donors with an address the owner can see (never erased).
-  const all = (await loadDonors(charityId)).filter((d): d is DonorRow & { email: string } => Boolean(d.email) && !isErasedEmail(d.email));
+  const listed = await loadDonors(charityId);
+  const all = listed.filter((d): d is DonorRow & { email: string } => Boolean(d.email) && !isErasedEmail(d.email));
   let donors: (DonorRow & { email: string })[];
   let label: string;
   switch (audience.kind) {
@@ -125,6 +126,16 @@ export async function pickAudience(charityId: string, audience: Audience, now = 
       donors = all.filter((d) => d.wants_18a);
       label = WHEN_GAVE_LABELS["s18a:asked"];
       break;
+    case "donor": {
+      // One donor (24/11/2026): found only in this charity's own list, read as the person asking, so another
+      // charity's donor id finds nobody. Someone erased at their request is never emailed. Every check below (said
+      // no, one a week, one per inbox, gifts the charity only recorded) applies as for any group.
+      const one = listed.find((d) => d.donor_id === audience.donorId);
+      if (!one || isErasedEmail(one.email)) return null;
+      donors = all.filter((d) => d.donor_id === one.donor_id);
+      label = oneDonorLabel(one.display_name);
+      break;
+    }
   }
   const gaveOnGivezy = await donorsWhoGaveOnGivezy(charityId);
   const reachable = donors.filter((d) => gaveOnGivezy.has(d.donor_id));

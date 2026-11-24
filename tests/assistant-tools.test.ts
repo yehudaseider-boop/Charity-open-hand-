@@ -38,7 +38,7 @@ describe("the tools offered", () => {
   it("are read-only lookups, strict, with donors' names only behind the switch", () => {
     const without = toolDefinitions(false).map((t) => t.name);
     expect(without).toEqual(["giving_totals", "giving_by_month", "monthly_donations", "setup_progress", "receipts_progress", "recent_gifts"]);
-    expect(toolDefinitions(true).map((t) => t.name)).toEqual([...without, "top_donors", "find_donor"]);
+    expect(toolDefinitions(true).map((t) => t.name)).toEqual([...without, "top_donors", "find_donor", "donor_giving", "donor_list"]);
     for (const t of toolDefinitions(true)) {
       expect(t.strict).toBe(true);
       expect((t.input_schema as unknown as { additionalProperties: boolean }).additionalProperties).toBe(false);
@@ -148,6 +148,6 @@ describe("the instructions", () => {
     expect(text).toMatch(/Never guess or work out a figure yourself/);
     expect(text).toMatch(/can't change, send, approve or delete/);
     expect(text).toMatch(/can't see individual donors' names/);
-    expect(stableInstructions({ whatsApp: null, email: null }, true)).toMatch(/look up donors by name/);
+    expect(stableInstructions({ whatsApp: null, email: null }, true)).toMatch(/answer about donors by name/);
   });
 });

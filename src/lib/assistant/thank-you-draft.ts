@@ -33,6 +33,19 @@ export function isGivyAudience(v: unknown): v is GivyAudience {
   return typeof v === "string" && Object.hasOwn(GIVY_AUDIENCES, v);
 }
 
+/**
+ * Who a kept draft is for: one of the groups above, or one donor (24/11/2026, only with donors' names switched on).
+ * A one-donor draft carries the donor's id, which the server found by name in this charity's own list; the model
+ * never sees or writes it, and the Email donors page resolves it again against the charity's own list.
+ */
+export type DraftAudience = GivyAudience | `donor:${string}`;
+
+export const isOneDonor = (v: unknown): v is `donor:${string}` => typeof v === "string" && /^donor:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v);
+
+export function isDraftAudience(v: unknown): v is DraftAudience {
+  return isGivyAudience(v) || isOneDonor(v);
+}
+
 /** The Email donors page's limits (appeals-rules.ts), and shorter ones for what Givy writes. */
 export const DRAFT_SUBJECT_MAX = 120;
 export const DRAFT_BODY_MAX = 1500;
@@ -68,7 +81,7 @@ export function checkDraft(input: { audience?: unknown; subject?: unknown; messa
 }
 
 /** The marker the server adds after an answer that prepared a thank-you: a kept draft's id, or only the audience. */
-export function thanksMark(prepared: { draftId: string | null; audience: GivyAudience }): string {
+export function thanksMark(prepared: { draftId: string | null; audience: DraftAudience }): string {
   return prepared.draftId && UUID.test(prepared.draftId) ? `\n[[thanks:d=${prepared.draftId.toLowerCase()}]]` : `\n[[thanks:to=${prepared.audience}]]`;
 }
 
@@ -76,11 +89,12 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Where the panel's "Check and send" button goes for a marker's value ("d=<id>" or "to=<audience>"), or null.
- * Only this dashboard's Email donors page, with a draft id or one of our fixed audiences; never the demo.
+ * Only this dashboard's Email donors page, with a draft id, one of our fixed audiences or one donor's id (which the
+ * page looks up again in this charity's own list, so it can never reach another charity's donor); never the demo.
  */
 export function thanksHref(value: string, base: string): string | null {
   if (!/^\/charity-admin\/[0-9a-f-]{36}$/i.test(base)) return null;
   if (value.startsWith("d=") && UUID.test(value.slice(2))) return `${base}/email-donors?draft=${value.slice(2).toLowerCase()}`;
-  if (value.startsWith("to=") && isGivyAudience(value.slice(3))) return `${base}/email-donors?to=${encodeURIComponent(value.slice(3))}`;
+  if (value.startsWith("to=") && isDraftAudience(value.slice(3))) return `${base}/email-donors?to=${encodeURIComponent(value.slice(3))}`;
   return null;
 }
