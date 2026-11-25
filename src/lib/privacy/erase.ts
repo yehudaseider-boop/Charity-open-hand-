@@ -4,6 +4,7 @@ import { getEmailTransport } from "@/lib/email";
 import { hashedKey } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { certificateKey } from "@/lib/receipts/review";
+import { ERASE_KEPT_TEXT } from "@/lib/delete-account";
 import { CERTIFICATE_KINDS, TEAM_KINDS, namesFrom, scrubCertificateDetails } from "./scrub-actions";
 
 export type EraseSummary = {
@@ -22,9 +23,8 @@ const UUID = /^[0-9a-f-]{36}$/i;
 /** A table whose migration hasn't run yet: nothing in it to erase. */
 const isMissingTable = (e: { code?: string } | null | undefined) => e?.code === "PGRST205" || e?.code === "42P01";
 
-/** What stays after an erasure, in words a person can read. */
-export const ERASE_KEPT_TEXT =
-  "We keep each donation's amount, date, charity and tax year, and any s18A receipt already issued. For a donation on an issued s18A receipt we also keep the name, ID or income tax number, registration number and address the charity must report to SARS, because tax law requires us to keep those records. Your email address, phone number and everything else are erased, including any copy of your details a charity imported into its own contact list on Givezy.";
+/** What stays after an erasure, in words a person can read (one source: src/lib/delete-account.ts, DRAFT for Yosef). */
+export { ERASE_KEPT_TEXT };
 
 /**
  * Erase everything that identifies a person, keeping only the records tax law requires
@@ -39,7 +39,15 @@ export const ERASE_KEPT_TEXT =
  * address read beforehand), and the sign-in account is deleted last (deleting it also removes their open privacy
  * request, so the audit log is the lasting record). Safe to run again.
  */
-export async function eraseDonor(args: { userId?: string; email?: string; actorUserId: string }): Promise<EraseSummary> {
+export async function eraseDonor(args: {
+  userId?: string;
+  email?: string;
+  actorUserId: string;
+  /** The audit action to record (default "privacy.donor_erased"). The in-app deletion records its own. */
+  auditAction?: string;
+  /** The confirmation email's words, instead of the default (the in-app deletion's own, 25/11/2026). `keptForWork`: the sign-in account had to stay. */
+  confirmationEmail?: (opts: { keptForWork: boolean }) => { subject: string; text: string };
+}): Promise<EraseSummary> {
   const db = createAdminClient();
   const userId = args.userId && UUID.test(args.userId) ? args.userId : undefined;
   let email = args.email?.trim().toLowerCase();
@@ -275,11 +283,13 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
   // now, so we use the one we read before.
   if (email && (summary.donors > 0 || summary.accountDeleted)) {
     try {
-      await getEmailTransport().send({
-        to: email,
-        subject: "Your information has been erased",
-        text: `As you asked, we have erased the information that identifies you from Givezy.\n\n${ERASE_KEPT_TEXT}${keptForWork ? "\n\nOne exception: your sign-in account stays, with your email address on it, because you manage a charity or run the platform." : ""}\n\nGivezy`,
-      });
+      const message = args.confirmationEmail
+        ? args.confirmationEmail({ keptForWork })
+        : {
+            subject: "Your information has been erased",
+            text: `As you asked, we have erased the information that identifies you from Givezy.\n\n${ERASE_KEPT_TEXT}${keptForWork ? "\n\nOne exception: your sign-in account stays, with your email address on it, because you manage a charity or run the platform." : ""}\n\nGivezy`,
+          };
+      await getEmailTransport().send({ to: email, ...message });
     } catch (e) {
       console.error("[erase] confirmation email not sent", e);
     }
@@ -288,7 +298,7 @@ export async function eraseDonor(args: { userId?: string; email?: string; actorU
   // Counts only: no names or addresses in the audit log.
   await logAudit({
     actorUserId: args.actorUserId,
-    action: "privacy.donor_erased",
+    action: args.auditAction ?? "privacy.donor_erased",
     entityType: userId ? "user" : "donor",
     entityId: userId ?? null,
     details: { ...summary },

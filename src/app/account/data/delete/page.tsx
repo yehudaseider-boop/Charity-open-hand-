@@ -34,6 +34,7 @@ export default async function DeleteAccountPage() {
             tax law requires us to keep are kept for as long as that law requires, no longer, and not used for anything else.
           </p>
           <p>Any open monthly donations are stopped when we delete the account.</p>
+          <p>Using the Givezy app? Account, then Delete my account deletes it at once, without waiting for us. This page is for when you can&apos;t use the app.</p>
           <p>We check that the request is from you first. Our reply shows on your <Link href="/account/data" className="text-brand underline">Your information</Link> page, and once your information is erased we email you to confirm.</p>
         </div>
         <div className="mt-4">

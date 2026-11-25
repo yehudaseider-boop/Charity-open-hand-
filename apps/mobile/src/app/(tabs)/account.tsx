@@ -162,7 +162,8 @@ export default function Account() {
               title="Your information"
               cells={[
                 { label: "Download my information", onPress: open("/account/data") },
-                { label: "Delete my account", onPress: open("/account/data/delete") },
+                // Inside the app, never the browser (25/11/2026, Apple 5.1.1(v)).
+                { label: "Delete my account", onPress: () => router.push("/delete-account") },
               ]}
             />
             <SettingsGroup

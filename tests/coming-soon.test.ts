@@ -85,6 +85,17 @@ describe("comingSoonAction", () => {
     expect(closed("https://givezy.co.za/logo.png")).toBe("pass-through");
   });
 
+  it("keeps the 'delete your account' information page open to read, whatever else is closed (Google Play, 25/11/2026)", () => {
+    expect(closed("https://givezy.co.za/delete-account")).toBe("pass-through");
+    expect(closed("https://www.givezy.co.za/delete-account", "HEAD")).toBe("pass-through");
+    // Information only: it takes no posts, and nothing under it is open.
+    expect(closed("https://givezy.co.za/delete-account", "POST")).toBe("not-found");
+    expect(closed("https://givezy.co.za/delete-account/more")).toBe("redirect-home");
+    // The signed-in deletion pages and the app's call stay closed on this address.
+    expect(closed("https://givezy.co.za/account/data/delete")).toBe("redirect-home");
+    expect(closed("https://givezy.co.za/api/app/delete-account")).toBe("not-found");
+  });
+
   it("opens only the policies for the launch list", () => {
     const listOnly = (p: string) => comingSoonAction(new URL(`https://givezy.co.za${p}`), "GET", on, true, { signUp: false, policies: true });
     expect(listOnly("/privacy")).toBe("pass-through");

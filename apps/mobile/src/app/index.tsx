@@ -34,7 +34,7 @@ export default function Welcome() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const directory = useDirectory();
-  const p = useLocalSearchParams<{ welcome?: string; step?: string }>();
+  const p = useLocalSearchParams<{ welcome?: string; step?: string; deleted?: string }>();
   const forced = p.welcome === "1" && (TEST_BUILD || isIphonePreview());
   const [seen, setSeen] = useState<boolean | null>(forced ? false : null);
   const [step, setStep] = useState(() => (forced ? Math.min(STEPS, Math.max(0, Number(p.step) || 0)) : 0));
@@ -84,7 +84,15 @@ export default function Welcome() {
             { size: 44, color: colors.lilac, ring: true, float: true, at: height < 760 ? { right: -12, top: height - insets.bottom - 70 } : { right: -12, top: insets.top + 470 } },
           ]}
         />
-        <View style={styles.gutter}><Logo width={130} /></View>
+        <View style={[styles.gutter, { gap: 14 }]}>
+          <Logo width={130} />
+          {/* After deleting the account in the app (25/11/2026): one short confirmation, then the usual welcome. */}
+          {p.deleted === "1" ? (
+            <View style={styles.deletedNote} accessibilityRole="alert">
+              <Text style={styles.deletedText}>Your account has been deleted. We&apos;ve emailed you a confirmation.</Text>
+            </View>
+          ) : null}
+        </View>
         <View style={styles.welcomeArt}>
           {/* Smaller on short phones (iPhone SE), so it never runs into the logo or the headline (12/11/2026). */}
           <People name="mobilePay" width={Math.min(280, width - 80, height < 760 ? Math.round(height * 0.27) : 280)} />
@@ -242,6 +250,8 @@ export default function Welcome() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.cream },
   whiteScreen: { flex: 1, backgroundColor: colors.cream, overflow: "hidden" },
+  deletedNote: { padding: 14, borderRadius: radius.control, backgroundColor: colors.lilacSoft, borderWidth: 1.5, borderColor: colors.lightPurple },
+  deletedText: { fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 23, color: colors.navy },
   welcomeArt: { flex: 1, minHeight: 0, overflow: "hidden", alignItems: "center", justifyContent: "center", paddingVertical: 12 },
   gutter: { paddingHorizontal: space.gutter },
   welcomeTitle: { fontFamily: fonts.displayBold, fontSize: 46, lineHeight: 50, letterSpacing: -0.5, color: colors.navy },

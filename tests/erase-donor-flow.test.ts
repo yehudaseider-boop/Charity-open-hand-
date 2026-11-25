@@ -351,3 +351,30 @@ describe("what charities kept about them (review 23/11/2026)", () => {
     expect(calls.some((c) => c.startsWith("charity_actions:update:") && c.includes('"name":"a donor"') && c.includes('"total":"R100"'))).toBe(true);
   });
 });
+
+describe("deleting your own account in the app (25/11/2026)", () => {
+  it("sends the app's own confirmation after the work (not before), records its own audit action, and sends one email only", async () => {
+    await eraseDonor({
+      userId: USER,
+      actorUserId: USER,
+      auditAction: "privacy.account_deleted_in_app",
+      confirmationEmail: () => ({ subject: "Your Givezy account has been deleted", text: "Draft confirmation" }),
+    });
+    expect(emails).toHaveLength(1);
+    expect(emails[0]).toMatchObject({ to: "erin@example.co.za", text: "Draft confirmation" });
+    // After the database erasure and the account deletion, before the audit entry.
+    expect(calls.indexOf("email")).toBeGreaterThan(calls.indexOf("rpc"));
+    expect(calls.indexOf("email")).toBeGreaterThan(calls.indexOf("deleteUser"));
+    expect(audits[0]).toMatchObject({ action: "privacy.account_deleted_in_app", actorUserId: USER });
+    expect(JSON.stringify(audits)).not.toMatch(/erin|example\.co\.za/i);
+  });
+
+  it("run again after the sign-in account is already gone: nothing left to erase, no second email, no failure", async () => {
+    donorsByUser = [];
+    donorsByEmail = [];
+    profile = null;
+    const s = await eraseDonor({ userId: USER, actorUserId: USER, auditAction: "privacy.account_deleted_in_app", confirmationEmail: () => ({ subject: "x", text: "y" }) });
+    expect(s.donors).toBe(0);
+    expect(emails).toHaveLength(0);
+  });
+});
