@@ -30,9 +30,10 @@ describe("delete my account: open request check", () => {
 });
 
 describe("delete my account: where it is offered", () => {
-  it("the app's account screen goes straight to the deletion page", () => {
+  it("the app's account screen opens the in-app deletion screen, not the browser (25/11/2026)", () => {
     const src = readFileSync("apps/mobile/src/app/(tabs)/account.tsx", "utf8");
-    expect(src).toMatch(/label: "Delete my account", onPress: open\("\/account\/data\/delete"\)/);
+    expect(src).toMatch(/label: "Delete my account", onPress: \(\) => router\.push\("\/delete-account"\)/);
+    expect(src).not.toMatch(/open\("\/account\/data\/delete"\)/);
   });
 
   it("the app's agreement screen offers it too", () => {

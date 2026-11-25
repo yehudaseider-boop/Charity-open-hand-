@@ -59,6 +59,11 @@ export function isComingSoonHost(hostname: string, setting: string | undefined):
  * any method.
  */
 const CHARITY_SIGN_UP_PATHS = ["/apply", "/login", "/auth", "/charity-admin", "/mfa", "/agree", "/documents", "/demo"];
+/**
+ * How to delete your account and data (25/11/2026): always open, on every address, to read signed out. Google Play wants
+ * a public page like this in the store listing, and the page is information only (it asks for nothing). GET and HEAD only.
+ */
+const DELETE_INFO_PATH = "/delete-account";
 /** The policies and the launch list's unsubscribe link: open while charities can apply or givers can join the list. */
 const POLICY_PATHS = ["/privacy", "/terms", "/launch-list/stop"];
 
@@ -96,7 +101,7 @@ export function comingSoonAction(url: URL, method: string, setting: string | und
   if (!deployed || !isComingSoonHost(url.hostname, setting)) return "pass-through";
   const pathname = url.pathname;
   // Technical files first, so robots.txt and the logo work for any method a browser or crawler uses.
-  if (isAllowedFile(pathname) && (method === "GET" || method === "HEAD")) return "pass-through";
+  if ((isAllowedFile(pathname) || pathname === DELETE_INFO_PATH) && (method === "GET" || method === "HEAD")) return "pass-through";
   // The charity sign-up path (see above), and the one call its header makes to know who is signed in.
   if (open.signUp && (under(CHARITY_SIGN_UP_PATHS, pathname) || (pathname === "/api/viewer" && (method === "GET" || method === "HEAD")))) return "pass-through";
   if ((open.signUp || open.policies) && under(POLICY_PATHS, pathname)) return "pass-through";

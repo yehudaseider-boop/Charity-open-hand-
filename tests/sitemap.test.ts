@@ -13,6 +13,7 @@ describe("the site map", () => {
       "https://givezy.test/faq",
       "https://givezy.test/privacy",
       "https://givezy.test/terms",
+      "https://givezy.test/delete-account",
       "https://givezy.test/c/meals-fund",
     ]);
   });
