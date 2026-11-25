@@ -17,7 +17,7 @@
   - **Service recovery.** A failed payment, a declined card, a lost connection or an outage gets as much care as success: say it plainly, say what did and didn't happen ("nothing was charged"), keep what the person typed, give one clear next step, and a way to reach a person.
   - **Edge cases are designed, not left over.** Empty states, error states, offline, slow networks, empty or silly input, very long names, zero and huge amounts: each is designed with the same care as the success screen.
   - **Test and break before calling it done.** Use it as a real person would, with Wi-Fi off, empty fields and a declined card, and fix what breaks.
-- Run `npm test`, `npm run typecheck` and `npm run lint` before committing. `npm test` starts the local test database if it is stopped, and refuses to run (one plain message) if it still can't reach it, so a green run always includes the database checks. `npm run test:no-db` is only for a machine with no local database.
+- Run `npm test`, `npm run typecheck` and `npm run lint` before committing. For anything in `apps/mobile`, also run `cd apps/mobile && npx tsc --noEmit && npx eslint src` (the phone app has its own code check, with React Compiler rules, that GitHub runs; 25/11/2026 a push failed on it because only the type check had been run). `npm test` starts the local test database if it is stopped, and refuses to run (one plain message) if it still can't reach it, so a green run always includes the database checks. `npm run test:no-db` is only for a machine with no local database.
 
 # Phone app (apps/mobile)
 

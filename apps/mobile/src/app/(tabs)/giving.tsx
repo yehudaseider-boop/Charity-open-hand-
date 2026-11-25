@@ -1,6 +1,6 @@
 import { recurringChangeError } from "@/lib/recurring-error";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { bigAmountSize, NARROW_SCREEN } from "@/lib/amount-size";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -289,8 +289,8 @@ export default function Giving() {
   // The last branch of the states below (not loading, not an error); the history is only for the preview and signed-in donors.
   const showMain = state !== "loading" && state !== "error";
   const showHistory = showMain && (preview || signedIn);
-  // Kept between renders so the list isn't redrawn on every scroll or countdown tick (review 24/11/2026).
-  const historyGroups = useMemo(() => (showHistory ? groupByMonth(myGifts) : []), [showHistory, myGifts]);
+  // The app's compiler (React Compiler) keeps this between renders, so the list isn't redrawn on every scroll or countdown tick.
+  const historyGroups = showHistory ? groupByMonth(myGifts) : [];
   const footerLabels = showMain && ((preview && myGifts.length > 0) || (signedIn && account.live));
 
   return (
