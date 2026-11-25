@@ -88,7 +88,10 @@ export default function DeleteAccount() {
 
   const signedIn = preview || account.status === "signed-in";
   useEffect(() => {
-    if (signedIn && !preview) void check();
+    if (!signedIn || preview) return;
+    // Started after this render (not inside it), so the screen's states are set from a callback.
+    const t = setTimeout(() => void check(), 0);
+    return () => clearTimeout(t);
     // Only when the screen opens or the sign-in changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn, preview]);
@@ -205,7 +208,7 @@ export default function DeleteAccount() {
             )}
             <Text style={styles.headTitle} accessibilityRole="header">{stage === "done" ? "Your account is deleted" : "Delete my account"}</Text>
             <Text style={styles.headLine}>
-              {stage === "done" ? "We've emailed you a confirmation." : stage === "confirm" || stage === "code" || working ? "Nearly done. One more check." : "Read this first. It takes a minute."}
+              {stage === "done" ? "We&apos;ve emailed you a confirmation." : stage === "confirm" || stage === "code" || working ? "Nearly done. One more check." : "Read this first. It takes a minute."}
             </Text>
           </BlueHeader>
 
@@ -237,7 +240,7 @@ export default function DeleteAccount() {
               <View style={styles.card}>
                 <Text variant="h2">Sign in again first</Text>
                 <Text variant="bodyMuted">
-                  It's a safety step: deleting can't be undone, so we check it is you. We'll email a code to {email}. What you typed stays here, and nothing has been deleted.
+                  It&apos;s a safety step: deleting can&apos;t be undone, so we check it is you. We&apos;ll email a code to {email}. What you typed stays here, and nothing has been deleted.
                 </Text>
                 {codeSent ? (
                   <>
@@ -281,7 +284,7 @@ export default function DeleteAccount() {
                 {problem ? <Problem problem={problem} onReach={reach} onRetry={() => void check()} /> : null}
                 {refusal ? (
                   <View style={styles.card} accessibilityRole="alert">
-                    <Text variant="h2">We can't delete it here</Text>
+                    <Text variant="h2">We can&apos;t delete it here</Text>
                     <Text variant="body">{refusal}</Text>
                     <Text variant="bodyMuted">{helpLine()}</Text>
                     <Button label="Back to Account" onPress={leave} />
@@ -364,7 +367,7 @@ function Done({ onContinue }: { onContinue: () => void }) {
         <People name="mailSent" width={190} />
         <Text variant="h2" style={{ textAlign: "center" }}>All done</Text>
         <Text variant="bodyMuted" style={{ textAlign: "center" }}>
-          Your account is deleted, your monthly donations are cancelled, and you are signed out. We've emailed you a confirmation of what was deleted and what we kept.
+          Your account is deleted, your monthly donations are cancelled, and you are signed out. We&apos;ve emailed you a confirmation of what was deleted and what we kept.
         </Text>
       </View>
       <Button label="Back to Givezy" onPress={onContinue} />
