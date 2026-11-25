@@ -14,7 +14,7 @@ export type Viewer = {
   charities: { id: string; name_en: string; status: string }[];
   /** Ids of the charities this person administers, known even before the second step. */
   managedCharityIds: string[];
-  /** Has agreed to the current Terms and Privacy Policy (POPIA). */
+  /** Has agreed to the current Terms and Privacy policy (POPIA). */
   agreedToCurrentPolicy: boolean;
 };
 
@@ -127,7 +127,7 @@ export async function requireViewer(next = "/account"): Promise<Viewer> {
   next = await currentNext(next);
   const viewer = await getViewer();
   if (!viewer) redirect(`/login?next=${encodeURIComponent(next)}`);
-  // Everyone with an account agrees to the current Terms and Privacy Policy first.
+  // Everyone with an account agrees to the current Terms and Privacy policy first.
   if (!viewer.agreedToCurrentPolicy) redirect(`/agree?next=${encodeURIComponent(next)}`);
   return viewer;
 }

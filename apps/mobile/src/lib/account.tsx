@@ -24,7 +24,7 @@ import { isNetworkError, recordAgreement, reviewerSignIn, signInWithCode, unread
  *
  *   preview      no live database yet: screens show sample data
  *   signed-out   live, not signed in
- *   agreeing     signed in, but hasn't agreed to the current Terms and Privacy Policy
+ *   agreeing     signed in, but hasn't agreed to the current Terms and Privacy policy
  *   signed-in    live data, read through row-level security (own rows only)
  *
  * Giving history is written by the server when the payment provider confirms a

@@ -25,7 +25,7 @@ The account is a new, empty donor account made for review. It has no gifts, no r
 
 **Delete my account.** Account, then "Delete my account" (under Your information). It is inside the app, shows what is deleted and what is kept (records tax law requires us to keep), and asks you to type DELETE. If you signed in more than 10 minutes ago it first emails a code. The reviewer sign-in above cannot be deleted (so the app can be checked again), and will say so; please create a different account with your own email if you want to see a deletion complete. The same instructions are public at https://givezy.co.za/delete-account (Play Console: use as the data deletion link once the live site is open).
 
-**Support.** hello@givezy.co.za, or WhatsApp 078 616 0489 (South African number). Privacy Policy: https://givezy.co.za/privacy
+**Support.** hello@givezy.co.za, or WhatsApp 078 616 0489 (South African number). Privacy policy: https://givezy.co.za/privacy
 
 **Donations and the optional contribution.** In this version, donations are made in the browser only. Donors may add an optional contribution to Givezy's running costs on top of their gift; it is clearly separate and can be set to zero.
 

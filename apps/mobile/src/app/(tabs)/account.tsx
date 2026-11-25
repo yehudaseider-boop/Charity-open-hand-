@@ -81,7 +81,7 @@ export default function Account() {
   const support = [
     { label: "Get help", onPress: getHelp },
     { label: "How Givezy works", onPress: () => router.push("/how-it-works") },
-    { label: "Privacy Policy", onPress: open("/privacy") },
+    { label: "Privacy policy", onPress: open("/privacy") },
     { label: "Terms", onPress: open("/terms") },
     // Test builds only: see the new-donor first open again.
     ...(TEST_BUILD ? [{ label: "Start again as a new donor (testing)", onPress: confirmStartAgain }] : []),

@@ -5,7 +5,7 @@ import { DraftNotice, Section } from "@/components/legal";
 import { legalConfig, show } from "@/config/legal";
 import { platformConfig } from "@/config/platform";
 
-export const metadata: Metadata = { title: "Privacy Policy" };
+export const metadata: Metadata = { title: "Privacy policy" };
 
 /**
  * POPIA notice (section 18): who we are, what we collect and why, who we share
@@ -16,7 +16,7 @@ export default function PrivacyPage() {
   return (
     <article className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Privacy Policy</h1>
+        <h1 className="text-2xl font-semibold">Privacy policy</h1>
         <p className="text-xs text-muted">Version of {policyVersionLabel(legalConfig.policyVersion)}</p>
         <DraftNotice />
       </div>

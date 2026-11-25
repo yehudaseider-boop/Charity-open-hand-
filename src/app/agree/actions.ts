@@ -8,7 +8,7 @@ import { signedInWithPassword } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-/** Records that the signed-in person agreed to the current Terms and Privacy Policy. */
+/** Records that the signed-in person agreed to the current Terms and Privacy policy. */
 export async function agreeToPolicy(formData: FormData) {
   const next = safeNextPath(formData.get("next"));
   const supabase = await createClient();

@@ -1479,7 +1479,7 @@ export default function Give() {
           {/* The agreement, at the end of the form. Only the total and the Give button stay pinned. */}
           <View style={{ gap: 10 }} onLayout={at("agree")}>
             <CheckRow
-              label={`I am 18 or older. I agree to the Terms and the Privacy Policy, and that my details are shared with ${charity.nameEn} so they can record my donation.`}
+              label={`I am 18 or older. I agree to the Terms and the Privacy policy, and that my details are shared with ${charity.nameEn} so they can record my donation.`}
               value={agreed}
               onChange={setAgreed}
               error={err("agreed") ?? err("age_confirmed") ?? err("popia_consent")}
@@ -1489,7 +1489,7 @@ export default function Give() {
                 <Text style={styles.link}>Read the Terms</Text>
               </Pressable>
               <Pressable onPress={() => openSite("/privacy")} accessibilityRole="link" style={styles.linkTap}>
-                <Text style={styles.link}>Read the Privacy Policy</Text>
+                <Text style={styles.link}>Read the Privacy policy</Text>
               </Pressable>
             </View>
           </View>

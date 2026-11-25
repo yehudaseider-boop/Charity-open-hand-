@@ -100,7 +100,7 @@ export async function hitRateLimit(
   return refused;
 }
 
-/** Emails and address stand-ins in the limits table are kept for about a day (Privacy Policy). Never throws. */
+/** Emails and address stand-ins in the limits table are kept for about a day (Privacy policy). Never throws. */
 export async function clearOldAttempts(): Promise<void> {
   try {
     const { error } = await createAdminClient().from("rate_limit_events").delete().lt("created_at", new Date(Date.now() - 24 * 3_600_000).toISOString());

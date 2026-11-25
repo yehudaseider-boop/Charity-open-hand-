@@ -12,13 +12,13 @@ export function DraftNotice() {
   );
 }
 
-/** "the Terms and the Privacy Policy" with links, for consent lines. */
+/** "the Terms and the Privacy policy" with links, for consent lines. */
 export function TermsAndPrivacyLinks() {
   return (
     <>
       the{" "}
       <Link href="/terms" prefetch={false} target="_blank" className="text-brand underline">Terms<span className="sr-only"> (opens in a new tab)</span></Link> and the{" "}
-      <Link href="/privacy" prefetch={false} target="_blank" className="text-brand underline">Privacy Policy<span className="sr-only"> (opens in a new tab)</span></Link>
+      <Link href="/privacy" prefetch={false} target="_blank" className="text-brand underline">Privacy policy<span className="sr-only"> (opens in a new tab)</span></Link>
     </>
   );
 }
@@ -26,7 +26,7 @@ export function TermsAndPrivacyLinks() {
 const footerGroups = [
   { title: "Give", links: [["Find a charity", "/charities"], ["How it works", "/for-donors"], ["Questions", "/faq"], ["Your account", "/account"]] },
   { title: "Charities", links: [["For charities", "/for-charities"], ["List your charity", "/apply"], ["Charity sign in", "/login"]] },
-  { title: "Your privacy", links: [["Privacy Policy", "/privacy"], ["Terms", "/terms"], ["Your information", "/account/data"]] },
+  { title: "Your privacy", links: [["Privacy policy", "/privacy"], ["Terms", "/terms"], ["Your information", "/account/data"]] },
 ] as const;
 
 export function SiteFooter() {

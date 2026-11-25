@@ -6,7 +6,7 @@ import { hitRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
- * The phone app's "I agree" to the Terms and Privacy Policy (24/11/2026). It used to call the database's
+ * The phone app's "I agree" to the Terms and Privacy policy (24/11/2026). It used to call the database's
  * agree_to_policy() with the donor's own sign-in, which let anyone signed in record agreement to any version text.
  * Now the server records it, and only for the version it has: an app showing an older or newer version than ours is
  * told to update, and nothing is recorded. Only for the signed-in donor (their token; a password session is refused).

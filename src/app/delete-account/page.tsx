@@ -82,7 +82,7 @@ export default function DeleteAccountInfoPage() {
       </Section>
 
       <p className="text-xs text-muted">
-        Questions about your information? See our <Link href="/privacy" className="text-brand underline">Privacy Policy</Link>
+        Questions about your information? See our <Link href="/privacy" className="text-brand underline">Privacy policy</Link>
         {legalConfig.privacyEmail ? <> or write to {legalConfig.privacyEmail}</> : null}.
       </p>
     </article>

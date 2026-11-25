@@ -310,7 +310,7 @@ export async function requestS18aWaiting(site: string, token: string, post: Post
  * (offline, an error): Home then shows no news at all, never news they said no to.
  */
 /**
- * "I agree" to the Terms and Privacy Policy, recorded by our server (24/11/2026), for the version this app shows.
+ * "I agree" to the Terms and Privacy policy, recorded by our server (24/11/2026), for the version this app shows.
  * A refusal carries the server's own words (for example "please update the app").
  */
 export async function recordAgreement(site: string, token: string, version: string, post: Post = fetchPost): Promise<{ ok: true } | { ok: false; message: string }> {

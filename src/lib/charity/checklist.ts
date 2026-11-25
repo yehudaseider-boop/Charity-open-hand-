@@ -23,11 +23,18 @@ type ChecklistInput = {
   documentTypes: DocumentType[];
 };
 
-export type ChecklistItem = { key: string; label: string; done: boolean };
+export type ChecklistItem = {
+  key: string;
+  label: string;
+  done: boolean;
+  /** Can follow after submitting: never holds up the application (the receipting mandate, 25/11/2026). */
+  optional?: boolean;
+};
 
 /**
- * What an application needs before it can be submitted. s18A applicants
- * must also upload their PBO and s18A approvals and the signed mandate.
+ * What an application needs before it can be submitted. s18A applicants must also upload their PBO and s18A
+ * approvals. The signed receipting mandate is listed but can follow (Yehuda, 25/11/2026: nothing sent charities the
+ * mandate, yet it was required to submit): Givezy sends it, and receipts start once it is back and confirmed.
  */
 export function applicationChecklist({ charity, priv, documentTypes }: ChecklistInput): ChecklistItem[] {
   const has = (t: DocumentType) => documentTypes.includes(t);
@@ -52,14 +59,14 @@ export function applicationChecklist({ charity, priv, documentTypes }: Checklist
   if (charity.s18a_reference) {
     items.push(
       { key: "s18a_approval", label: "s18A approval", done: has("s18a_approval") },
-      { key: "receipting_mandate", label: "Signed receipting mandate", done: has("receipting_mandate") },
+      { key: "receipting_mandate", label: "Signed receipting mandate", done: has("receipting_mandate"), optional: true },
     );
   }
   return items;
 }
 
 export function isComplete(items: ChecklistItem[]) {
-  return items.every((i) => i.done);
+  return items.every((i) => i.done || i.optional);
 }
 
 /** The application as five steps plus submit, each done when its checklist items are. */
@@ -74,7 +81,7 @@ const STEP_ITEMS: Record<Exclude<ApplicationStep["key"], "submit">, string[]> = 
 };
 
 export function applicationSteps(items: ChecklistItem[]): ApplicationStep[] {
-  const done = (keys: string[]) => items.filter((i) => keys.includes(i.key)).every((i) => i.done);
+  const done = (keys: string[]) => items.filter((i) => keys.includes(i.key)).every((i) => i.done || i.optional);
   const steps: ApplicationStep[] = [
     { key: "organisation", label: "Your organisation", hint: "The name donors will see, your registered legal name, and your NPO or PBO number. About two minutes.", done: done(STEP_ITEMS.organisation) },
     { key: "address", label: "Registered address", hint: "The address on your registration documents. It appears on s18A receipts.", done: done(STEP_ITEMS.address) },

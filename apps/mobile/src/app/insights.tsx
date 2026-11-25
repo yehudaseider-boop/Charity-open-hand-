@@ -72,7 +72,7 @@ export default function Insights() {
           ) : state === "error" ? (
             <ErrorState body="We couldn't load your giving. Check your connection and try again." onRetry={() => account.refresh()} />
           ) : account.status === "agreeing" ? (
-            <EmptyState art="checklist" title="One more step" body="Agree to the Terms and Privacy Policy on the Account tab, and your giving appears here." action={{ label: "Go to Account", onPress: () => router.navigate("/account") }} />
+            <EmptyState art="checklist" title="One more step" body="Agree to the Terms and Privacy policy on the Account tab, and your giving appears here." action={{ label: "Go to Account", onPress: () => router.navigate("/account") }} />
           ) : !preview && !signedIn ? (
             <EmptyState art="loveIt" title="See your giving here" body="Sign in with the email you give with, and your gifts show up here with your insights." action={{ label: "Sign in", onPress: () => router.navigate("/account") }} />
           ) : (

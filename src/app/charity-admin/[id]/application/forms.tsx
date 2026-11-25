@@ -120,7 +120,7 @@ export function UploadForm({ action, showMandateDate, canBank = true }: { action
 export const charityDeclarations = [
   ["declare_authority", "I am authorised to act for this organisation."],
   ["declare_true", "The information and documents we have given are true and correct."],
-  ["declare_terms", "We agree to the Terms and Privacy Policy, including the section for charities."],
+  ["declare_terms", "We agree to the Terms and Privacy policy, including the section for charities."],
   ["declare_donor_data", "We will use donors' information only to record donations and thank donors, keep it secure under POPIA, and never sell or share it."],
 ] as const;
 

@@ -25,7 +25,7 @@ export function llmsText(origin: string, charities: { slug: string; name_en: str
     `- [For donors](${base}/for-donors): how giving works, monthly gifts, s18A receipts and card privacy`,
     `- [For charities](${base}/for-charities): how a South African charity joins`,
     `- [Questions](${base}/faq): costs, safety, s18A receipts and privacy`,
-    `- [Privacy Policy](${base}/privacy) and [Terms](${base}/terms)`,
+    `- [Privacy policy](${base}/privacy) and [Terms](${base}/terms)`,
     "",
     "## For donors",
     "",

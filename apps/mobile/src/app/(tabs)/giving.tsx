@@ -461,7 +461,7 @@ export default function Giving() {
             ) : account.status === "agreeing" ? (
               <View style={styles.softCard}>
                 <Text variant="h2" style={styles.cardTitle}>One more step</Text>
-                <Text variant="bodyMuted">Agree to the Terms and Privacy Policy on the Account tab, and your giving and goals appear here.</Text>
+                <Text variant="bodyMuted">Agree to the Terms and Privacy policy on the Account tab, and your giving and goals appear here.</Text>
                 <Button label="Go to Account" onPress={() => router.push("/account")} />
               </View>
             ) : !goalsLoaded ? (

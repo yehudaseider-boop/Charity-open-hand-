@@ -196,7 +196,7 @@ export default function Receipts() {
               <View style={styles.emptyBox}>
                 <People name="checklist" width={170} float={false} />
                 <Text variant="h2" style={styles.emptyTitle}>One more step</Text>
-                <Text variant="bodyMuted" style={{ textAlign: "center" }}>Agree to the Terms and Privacy Policy on the Account tab, and your receipts appear here.</Text>
+                <Text variant="bodyMuted" style={{ textAlign: "center" }}>Agree to the Terms and Privacy policy on the Account tab, and your receipts appear here.</Text>
                 <Button label="Go to Account" onPress={() => router.push("/account")} />
               </View>
             ) : !preview && !signedIn ? (

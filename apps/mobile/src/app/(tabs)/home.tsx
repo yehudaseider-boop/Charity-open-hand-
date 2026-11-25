@@ -206,7 +206,7 @@ export default function Home() {
               // Not agreed to the current Terms yet: goals wait for that, so say what to do, as Progress does (20/11/2026).
               <View style={{ gap: 12 }}>
                 <Text style={styles.goalAmount} accessibilityRole="header">One more step</Text>
-                <Text style={styles.goalSub}>Agree to the Terms and Privacy Policy on the Account tab, and your giving and goals appear here.</Text>
+                <Text style={styles.goalSub}>Agree to the Terms and Privacy policy on the Account tab, and your giving and goals appear here.</Text>
                 <Button variant="white" label="Go to Account" onPress={() => router.push("/account")} />
               </View>
             ) : goals.status !== "ready" && !preview ? (

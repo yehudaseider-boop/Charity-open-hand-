@@ -356,7 +356,7 @@ export async function startDonation(args: {
         if (details.error) throw details.error;
       })(),
       (async () => {
-        // What the donor agreed to, and which version of the Terms and Privacy Policy they saw.
+        // What the donor agreed to, and which version of the Terms and Privacy policy they saw.
         const consent = await db.from("consents").insert({ kind: "donation", policy_version: legalConfig.policyVersion, donation_id: donationId });
         if (consent.error) throw consent.error;
       })(),

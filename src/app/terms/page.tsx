@@ -22,7 +22,7 @@ export default function TermsPage() {
       <Section title="About these terms">
         <p>
           These terms apply to the {name} website and app, run by {show(legalConfig.companyName)}. By donating, signing in or
-          listing a charity you agree to them and to our <Link href="/privacy" className="text-brand underline">Privacy Policy</Link>.
+          listing a charity you agree to them and to our <Link href="/privacy" className="text-brand underline">Privacy policy</Link>.
           South African law applies.
         </p>
       </Section>

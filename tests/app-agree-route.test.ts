@@ -1,5 +1,5 @@
 /**
- * POST /api/app/agree (24/11/2026): the phone app's "I agree" to the Terms and Privacy Policy is recorded by our server,
+ * POST /api/app/agree (24/11/2026): the phone app's "I agree" to the Terms and Privacy policy is recorded by our server,
  * only for a donor signed in with an emailed code, only for the version the server has, and a second agreement counts as
  * already recorded. Before, the app wrote it to the database itself with any version text.
  */

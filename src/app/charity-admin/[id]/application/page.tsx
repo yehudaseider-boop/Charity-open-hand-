@@ -37,7 +37,7 @@ const documentHelp: Record<string, string> = {
   bank_confirmation: "A letter from your bank showing the account is in the organisation's name, with the account number and branch code.",
   pbo_approval: "The SARS letter confirming your PBO status.",
   s18a_approval: "The SARS letter that lets you issue s18A receipts.",
-  receipting_mandate: "Our receipting mandate, signed. It lets us issue s18A receipts in your name.",
+  receipting_mandate: "Our receipting mandate, signed. It lets us issue s18A receipts in your name. It can follow after you submit: we email it to you to sign.",
 };
 
 export default async function ApplicationPage({ params, searchParams }: PageProps<"/charity-admin/[id]/application">) {
@@ -181,7 +181,8 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
                 {charity.s18a_reference ? (
                   <p className="mb-3 text-sm text-muted">
                     As an s18A organisation you also sign a receipting mandate. It authorises us to issue s18A receipts in
-                    your name. We&apos;ll send you the mandate to sign; upload the signed copy here.
+                    your name. You don&apos;t need it to submit: we email you the mandate to sign, and s18A receipts start once
+                    we have the signed copy. If you already have it, upload it here.
                   </p>
                 ) : null}
                 <DocumentList docs={documents} removeAction={(docId) => removeDocument.bind(null, id, docId)} />

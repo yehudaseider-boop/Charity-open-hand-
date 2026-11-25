@@ -27,7 +27,7 @@ export default async function YourInformationPage() {
       <Link href="/account" className="text-sm font-semibold text-muted hover:text-brand">← Your account</Link>
       <h1 className="font-display text-2xl text-indigo">Your information</h1>
       <p className="text-sm text-muted">
-        What we keep and why is set out in our <Link href="/privacy" className="text-brand underline">Privacy Policy</Link>.
+        What we keep and why is set out in our <Link href="/privacy" className="text-brand underline">Privacy policy</Link>.
       </p>
 
       <Card title="Download everything we hold about you">
@@ -63,7 +63,7 @@ export default async function YourInformationPage() {
           <ul className="space-y-1 text-sm">
             {consents.map((c, i) => (
               <li key={i}>
-                Terms and Privacy Policy, version of {policyVersionLabel(c.policy_version)}, on {formatDate(c.accepted_at)}
+                Terms and Privacy policy, version of {policyVersionLabel(c.policy_version)}, on {formatDate(c.accepted_at)}
               </li>
             ))}
           </ul>

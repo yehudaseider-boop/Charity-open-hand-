@@ -118,7 +118,7 @@ export function SignIn() {
   );
 }
 
-/** Agree to the Terms and Privacy Policy (once per version), as on the website. */
+/** Agree to the Terms and Privacy policy (once per version), as on the website. */
 export function Agree() {
   const account = useAccount();
   const [terms, setTerms] = useState(false);
@@ -135,10 +135,10 @@ export function Agree() {
         We keep your email and your giving records so you can see them here. Only you see your giving goal and the labels you give your donations. We never sell your
         information or send you marketing.
       </Text>
-      <Check checked={terms} onPress={() => setTerms((v) => !v)} label="I agree to the Terms and the Privacy Policy." />
+      <Check checked={terms} onPress={() => setTerms((v) => !v)} label="I agree to the Terms and the Privacy policy." />
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16, paddingLeft: 36 }}>
         <TextLink label="Read the Terms" onPress={() => open("/terms")} />
-        <TextLink label="Read the Privacy Policy" onPress={() => open("/privacy")} />
+        <TextLink label="Read the Privacy policy" onPress={() => open("/privacy")} />
       </View>
       <Check checked={age} onPress={() => setAge((v) => !v)} label="I am 18 or older." />
       {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}
