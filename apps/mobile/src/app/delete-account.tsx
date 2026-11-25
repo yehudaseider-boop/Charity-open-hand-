@@ -1,8 +1,8 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BackHandler, KeyboardAvoidingView, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CANT_UNDO, DELETED_LIST, KEPT_LIST, KEPT_WHY, TAKES_HOW_LONG } from "@shared/delete-account";
+import { CANT_UNDO, DELETED_LIST, DELETE_MESSAGES, KEPT_LIST, KEPT_WHY, TAKES_HOW_LONG } from "@shared/delete-account";
 import { Backdrop, BlueHeader } from "@/components/backdrop";
 import { Button, TextLink } from "@/components/button";
 import { Field } from "@/components/field";
@@ -14,7 +14,7 @@ import { useStatusCover } from "@/components/status-cover";
 import { Text } from "@/components/text";
 import { sampleDonor } from "@/data/giving";
 import { useAccount } from "@/lib/account";
-import { checkDeletion, deleteReady, phoneKeysFor, requestDeletion } from "@/lib/delete-account";
+import { checkDeletion, deleteReady, phoneKeysFor, requestDeletion, stageAfterRefusal } from "@/lib/delete-account";
 import { startAgainAsNewDonor } from "@/lib/first-run";
 import { haptic } from "@/lib/haptics";
 import { helpLine, helpMailto } from "@/lib/help";
@@ -50,7 +50,7 @@ export default function DeleteAccount() {
 
   const [stage, setStage] = useState<Stage>(shot === "confirm" || shot === "error" ? "confirm" : shot === "code" ? "code" : shot === "done" ? "done" : preview ? "intro" : "check");
   const [typed, setTyped] = useState(shot === "confirm" || shot === "error" ? "DELETE" : "");
-  const [refusal, setRefusal] = useState<string | null>(shot === "refused" ? "You manage a charity on Givezy, so we can't delete your account yet. A charity needs an owner: hand it over to someone else first. Nothing was deleted." : null);
+  const [refusal, setRefusal] = useState<string | null>(shot === "refused" ? DELETE_MESSAGES.manager : null);
   const [problem, setProblem] = useState<ProblemInfo | null>(shot === "error" ? { title: "Your account wasn't deleted", message: "We couldn't reach Givezy. Check your connection and try again. Nothing was deleted that we know of, and what you typed is still here." } : null);
   const [needsFreshSignIn, setNeedsFreshSignIn] = useState(false);
   const [codeSent, setCodeSent] = useState(shot === "code" ? true : false);
@@ -59,6 +59,8 @@ export default function DeleteAccount() {
   const [busy, setBusy] = useState(false);
   /** An earlier try got no answer, so it may have gone through. */
   const attempted = useRef(false);
+  /** A delete is on its way: a second press does nothing. */
+  const running = useRef(false);
   const working = stage === "working";
 
   // The check before anything is typed: can this account be deleted here? Refusals show first, not after typing.
@@ -120,6 +122,17 @@ export default function DeleteAccount() {
   };
 
   const run = async () => {
+    // A double tap must not send a second delete: its answer (a dead sign-in) would be drawn over the "done" screen.
+    if (running.current) return;
+    running.current = true;
+    try {
+      await runOnce();
+    } finally {
+      running.current = false;
+    }
+  };
+
+  const runOnce = async () => {
     setProblem(null);
     setStage("working");
     if (preview || !SITE_URL) {
@@ -141,8 +154,13 @@ export default function DeleteAccount() {
         setCodeError(null);
         return setStage("code");
       case "refused":
-        setRefusal(o.message);
-        return setStage("intro");
+        if (stageAfterRefusal(o.code) === "dead_end") {
+          setRefusal(o.message);
+          return setStage("intro");
+        }
+        // Temporary: back to the confirm step with the words shown, what was typed kept, and "Try again".
+        setProblem({ title: "Your account wasn't deleted", message: o.message });
+        return setStage("confirm");
       case "maybe_done":
         setProblem({ title: "We're not sure it went through", message: o.message });
         return setStage("confirm");
@@ -195,6 +213,8 @@ export default function DeleteAccount() {
 
   return (
     <View style={{ flex: 1 }}>
+      {/* While it runs, an iPhone swipe-back waits too (Android's back button is held above). */}
+      <Stack.Screen options={{ gestureEnabled: !working }} />
       <Backdrop variant="account" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView style={styles.screen} onScroll={status.onScroll} scrollEventThrottle={16} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 40, gap: space.block }}>
@@ -240,7 +260,7 @@ export default function DeleteAccount() {
               <View style={styles.card}>
                 <Text variant="h2">Sign in again first</Text>
                 <Text variant="bodyMuted">
-                  It&apos;s a safety step: deleting can&apos;t be undone, so we check it is you. We&apos;ll email a code to {email}. What you typed stays here, and nothing has been deleted.
+                  It&apos;s a safety step: deleting can&apos;t be undone, so we check it is you. We&apos;ll email a code to {email}. What you typed stays here, and your account is still there.
                 </Text>
                 {codeSent ? (
                   <>
@@ -260,7 +280,7 @@ export default function DeleteAccount() {
               </View>
             ) : stage === "confirm" ? (
               <>
-                {problem ? <Problem problem={problem} onReach={reach} /> : null}
+                {problem ? <Problem problem={problem} onReach={reach} onRetry={pressDelete} /> : null}
                 <View style={styles.card}>
                   <Text variant="h2">Type DELETE to confirm</Text>
                   <Text variant="bodyMuted">Your monthly donations will be cancelled and your account deleted for good. {CANT_UNDO}</Text>

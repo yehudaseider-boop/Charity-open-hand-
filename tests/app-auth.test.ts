@@ -31,6 +31,13 @@ describe("app sign-in check", () => {
     expect(getUser).toHaveBeenCalledWith("tok");
   });
 
+  it("for money, uses the live email, which can differ from the token's after an email change", async () => {
+    liveUser = { id: "u1", email: "new@example.com" } as { id: string };
+    expect(await appAccount(req(), { forMoney: true })).toEqual({ userId: "u1", email: "new@example.com" });
+    // Everyday calls keep reading the token.
+    expect(await appAccount(req())).toEqual({ userId: "u1", email: "a@example.com" });
+  });
+
   it("for money, refuses a token whose session was signed out or whose account is gone", async () => {
     liveError = new Error("session_not_found");
     liveUser = null;

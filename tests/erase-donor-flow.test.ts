@@ -369,6 +369,43 @@ describe("deleting your own account in the app (25/11/2026)", () => {
     expect(JSON.stringify(audits)).not.toMatch(/erin|example\.co\.za/i);
   });
 
+  const inApp = { userId: USER, actorUserId: USER, auditAction: "privacy.account_deleted_in_app", confirmationEmail: () => ({ subject: "Your Givezy account has been deleted", text: "Draft" }), emailOnlyWhenAccountDeleted: true };
+
+  it("emails only when the sign-in account was really deleted: never while it still exists (review 25/11/2026)", async () => {
+    // Kept because they run the platform: donor records were erased (donors > 0) but the account stays, so no "deleted" email.
+    profile = { email: "boss@example.co.za", role: "platform_admin" };
+    let s = await eraseDonor(inApp);
+    expect(s.donors).toBeGreaterThan(0);
+    expect(s.accountDeleted).toBe(false);
+    expect(emails).toHaveLength(0);
+
+    // The account could not be deleted: no email either.
+    profile = { email: "erin@example.co.za", role: "user" };
+    deleteUserError = { message: "constraint" };
+    s = await eraseDonor(inApp);
+    expect(s.accountDeleted).toBe(false);
+    expect(emails).toHaveLength(0);
+
+    // Deleted this time: one email.
+    deleteUserError = null;
+    s = await eraseDonor(inApp);
+    expect(s.accountDeleted).toBe(true);
+    expect(emails).toHaveLength(1);
+  });
+
+  it("a repeat that finds the account already deleted (404) sends no second email", async () => {
+    deleteUserError = { message: "User not found", status: 404 } as { message: string };
+    const s = await eraseDonor(inApp);
+    expect(s.accountDeleted).toBe(true);
+    expect(emails).toHaveLength(0);
+  });
+
+  it("the older erasures (by a person at Givezy) keep their rule: donor records erased is enough to email", async () => {
+    profile = { email: "boss@example.co.za", role: "platform_admin" };
+    await eraseDonor({ userId: USER, actorUserId: "admin1" });
+    expect(emails).toHaveLength(1);
+  });
+
   it("run again after the sign-in account is already gone: nothing left to erase, no second email, no failure", async () => {
     donorsByUser = [];
     donorsByEmail = [];

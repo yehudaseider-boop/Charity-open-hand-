@@ -10,7 +10,9 @@ import {
   deletionEmail,
   lastSignInSeconds,
   outcomeFor,
+  refusalIsDeadEnd,
   signInIsRecent,
+  type DeleteCode,
 } from "@/lib/delete-account";
 
 const NOW = Date.UTC(2026, 10, 25, 10, 0, 0);
@@ -25,6 +27,16 @@ describe("when did they last sign in", () => {
     expect(lastSignInSeconds(undefined)).toBeNull();
     expect(lastSignInSeconds("x")).toBeNull();
     expect(lastSignInSeconds([{ timestamp: "soon" }, { timestamp: -5 }, null])).toBeNull();
+  });
+  it("reads Supabase's real shape: an array of { method, timestamp } with unix seconds, and counts no amr, or entries without a timestamp, as not recent", () => {
+    const real = [{ method: "otp", timestamp: sec(60_000) }];
+    expect(lastSignInSeconds(real)).toBe(sec(60_000));
+    expect(signInIsRecent(lastSignInSeconds(real), NOW)).toBe(true);
+    for (const amr of [[{ method: "otp" }], [{ method: "otp", timestamp: undefined }], undefined, null, []]) {
+      expect(signInIsRecent(lastSignInSeconds(amr), NOW)).toBe(false);
+    }
+    // An old session that was only refreshed stays old.
+    expect(signInIsRecent(lastSignInSeconds([{ method: "otp", timestamp: sec(3 * 3_600_000) }]), NOW)).toBe(false);
   });
 });
 
@@ -59,7 +71,8 @@ describe("the words (DRAFT for Yosef)", () => {
   it("every refusal says what happened to their data, and none shouts", () => {
     for (const [code, text] of Object.entries(DELETE_MESSAGES)) {
       expect(text, code).not.toMatch(/!/);
-      if (code !== "incomplete") expect(text, code).toMatch(/nothing was deleted|deleted nothing/i);
+      // Never claims more than is true: a person may be part way through (charging stopped, data possibly erased).
+      if (code !== "incomplete") expect(text, code).toMatch(/nothing was deleted|your account is still there|part of your data/i);
     }
     // A half-done run says what is already stopped, and that pressing again carries on.
     expect(DELETE_MESSAGES.incomplete).toMatch(/already stopped/);
@@ -68,6 +81,23 @@ describe("the words (DRAFT for Yosef)", () => {
   it("the manager refusal says to hand over the charity, the open request one says we are on it", () => {
     expect(DELETE_MESSAGES.manager).toMatch(/hand it over/i);
     expect(DELETE_MESSAGES.request_open).toMatch(/working on it/i);
+  });
+  it("claims 'nothing was deleted' only where that is always true", () => {
+    // These can come after the cancel or part of the erasure, so they say the account is still there instead.
+    for (const code of ["busy", "unavailable", "cancel_failed", "payment_in_progress", "sign_in_again", "confirm", "manager"] as DeleteCode[]) {
+      expect(DELETE_MESSAGES[code], code).not.toMatch(/nothing was deleted|deleted nothing/i);
+    }
+    expect(DELETE_MESSAGES.busy).toMatch(/your account is still there/i);
+    expect(DELETE_MESSAGES.unavailable).toMatch(/your account is still there/i);
+    expect(DELETE_MESSAGES.cancel_failed).toMatch(/some of your monthly donations may already be stopped/i);
+  });
+  it("the manager refusal also says plainly that part of the data may already be gone, and to contact us", () => {
+    expect(DELETE_MESSAGES.manager).toMatch(/part of your data was deleted before we could finish/);
+    expect(DELETE_MESSAGES.manager).toMatch(/contact us/);
+  });
+  it("only a refusal that retrying cannot fix is a dead end", () => {
+    for (const code of ["manager", "platform_admin", "request_open", "reviewer"] as DeleteCode[]) expect(refusalIsDeadEnd(code), code).toBe(true);
+    for (const code of ["incomplete", "cancel_failed", "unavailable", "busy", "payment_in_progress", "confirm"] as DeleteCode[]) expect(refusalIsDeadEnd(code), code).toBe(false);
   });
   it("fits in the app's 300-character limit for a server message", () => {
     for (const text of Object.values(DELETE_MESSAGES)) expect(text.length).toBeLessThanOrEqual(300);

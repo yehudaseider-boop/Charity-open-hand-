@@ -47,6 +47,11 @@ export async function eraseDonor(args: {
   auditAction?: string;
   /** The confirmation email's words, instead of the default (the in-app deletion's own, 25/11/2026). `keptForWork`: the sign-in account had to stay. */
   confirmationEmail?: (opts: { keptForWork: boolean }) => { subject: string; text: string };
+  /**
+   * Send the confirmation only when this run really deleted the sign-in account (the in-app deletion's email says "your
+   * account has been deleted", so it is never sent while the account still exists, or a second time on a repeat).
+   */
+  emailOnlyWhenAccountDeleted?: boolean;
 }): Promise<EraseSummary> {
   const db = createAdminClient();
   const userId = args.userId && UUID.test(args.userId) ? args.userId : undefined;
@@ -248,6 +253,8 @@ export async function eraseDonor(args: {
 
   // The sign-in account stays on purpose (they run a charity or the platform): the email says so, and only then.
   let keptForWork = false;
+  /** This run deleted the sign-in account (not "it was already gone"). */
+  let accountDeletedNow = false;
   if (userId) {
     // Their own records kept against the account go in every case, also when the account itself has to stay
     // (they run a charity or the platform): income log, giving elsewhere, private notes, saved charities, giving-target settings, the saved card.
@@ -274,14 +281,18 @@ export async function eraseDonor(args: {
       const { error: delError } = await db.auth.admin.deleteUser(userId);
       // Running the erasure again after the account is gone is not a failure.
       if (delError && delError.status !== 404) summary.note = `Their sign-in account could not be deleted: ${delError.message}`;
-      else summary.accountDeleted = true;
+      else {
+        summary.accountDeleted = true;
+        accountDeletedNow = !delError;
+      }
     }
   }
 
   // Tell them once it is done and something was erased: donor records, or the sign-in account itself (someone who
   // signed in but never gave was promised an email too, sweep of 18/11/2026). The address is gone from our records
   // now, so we use the one we read before.
-  if (email && (summary.donors > 0 || summary.accountDeleted)) {
+  const sendConfirmation = args.emailOnlyWhenAccountDeleted ? accountDeletedNow : summary.donors > 0 || summary.accountDeleted;
+  if (email && sendConfirmation) {
     try {
       const message = args.confirmationEmail
         ? args.confirmationEmail({ keptForWork })

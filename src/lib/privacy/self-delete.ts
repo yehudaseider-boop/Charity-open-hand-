@@ -37,40 +37,69 @@ type Db = ReturnType<typeof createAdminClient>;
 export async function whyNotDeletable(userId: string, email: string, now = Date.now(), env: Record<string, string | undefined> = process.env): Promise<DeleteCode | null> {
   const db = createAdminClient();
   // The reviewer's sign-in is never deleted, whatever else is true of it, and whether or not the fixed code is switched on.
+  // `email` is the live one from Supabase (not the token's, which can be stale after an email change); the address on
+  // the account's own profile row is checked too, so the reviewer's account is recognised by either.
   const reviewer = (env.REVIEW_SIGN_IN_EMAIL ?? "").trim().toLowerCase();
-  if (reviewer && email.trim().toLowerCase() === reviewer) return "reviewer";
+  const sameAsReviewer = (e: unknown) => reviewer !== "" && typeof e === "string" && e.trim().toLowerCase() === reviewer;
+  if (sameAsReviewer(email)) return "reviewer";
 
   const [profile, admins, requests] = await Promise.all([
-    db.from("profiles").select("role").eq("id", userId).maybeSingle(),
+    db.from("profiles").select("role, email").eq("id", userId).maybeSingle(),
     db.from("charity_admins").select("user_id", { count: "exact", head: true }).eq("user_id", userId),
     db.from("data_requests").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("status", "open"),
   ]);
   for (const r of [profile, admins, requests]) if (r.error) throw new Error(`Could not check the account: ${r.error.message}`);
+  if (sameAsReviewer(profile.data?.email)) return "reviewer";
   if (profile.data?.role === "platform_admin") return "platform_admin";
   if ((admins.count ?? 0) > 0) return "manager";
   if ((requests.count ?? 0) > 0) return "request_open";
 
   // A monthly charge that started in the last half hour may still be on its way: wait, so nobody is charged after deleting.
-  const donorIds = await donorIdsOf(db, userId);
-  if (donorIds.length) {
-    const since = new Date(now - CHARGE_IN_FLIGHT_MS).toISOString();
-    const { count, error } = await db
-      .from("donations")
-      .select("id", { count: "exact", head: true })
-      .in("donor_id", donorIds)
-      .eq("status", "pending")
-      .not("recurring_id", "is", null)
-      .gte("created_at", since);
-    if (error) throw new Error(`Could not check for a charge on its way: ${error.message}`);
-    if ((count ?? 0) > 0) return "payment_in_progress";
-  }
+  if (await chargeOnItsWay(db, await donorIdsOf(db, userId, [email, profile.data?.email]), now)) return "payment_in_progress";
   return null;
 }
 
-async function donorIdsOf(db: Db, userId: string): Promise<string[]> {
-  const { data, error } = await db.from("donors").select("id").eq("user_id", userId);
-  if (error) throw new Error(`Could not read the donor records: ${error.message}`);
-  return (data ?? []).map((d) => d.id as string);
+/** Has a monthly charge started in the last half hour for any of these donor records? Throws when it cannot be checked. */
+async function chargeOnItsWay(db: Db, donorIds: string[], now: number): Promise<boolean> {
+  if (!donorIds.length) return false;
+  const since = new Date(now - CHARGE_IN_FLIGHT_MS).toISOString();
+  const { count, error } = await db
+    .from("donations")
+    .select("id", { count: "exact", head: true })
+    .in("donor_id", donorIds)
+    .eq("status", "pending")
+    .not("recurring_id", "is", null)
+    .gte("created_at", since);
+  if (error) throw new Error(`Could not check for a charge on its way: ${error.message}`);
+  return (count ?? 0) > 0;
+}
+
+/**
+ * Every donor record that is this person's: linked to their account, or given with their address. The SAME set the
+ * erasure uses (src/lib/privacy/erase.ts: donors.user_id plus the email match), so a guest-checkout monthly donation
+ * tied to them only by email is checked, stopped and read back too (review 25/11/2026). `emails` are the live sign-in
+ * address and the one on the profile (erase.ts matches on the profile's).
+ */
+async function donorIdsOf(db: Db, userId: string, emails: unknown[]): Promise<string[]> {
+  const ids = new Set<string>();
+  const byAccount = await db.from("donors").select("id").eq("user_id", userId);
+  if (byAccount.error) throw new Error(`Could not read the donor records: ${byAccount.error.message}`);
+  for (const d of byAccount.data ?? []) ids.add(d.id as string);
+  const addresses = new Set<string>();
+  for (const e of emails) if (typeof e === "string" && e.trim()) addresses.add(e.trim().toLowerCase());
+  for (const address of addresses) {
+    const byEmail = await db.from("donors").select("id").eq("email", address);
+    if (byEmail.error) throw new Error(`Could not read the donor records: ${byEmail.error.message}`);
+    for (const d of byEmail.data ?? []) ids.add(d.id as string);
+  }
+  return [...ids];
+}
+
+/** This person's donor records, as the check and the stopping both read them (the live address plus the profile's). */
+async function theirDonorIds(db: Db, userId: string, liveEmail: string): Promise<string[]> {
+  const { data, error } = await db.from("profiles").select("email").eq("id", userId).maybeSingle();
+  if (error) throw new Error(`Could not read the profile: ${error.message}`);
+  return donorIdsOf(db, userId, [liveEmail, data?.email]);
 }
 
 /**
@@ -82,10 +111,10 @@ async function donorIdsOf(db: Db, userId: string): Promise<string[]> {
  * with everything kept. (If a provider-side "forget this card" call is ever added to the gateway adapter, it goes here,
  * and a refusal from it stops the deletion the same way.) Safe to run again.
  */
-export async function stopAllCharging(userId: string, now = new Date()): Promise<boolean> {
+export async function stopAllCharging(userId: string, email: string, now = new Date()): Promise<boolean> {
   const db = createAdminClient();
   try {
-    const donorIds = await donorIdsOf(db, userId);
+    const donorIds = await theirDonorIds(db, userId, email);
     if (donorIds.length) {
       const { error } = await db
         .from("recurring_donations")
@@ -158,9 +187,22 @@ export async function deleteOwnAccount(account: { userId: string; email: string;
   // Recorded before any work, so a run that is cut off leaves a trace. No names or addresses: who and when only.
   if (!(await audit(account.userId, "privacy.account_delete_started", {}))) return refuse(503, "unavailable");
 
-  if (!(await stopAllCharging(account.userId))) {
+  if (!(await stopAllCharging(account.userId, account.email, new Date(now)))) {
     await audit(account.userId, "privacy.account_delete_refused", { reason: "cancel_failed" });
     return refuse(502, "cancel_failed");
+  }
+
+  // The monthly job may have started a charge between the first check and the cancel (it read the card before it was
+  // destroyed). Look again now that no new attempt can start: a charge that is on its way means wait. The cancel stays
+  // done, and pressing again later is safe (nothing can start once the card is gone). A check that cannot be made fails closed.
+  try {
+    if (await chargeOnItsWay(createAdminClient(), await theirDonorIds(createAdminClient(), account.userId, account.email), now)) {
+      await audit(account.userId, "privacy.account_delete_refused", { reason: "payment_in_progress" });
+      return refuse(409, "payment_in_progress");
+    }
+  } catch (e) {
+    console.error("[delete-account] could not re-check for a charge on its way", e instanceof Error ? e.message : e);
+    return refuse(503, "unavailable");
   }
 
   try {
@@ -169,9 +211,23 @@ export async function deleteOwnAccount(account: { userId: string; email: string;
       actorUserId: account.userId,
       auditAction: "privacy.account_deleted_in_app",
       confirmationEmail: () => deletionEmail(legalConfig.supportEmail),
+      // The "your account has been deleted" email goes only when the sign-in account really is deleted, and only by the
+      // run that deleted it, so a run that finishes the donor records but keeps the account, or a repeat, never sends it.
+      emailOnlyWhenAccountDeleted: true,
     });
     if (!summary.accountDeleted) {
       console.error("[delete-account] erased, but the sign-in account stayed");
+      // The account was kept because they run a charity (or Givezy) that became true after the check: part of their data
+      // is already gone, and the retry would only say "manager". Say so now, with the same words.
+      try {
+        const why = await whyNotDeletable(account.userId, account.email, now);
+        if (why === "manager" || why === "platform_admin") {
+          await audit(account.userId, "privacy.account_delete_refused", { reason: why, partial: true });
+          return refuse(409, why);
+        }
+      } catch {
+        // cannot tell: the general "didn't finish" answer below
+      }
       return refuse(500, "incomplete");
     }
   } catch (e) {

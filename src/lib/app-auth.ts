@@ -29,9 +29,13 @@ export async function appAccount(
   const claims = data.claims as { sub?: string; email?: string; amr?: { method?: string; timestamp?: number }[]; role?: string };
   if (!claims.sub || !claims.email || claims.role !== "authenticated") return null;
   if ((claims.amr ?? []).some((a) => a.method === "password")) return null;
+  // The token's email can be stale after an email change; the live check knows the current one (25/11/2026), and that is
+  // what is used for anything that matters (the reviewer's sign-in, the typed-email confirmation).
+  let email = claims.email;
   if (forMoney) {
     const live = await createAdminClient().auth.getUser(token);
     if (live.error || live.data.user?.id !== claims.sub) return null;
+    if (typeof live.data.user?.email === "string" && live.data.user.email.trim()) email = live.data.user.email;
   }
-  return withSignInTime ? { userId: claims.sub, email: claims.email, signedInAt: lastSignInSeconds(claims.amr) } : { userId: claims.sub, email: claims.email };
+  return withSignInTime ? { userId: claims.sub, email, signedInAt: lastSignInSeconds(claims.amr) } : { userId: claims.sub, email };
 }

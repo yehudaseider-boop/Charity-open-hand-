@@ -3,8 +3,8 @@
  * and what this phone forgets. The screen itself is checked by eye (see docs/decisions.md); these are its pure parts.
  */
 import { describe, expect, it } from "vitest";
-import { checkDeletion, deleteReady, phoneKeysFor, requestDeletion } from "../apps/mobile/src/lib/delete-account";
-import { DELETE_MESSAGES } from "@/lib/delete-account";
+import { checkDeletion, deleteReady, phoneKeysFor, requestDeletion, stageAfterRefusal } from "../apps/mobile/src/lib/delete-account";
+import { DELETE_MESSAGES, type DeleteCode } from "@/lib/delete-account";
 
 const site = "https://givezy.example/";
 const sender = (reply: { status: number; json: unknown } | Error) => {
@@ -56,7 +56,7 @@ describe("deleting", () => {
   it("a refusal says what was and was not deleted", async () => {
     const o = await requestDeletion(site, "tok", "DELETE", false, sender({ status: 502, json: { ok: false, code: "cancel_failed" } }).send);
     expect(o).toMatchObject({ kind: "refused", code: "cancel_failed" });
-    expect(o.kind === "refused" && o.message).toMatch(/deleted nothing/);
+    expect(o.kind === "refused" && o.message).toMatch(/some of your monthly donations may already be stopped/);
   });
 
   it("an answer that is too old a sign-in goes to the fresh code step", async () => {
@@ -72,6 +72,24 @@ describe("deleting", () => {
   it("after an unanswered try, a dead sign-in means the account may already be gone", async () => {
     const o = await requestDeletion(site, "tok", "DELETE", true, sender({ status: 401, json: { ok: false, message: "Please sign in again." } }).send);
     expect(o.kind).toBe("maybe_done");
+  });
+});
+
+describe("where the screen goes after a refusal", () => {
+  it("a temporary refusal goes back to the confirm step (typed text kept, Try again), never the dead end", () => {
+    for (const code of ["incomplete", "cancel_failed", "unavailable", "busy", "payment_in_progress", "confirm"] as DeleteCode[]) expect(stageAfterRefusal(code), code).toBe("confirm");
+  });
+  it("only a manager, a Givezy admin, an open request or the reviewer gets the dead-end card", () => {
+    for (const code of ["manager", "platform_admin", "request_open", "reviewer"] as DeleteCode[]) expect(stageAfterRefusal(code), code).toBe("dead_end");
+  });
+  it("what the server really sends for a busy or half-finished try is decided from its code, via the outcome", async () => {
+    for (const [status, code] of [[429, "busy"], [503, "unavailable"], [502, "cancel_failed"], [409, "payment_in_progress"], [500, "incomplete"]] as const) {
+      const o = await requestDeletion(site, "tok", "DELETE", false, sender({ status, json: { ok: false, code } }).send);
+      expect(o.kind).toBe("refused");
+      expect(o.kind === "refused" && stageAfterRefusal(o.code)).toBe("confirm");
+    }
+    const manager = await requestDeletion(site, "tok", "DELETE", false, sender({ status: 409, json: { ok: false, code: "manager" } }).send);
+    expect(manager.kind === "refused" && stageAfterRefusal(manager.code)).toBe("dead_end");
   });
 });
 

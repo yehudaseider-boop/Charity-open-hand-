@@ -78,16 +78,45 @@ describe("POST /api/app/delete-account", () => {
     expect(r.headers.get("cache-control")).toBe("no-store");
   });
 
-  it("a token that gives no sign-in time reaches the check as null (it will ask to sign in again)", async () => {
-    claims = { sub: "u1", email: "a@example.com", role: "authenticated", amr: [{ method: "otp" }] };
+  it("a token that gives no sign-in time reaches the check as null (it will ask to sign in again): amr entries without a timestamp, or no amr at all", async () => {
+    // Supabase's real shape: an array of { method, timestamp } with unix seconds. Without a timestamp it is not recent.
+    for (const amr of [[{ method: "otp" }], [{ method: "otp", timestamp: undefined }], undefined, []]) {
+      claims = { sub: "u1", email: "a@example.com", role: "authenticated", ...(amr === undefined ? {} : { amr }) };
+      deleteOwnAccount.mockClear();
+      await POST(call("POST", { body: { confirm: "DELETE" } }));
+      expect(deleteOwnAccount.mock.calls[0][0]).toMatchObject({ signedInAt: null });
+    }
+  });
+
+  it("uses the live email from Supabase, not the token's, for the typed confirmation and the reviewer check", async () => {
+    liveUser = { id: "u1", email: "new@example.com" } as { id: string };
     await POST(call("POST", { body: { confirm: "DELETE" } }));
-    expect(deleteOwnAccount.mock.calls[0][0]).toMatchObject({ signedInAt: null });
+    expect(deleteOwnAccount.mock.calls[0][0]).toMatchObject({ email: "new@example.com" });
   });
 
   it("an unreadable body is treated as no confirmation", async () => {
     const req = new Request("https://x.test/api/app/delete-account", { method: "POST", headers: { authorization: "Bearer tok" }, body: "not json" }) as unknown as import("next/server").NextRequest;
     await POST(req);
     expect(deleteOwnAccount.mock.calls[0][1]).toBeUndefined();
+  });
+
+  it("only a call with the typed confirmation uses up the person's hourly tries: typos and refused retries do not lock anyone out", async () => {
+    for (const confirm of ["nope", "", undefined, 5]) {
+      limitCalls.length = 0;
+      await POST(call("POST", { body: { confirm } }));
+      expect(limitCalls.map((c) => c.bucket), String(confirm)).toEqual(["app-delete-account-ip"]);
+    }
+    // Even with the person's tries used up, a typo still gets its plain answer (nothing is deleted without the words).
+    limitBehaviour = "over";
+    overBucket = "app-delete-account";
+    deleteOwnAccount.mockClear();
+    expect((await POST(call("POST", { body: { confirm: "nope" } }))).status).toBe(200);
+    expect(deleteOwnAccount).toHaveBeenCalled();
+    // The email also counts as the typed confirmation, in any case.
+    limitCalls.length = 0;
+    limitBehaviour = "ok";
+    await POST(call("POST", { body: { confirm: " A@Example.com " } }));
+    expect(limitCalls.map((c) => c.bucket)).toEqual(["app-delete-account-ip", "app-delete-account"]);
   });
 
   it("is rate limited per person and per internet address, and over a limit nothing runs", async () => {
@@ -109,7 +138,7 @@ describe("POST /api/app/delete-account", () => {
     limitBehaviour = "throws";
     const r = await POST(call("POST", { body: { confirm: "DELETE" } }));
     expect(r.status).toBe(503);
-    expect((await r.json()).message).toMatch(/nothing was deleted/i);
+    expect((await r.json()).message).toMatch(/your account is still there/i);
     expect(deleteOwnAccount).not.toHaveBeenCalled();
   });
 

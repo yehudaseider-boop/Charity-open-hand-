@@ -33,19 +33,27 @@ export type DeleteCode =
 
 /** Plain words for each, always saying what was and was not deleted. The app adds how to reach a person. DRAFT for Yosef. */
 export const DELETE_MESSAGES: Record<DeleteCode, string> = {
-  manager: "You manage a charity on Givezy, so we can't delete your account yet. A charity needs an owner: hand it over to someone else first. Nothing was deleted.",
-  platform_admin: "This account runs Givezy itself, so it can't be deleted here. Nothing was deleted.",
+  manager: "You manage a charity on Givezy, so we can't delete your account here. Hand it over to someone else first. If you had already started deleting, part of your data was deleted before we could finish, and we can't finish here: please contact us.",
+  platform_admin: "This account runs Givezy itself, so it can't be deleted here. If you had already started deleting, part of your data may have been deleted before we could finish: please contact us and a person will help.",
   request_open: "You already asked us to delete your information and we're working on it. We'll email you when it's done, so there is nothing more to do. Nothing was deleted yet.",
   reviewer: "This is the app reviewer's sign-in. It stays so the app can be checked. Nothing was deleted.",
-  payment_in_progress: "A monthly donation is being processed right now. Please try again in about 30 minutes, so you are never charged after deleting. Nothing was deleted.",
-  sign_in_again: "For your safety, please sign in again with a new code first. Nothing was deleted.",
-  confirm: "Type DELETE, or your email address, to confirm. Nothing was deleted.",
-  busy: "You've tried this a few times. Please wait an hour and try again. Nothing was deleted.",
-  unavailable: "We couldn't check your account just now. Nothing was deleted. Please try again in a minute.",
-  cancel_failed: "We couldn't stop your monthly donations and saved card just now, so we deleted nothing. You are not charged any differently. Please try again in a few minutes.",
+  payment_in_progress: "A monthly donation is being processed right now. Your account is still there, and some of your monthly donations may already be stopped. Please try again in about 30 minutes, so you are never charged after deleting.",
+  sign_in_again: "For your safety, please sign in again with a new code first. Your account is still there.",
+  confirm: "Type DELETE, or your email address, to confirm. Your account is still there.",
+  busy: "You've tried this a few times. Please wait an hour and try again. Your account is still there.",
+  unavailable: "We couldn't check your account just now. Your account is still there. Please try again in a minute.",
+  cancel_failed: "We couldn't stop your monthly donations and saved card just now, so we stopped. Your account is still there, and some of your monthly donations may already be stopped. Please try again in a few minutes.",
   incomplete: "Part of the deletion didn't finish. Your monthly donations and saved card are already stopped, and nothing was undone. Please try again: it carries on where it stopped.",
   not_available: "Deleting your account in the app isn't switched on yet. Nothing was deleted.",
 };
+
+/**
+ * Refusals that retrying cannot fix: the screen shows the dead-end card ("We can't delete it here", only a way back).
+ * Every other code (incomplete, cancel_failed, unavailable, busy, payment_in_progress, confirm, ...) is temporary: the
+ * screen goes back to the confirm step with the problem shown, what was typed kept, and a "Try again" button.
+ */
+const DEAD_END_CODES: ReadonlySet<DeleteCode> = new Set<DeleteCode>(["manager", "platform_admin", "request_open", "reviewer"]);
+export const refusalIsDeadEnd = (code: DeleteCode): boolean => DEAD_END_CODES.has(code);
 
 /** What is deleted, as the app and the public page list it (DRAFT for Yosef). */
 export const DELETED_LIST: readonly string[] = [

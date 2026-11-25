@@ -18,6 +18,15 @@ let role: string;
 let adminCount: number;
 let openRequests: number;
 let donorIds: string[];
+/** Donor records tied to them only by email address (guest-checkout monthly donations). */
+let emailDonorIds: string[];
+let profileEmail: string | null;
+/** What the second look for a charge on its way (after the cancel) finds, and whether it can be made. */
+let inFlightAfterCancel: number;
+let recheckFails: boolean;
+let donationReads: number;
+/** A side effect of the erasure (a role added meanwhile). */
+let duringErase: (() => void) | null;
 let inFlight: number;
 let recurringLeft: number;
 let cardLeft: number;
@@ -40,6 +49,7 @@ vi.mock("@/lib/privacy/erase", () => ({
   eraseDonor: async (args: Record<string, unknown>) => {
     order.push("erase");
     eraseCalls.push(args);
+    duringErase?.();
     if (eraseResult instanceof Error) throw eraseResult;
     return { donors: 1, checkout_details: 0, monthly_stopped: 1, giving_choices: 0, messages: 0, gateway_records: 0, ...eraseResult };
   },
@@ -48,7 +58,7 @@ vi.mock("@/lib/privacy/erase", () => ({
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (table: string) => {
-      const st: { op: "select" | "update" | "delete"; head: boolean; patch?: Record<string, unknown> } = { op: "select", head: false };
+      const st: { op: "select" | "update" | "delete"; head: boolean; patch?: Record<string, unknown>; eqs: Record<string, unknown> } = { op: "select", head: false, eqs: {} };
       const exec = () => {
         const key = `${table}.${st.op}`;
         if (st.op !== "select") {
@@ -64,14 +74,17 @@ vi.mock("@/lib/supabase/admin", () => ({
             return { count: adminCount, data: null, error: null };
           case "data_requests":
             return { count: openRequests, data: null, error: null };
-          case "donations":
-            return { count: inFlight, data: null, error: null };
+          case "donations": {
+            donationReads += 1;
+            if (donationReads > 1 && recheckFails) return { data: null, count: null, error: { message: "donations recheck failed" } };
+            return { count: donationReads > 1 ? inFlightAfterCancel : inFlight, data: null, error: null };
+          }
           case "recurring_donations":
             return { count: recurringLeft, data: null, error: null };
           case "saved_cards":
             return { count: cardLeft, data: null, error: null };
           case "donors":
-            return { data: donorIds.map((id) => ({ id })), count: null, error: null };
+            return { data: ("email" in st.eqs ? emailDonorIds : donorIds).map((id) => ({ id })), count: null, error: null };
           default:
             return { data: null, count: 0, error: null };
         }
@@ -80,12 +93,12 @@ vi.mock("@/lib/supabase/admin", () => ({
         select: (_c?: string, o?: { head?: boolean }) => ((st.head = Boolean(o?.head)), api),
         update: (patch: Record<string, unknown>) => ((st.op = "update"), (st.patch = patch), api),
         delete: () => ((st.op = "delete"), api),
-        eq: () => api,
+        eq: (col: string, val: unknown) => ((st.eqs[col] = val), api),
         in: () => api,
         not: () => api,
         gte: () => api,
         or: () => api,
-        maybeSingle: async () => ({ data: table === "profiles" ? { role } : null, error: null }),
+        maybeSingle: async () => ({ data: table === "profiles" ? { role, email: profileEmail } : null, error: null }),
         then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) => Promise.resolve(exec()).then(resolve, reject),
       };
       return api;
@@ -112,6 +125,12 @@ beforeEach(() => {
   adminCount = 0;
   openRequests = 0;
   donorIds = ["d1"];
+  emailDonorIds = [];
+  profileEmail = EMAIL;
+  inFlightAfterCancel = 0;
+  recheckFails = false;
+  donationReads = 0;
+  duringErase = null;
   inFlight = 0;
   recurringLeft = 1;
   cardLeft = 1;
@@ -177,7 +196,7 @@ describe("who is refused, with nothing touched", () => {
     const r = await deleteOwnAccount(me(), "DELETE", NOW);
     expect(r.status).toBe(503);
     expect(r.body).toMatchObject({ code: "unavailable" });
-    expect((r.body as { message: string }).message).toMatch(/nothing was deleted/i);
+    expect((r.body as { message: string }).message).toMatch(/your account is still there/i);
     expectNothingTouched();
   });
 
@@ -270,7 +289,7 @@ describe("the work, in order", () => {
 
 describe("a donor is never charged again", () => {
   it("cancels every monthly donation, destroys the stored card token and the saved card", async () => {
-    await stopAllCharging(USER, new Date(NOW));
+    await stopAllCharging(USER, EMAIL, new Date(NOW));
     const recurring = writes.find((w) => w.table === "recurring_donations");
     expect(recurring?.patch).toMatchObject({ status: "cancelled", authorization_encrypted: null, ended_reason: "the donor deleted their account", card_last4: null });
     expect(writes.filter((w) => w.op === "delete").map((w) => w.table).sort()).toEqual(["card_save_requests", "saved_cards"]);
@@ -281,7 +300,7 @@ describe("a donor is never charged again", () => {
     const r = await deleteOwnAccount(me(), "DELETE", NOW);
     expect(r.status).toBe(502);
     expect(r.body).toMatchObject({ ok: false, code: "cancel_failed" });
-    expect((r.body as { message: string }).message).toMatch(/deleted nothing/);
+    expect((r.body as { message: string }).message).toMatch(/some of your monthly donations may already be stopped/);
     expect(order).not.toContain("erase");
     expect(audits.map((a) => a.action)).toContain("privacy.account_delete_refused");
   });
@@ -302,12 +321,12 @@ describe("a donor is never charged again", () => {
     cancelDoesNothing = false;
     cardLeft = 1;
     failing.add("saved_cards.delete");
-    expect(await stopAllCharging(USER)).toBe(false);
+    expect(await stopAllCharging(USER, EMAIL)).toBe(false);
   });
 
   it("with no donor records (never gave) there is nothing to cancel, and the saved card is still cleared", async () => {
     donorIds = [];
-    expect(await stopAllCharging(USER)).toBe(true);
+    expect(await stopAllCharging(USER, EMAIL)).toBe(true);
     expect(writes.map((w) => w.table)).toEqual(["saved_cards", "card_save_requests"]);
   });
 });
@@ -342,14 +361,95 @@ describe("a run that is cut off can be repeated", () => {
   it("the stopping of charges can run again when there is nothing left to stop", async () => {
     recurringLeft = 0;
     cardLeft = 0;
-    expect(await stopAllCharging(USER)).toBe(true);
-    expect(await stopAllCharging(USER)).toBe(true);
+    expect(await stopAllCharging(USER, EMAIL)).toBe(true);
+    expect(await stopAllCharging(USER, EMAIL)).toBe(true);
   });
 
   it("an erasure that finished but could not delete the sign-in account is not reported as done", async () => {
     eraseResult = { accountDeleted: false };
     const r = await deleteOwnAccount(me(), "DELETE", NOW);
     expect(r.body).toMatchObject({ ok: false, code: "incomplete" });
+  });
+});
+
+describe("a charge that starts between the check and the cancel (review 25/11/2026)", () => {
+  it("looks again after the cancel and refuses when a charge is on its way: the cancel stays done, nothing is erased", async () => {
+    inFlightAfterCancel = 1;
+    const r = await deleteOwnAccount(me(), "DELETE", NOW);
+    expect(r.status).toBe(409);
+    expect(r.body).toMatchObject({ ok: false, code: "payment_in_progress" });
+    expect(order).toContain("recurring_donations.update");
+    expect(order).not.toContain("erase");
+    expect(audits.map((a) => a.details)).toContainEqual({ reason: "payment_in_progress" });
+  });
+  it("pressing again later is safe and finishes once nothing is on its way", async () => {
+    inFlightAfterCancel = 1;
+    await deleteOwnAccount(me(), "DELETE", NOW);
+    donationReads = 0;
+    inFlightAfterCancel = 0;
+    recurringLeft = 0;
+    cardLeft = 0;
+    expect((await deleteOwnAccount(me(), "DELETE", NOW)).status).toBe(200);
+  });
+  it("when that second look cannot be made, nothing is erased (fails closed) and the answer says the account is still there", async () => {
+    recheckFails = true;
+    const r = await deleteOwnAccount(me(), "DELETE", NOW);
+    expect(r.status).toBe(503);
+    expect(r.body).toMatchObject({ code: "unavailable" });
+    expect(order).not.toContain("erase");
+  });
+});
+
+describe("a monthly donation tied to them only by email (guest checkout)", () => {
+  it("is checked for a charge on its way, even with no donor record linked to the account", async () => {
+    donorIds = [];
+    emailDonorIds = ["guest1"];
+    inFlight = 1;
+    expect(await whyNotDeletable(USER, EMAIL, NOW, {})).toBe("payment_in_progress");
+  });
+  it("is stopped and read back too: the cancel runs although no donor record is linked to the account", async () => {
+    donorIds = [];
+    emailDonorIds = ["guest1"];
+    recurringLeft = 1;
+    expect(await stopAllCharging(USER, EMAIL)).toBe(true);
+    expect(writes.map((w) => w.table)).toEqual(["recurring_donations", "saved_cards", "card_save_requests"]);
+  });
+  it("refuses when the email-only monthly donation is still live after the cancel", async () => {
+    donorIds = [];
+    emailDonorIds = ["guest1"];
+    cancelDoesNothing = true;
+    expect(await stopAllCharging(USER, EMAIL)).toBe(false);
+  });
+});
+
+describe("the live email, not the token's", () => {
+  it("the reviewer is recognised by the live email, or by the address on the account's own profile", async () => {
+    vi.stubEnv("REVIEW_SIGN_IN_EMAIL", "review@givezy.co.za");
+    // The token said something else (stale); the live email is the reviewer's.
+    expect(await whyNotDeletable(USER, "Review@Givezy.co.za", NOW)).toBe("reviewer");
+    // The live email differs, but the profile row (this account) carries the reviewer's address.
+    profileEmail = "review@givezy.co.za";
+    expect(await whyNotDeletable(USER, "other@example.com", NOW)).toBe("reviewer");
+  });
+});
+
+describe("a manager role added after the check", () => {
+  it("a run that erases but must keep the account says the manager refusal at once, not 'incomplete'", async () => {
+    eraseResult = { accountDeleted: false };
+    duringErase = () => {
+      adminCount = 1;
+    };
+    const r = await deleteOwnAccount(me(), "DELETE", NOW);
+    expect(r.status).toBe(409);
+    expect(r.body).toMatchObject({ ok: false, code: "manager" });
+    expect((r.body as { message: string }).message).toMatch(/part of your data was deleted before we could finish/);
+  });
+});
+
+describe("the confirmation email", () => {
+  it("the in-app deletion asks for it only when the sign-in account was really deleted", async () => {
+    await deleteOwnAccount(me(), "DELETE", NOW);
+    expect(eraseCalls[0].emailOnlyWhenAccountDeleted).toBe(true);
   });
 });
 

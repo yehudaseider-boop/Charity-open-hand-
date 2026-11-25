@@ -1,4 +1,4 @@
-import { confirmationOk, outcomeFor, type DeleteCode, type DeleteOutcome } from "@shared/delete-account";
+import { confirmationOk, outcomeFor, refusalIsDeadEnd, type DeleteCode, type DeleteOutcome } from "@shared/delete-account";
 import { fetchWithTimeout, noReplyMessage } from "./pay-api";
 
 /**
@@ -76,4 +76,13 @@ export function phoneKeysFor(userId: string): string[] {
     "nediv-lev.maaser-target.set-aside",
   ];
   return bases.map((b) => `${b}.u.${userId}`);
+}
+
+/**
+ * Where the screen goes after the server refuses a delete press. Only refusals that retrying cannot fix get the dead-end
+ * card ("intro" with the refusal); every temporary one (unfinished, busy, a charge on its way, cancel failed, no check
+ * possible, wrong confirmation) returns to the confirm step with the problem shown and what was typed kept.
+ */
+export function stageAfterRefusal(code: DeleteCode): "dead_end" | "confirm" {
+  return refusalIsDeadEnd(code) ? "dead_end" : "confirm";
 }
