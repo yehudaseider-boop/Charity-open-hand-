@@ -2,6 +2,8 @@
 
 The order to do these in, and what to bring to the first session, is in `docs/launch-plan.md` (22/10/2026).
 
+**Live setup, week of 30/11/2026:** the step-by-step brief for the new chat is `docs/live-setup-brief.md` (live Supabase project, second Vercel project on givezy.co.za behind the coming-soon page, the password guard).
+
 ## The short path to launch (17/11/2026, after the test-site check)
 
 The long lists below are the full record. This is the order that matters, in three stages. Each stage can start once the one before it is done.
