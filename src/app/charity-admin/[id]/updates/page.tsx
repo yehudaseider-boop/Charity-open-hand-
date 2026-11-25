@@ -5,7 +5,9 @@ import { EmptyState, PageHeader } from "@/components/dash";
 import { DonePanel, formKey } from "@/components/done-panel";
 import { RemoveButton } from "@/components/forms/remove-button";
 import { requireViewer } from "@/lib/auth";
-import { loadCharityForManager, loadStories, publicImageUrl } from "@/lib/charity/queries";
+import { loadCharityForManager, loadStories } from "@/lib/charity/queries";
+import { CharityImage } from "@/components/charity-image";
+import { SLOTS } from "@/lib/charity/picture-slots";
 import { can } from "@/lib/charity/permissions";
 import { viewerRole } from "@/lib/charity/team";
 import { MAX_PHOTOS } from "@/lib/charity/validation";
@@ -59,13 +61,11 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
         <Card title="Your updates">
           <ul className="divide-y divide-border">
             {updates.map((u) => {
-              const photo = publicImageUrl(u.photo_path);
               return (
                 <li key={u.id} className="space-y-2 py-3 first:pt-0 last:pb-0">
                   <p className="text-xs font-semibold text-muted">{formatDate(u.created_at)}</p>
                   <p className="whitespace-pre-line text-[0.95rem] text-navy [overflow-wrap:anywhere]">{u.body_en}</p>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {photo ? <img src={photo} alt="" className="aspect-[4/3] w-full max-w-sm rounded-card border-2 border-border object-cover" /> : null}
+                  {u.photo_path ? <CharityImage path={u.photo_path} alt="" width={384} height={288} slots={SLOTS.adminUpdate} className="aspect-[4/3] w-full max-w-sm rounded-card border-2 border-border object-cover" /> : null}
                   {u.video ? <div className="max-w-sm"><ProfileVideo video={u.video} charityName={charity.name_en} /></div> : null}
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                     {canEmail ? <Link href={`/charity-admin/${id}/email-donors?update=${u.id}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand underline hover:text-indigo">Email this to your donors</Link> : null}
@@ -87,8 +87,7 @@ export default async function UpdatesPage({ params, searchParams }: PageProps<"/
           <ul className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {photos.map((p) => (
               <li key={p.id} className="space-y-1">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={publicImageUrl(p.storage_path)!} alt={p.caption_en ?? ""} className="aspect-square w-full rounded-card border-2 border-border object-cover" />
+                <CharityImage path={p.storage_path} alt={p.caption_en ?? ""} width={300} height={300} slots={SLOTS.adminGallery} className="aspect-square w-full rounded-card border-2 border-border object-cover" />
                 {p.caption_en ? <p className="text-xs text-muted [overflow-wrap:anywhere]">{p.caption_en}</p> : null}
                 {canEdit ? (
                   <SafeForm nothingTyped action={removePhoto.bind(null, id, p.id)}>

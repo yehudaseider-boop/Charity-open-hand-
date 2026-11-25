@@ -13,15 +13,19 @@ import sharp from "sharp";
 export const MAX_IMAGE_PIXELS = 30_000_000;
 export const MAX_IMAGE_SIDE = 2_400;
 
-/** `maxSide`: a smaller limit for a picture that only goes in emails (journey pictures, 1 200 px). */
-export async function cleanImage(file: File, maxSide: number = MAX_IMAGE_SIDE): Promise<Blob> {
+/** The same clean-up on bytes already read, for a picture whose copies are made from the cleaned result (picture-copies.ts). */
+export async function cleanImageBytes(bytes: Buffer, type: string, maxSide: number = MAX_IMAGE_SIDE): Promise<Buffer> {
   const side = Math.min(maxSide, MAX_IMAGE_SIDE);
-  const image = sharp(Buffer.from(await file.arrayBuffer()), { limitInputPixels: MAX_IMAGE_PIXELS })
+  const image = sharp(bytes, { limitInputPixels: MAX_IMAGE_PIXELS })
     .rotate()
     .resize({ width: side, height: side, fit: "inside", withoutEnlargement: true });
-  const out =
-    file.type === "image/png" ? await image.png().toBuffer()
-    : file.type === "image/webp" ? await image.webp({ quality: 88 }).toBuffer()
-    : await image.jpeg({ quality: 88, mozjpeg: true }).toBuffer();
+  return type === "image/png" ? image.png().toBuffer()
+    : type === "image/webp" ? image.webp({ quality: 88 }).toBuffer()
+    : image.jpeg({ quality: 88, mozjpeg: true }).toBuffer();
+}
+
+/** `maxSide`: a smaller limit for a picture that only goes in emails (journey pictures, 1 200 px). */
+export async function cleanImage(file: File, maxSide: number = MAX_IMAGE_SIDE): Promise<Blob> {
+  const out = await cleanImageBytes(Buffer.from(await file.arrayBuffer()), file.type, maxSide);
   return new Blob([new Uint8Array(out)], { type: file.type });
 }

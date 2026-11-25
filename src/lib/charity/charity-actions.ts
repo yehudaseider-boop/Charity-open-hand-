@@ -11,6 +11,7 @@ import { canUndo, isActionKind, type ActionKind, type Details } from "./done";
 import { findJourney, readJourneyState, removeEnrolments, writeJourney, type JourneyState } from "./journey-write";
 import { enrolmentStates } from "./journey-store";
 import { GENERAL, journeyStepsMoved, partWay, type JourneyRef } from "./journey";
+import { pictureFiles } from "./picture-sizes";
 
 /**
  * Records each dashboard action (for "what just happened") and takes it back on request. Every call
@@ -79,10 +80,15 @@ export async function recordAction(charityId: string, userId: string, kind: Acti
   for (const row of old ?? []) {
     if (row.undone_at) continue;
     const kept = keptFile(row.undo as Undo | null);
-    if (kept && kept.path.startsWith(`${charityId}/`) && !kept.path.includes("..")) await db.storage.from(kept.bucket).remove([kept.path]).catch(() => undefined);
+    if (kept && kept.path.startsWith(`${charityId}/`) && !kept.path.includes("..")) await db.storage.from(kept.bucket).remove(filesOf(kept)).catch(() => undefined);
   }
   await db.from("charity_actions").delete().eq("charity_id", charityId).lt("created_at", cutoff);
   return data.id as string;
+}
+
+/** A stored file and, for a public picture, its smaller copies (25/11/2026): they go together. */
+function filesOf(file: { bucket: string; path: string }): string[] {
+  return file.bucket === "charity-public" ? pictureFiles(file.path) : [file.path];
 }
 
 /** The file an undo payload keeps on hand (the removed photo, the previous logo), if any. */
@@ -201,7 +207,7 @@ async function apply(charityId: string, undo: Undo, extra: Details = {}): Promis
           if (ins.error) throw ins.error;
         }
       }
-      if (undo.dropFile && ownPath(undo.dropFile.path)) await db.storage.from(undo.dropFile.bucket).remove([undo.dropFile.path]);
+      if (undo.dropFile && ownPath(undo.dropFile.path)) await db.storage.from(undo.dropFile.bucket).remove(filesOf(undo.dropFile));
       return null;
     }
     case "journey": {
@@ -269,10 +275,18 @@ async function apply(charityId: string, undo: Undo, extra: Details = {}): Promis
           if (dErr) throw dErr;
         }
       }
-      const { data, error } = await db.from(undo.table).delete().eq("id", undo.id).eq("charity_id", charityId).select("id");
+      const { data, error } = await db.from(undo.table).delete().eq("id", undo.id).eq("charity_id", charityId).select("*");
       if (error) throw error;
       if (!data?.length) return "removed";
-      if (undo.file && ownPath(undo.file.path)) await db.storage.from(undo.file.bucket).remove([undo.file.path]);
+      if (undo.file && ownPath(undo.file.path)) {
+        // The row's picture as it is now too: the one-off copy-making run (scripts/make-picture-copies.ts) may have
+        // given it a new name with copies since this action was recorded.
+        const row = data[0] as Record<string, unknown>;
+        const nowPath = (row.storage_path ?? row.photo_path) as string | null | undefined;
+        const paths = filesOf(undo.file);
+        if (nowPath && nowPath !== undo.file.path && ownPath(nowPath)) paths.push(...filesOf({ bucket: undo.file.bucket, path: nowPath }));
+        await db.storage.from(undo.file.bucket).remove(paths);
+      }
       return null;
     }
     case "reinsert": {

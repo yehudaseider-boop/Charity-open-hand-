@@ -12,7 +12,7 @@ import { isUuid } from "@/lib/ids";
 import { isRealImage } from "@/lib/charity/file-check";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { cleanImage } from "@/lib/charity/clean-image";
+import { removePicture, storePicture } from "@/lib/charity/picture-copies";
 import { notifyCharity, publicChangeEmail } from "@/lib/charity/emails";
 import { parseSuggestedAmounts } from "@/lib/charity/suggested-amounts";
 import { platformConfig } from "@/config/platform";
@@ -174,15 +174,20 @@ export async function uploadImage(
   if (!(await isRealImage(file))) return { ok: false, fieldErrors: { file: "That file isn't a JPG, PNG or WebP image" } };
 
   const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[file.type];
-  const path = `${charityId.toLowerCase()}/${kind}-${crypto.randomUUID()}.${ext}`;
   const supabase = await createClient();
   // Uploaded by the server, after the checks above (who, which role, a real image): a browser has no direct write to storage (18/11/2026).
-  const up = await createAdminClient().storage.from("charity-public").upload(path, await cleanImage(file), { contentType: file.type }); // re-encoded: no GPS or other hidden details
-  if (up.error) return failed(up.error);
+  // Re-encoded (no GPS or other hidden details), with lighter copies for phones and cards beside it (25/11/2026).
+  const up = await storePicture(createAdminClient().storage.from("charity-public"), `${charityId.toLowerCase()}/${kind}-${crypto.randomUUID()}.${ext}`, file);
+  if (up.path === undefined) return failed(up.error);
+  const path = up.path;
 
   const column = kind === "logo" ? "logo_path" : "cover_path";
   const { error } = await supabase.from("charities").update({ [column]: path }).eq("id", charityId);
-  if (error) return failed(error);
+  if (error) {
+    // Not saved: the new picture and its copies go again, so nothing is left in the public folder.
+    await removePicture(createAdminClient().storage.from("charity-public"), path).catch(() => undefined);
+    return failed(error);
+  }
 
   // The previous image file is kept, so "Undo" can put it back.
   const old = kind === "logo" ? charity.logo_path : charity.cover_path;

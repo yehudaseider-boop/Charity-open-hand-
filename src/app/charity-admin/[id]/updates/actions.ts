@@ -13,7 +13,7 @@ import { isUuid } from "@/lib/ids";
 import { isRealImage } from "@/lib/charity/file-check";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
-import { cleanImage } from "@/lib/charity/clean-image";
+import { removePicture, storePicture } from "@/lib/charity/picture-copies";
 import { refusal } from "@/lib/charity/team";
 import { revalidateCharitySlugs } from "@/lib/charity/public-cache";
 import { isMissingColumn, parseVideoLink, updateVideoColumns } from "@/lib/charity/video";
@@ -33,20 +33,20 @@ async function uploadIfAny(charityId: string, folder: "photos" | "updates", form
     return { error: { ok: false, fieldErrors: { file: "Upload a JPG, PNG or WebP photo" } } as FormState };
   }
   const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[file.type];
-  const path = `${charityId}/${folder}/${crypto.randomUUID()}.${ext}`;
   // Uploaded by the server, after the checks above and in the caller (who, which role, a real image): a browser has no direct write to storage (18/11/2026).
-  const up = await createAdminClient().storage.from("charity-public").upload(path, await cleanImage(file), { contentType: file.type }); // re-encoded: no GPS or other hidden details
-  if (up.error) {
+  // Re-encoded (no GPS or other hidden details), with lighter copies for phones and cards beside it (25/11/2026).
+  const up = await storePicture(createAdminClient().storage.from("charity-public"), `${charityId}/${folder}/${crypto.randomUUID()}.${ext}`, file);
+  if (up.path === undefined) {
     console.error(up.error);
     return { error: { ok: false, message: "The upload didn't work. Please try again." } as FormState };
   }
-  return { path };
+  return { path: up.path };
 }
 
 /** Only ever this charity's own files (the database also refuses any other path). */
 async function removeFile(charityId: string, path: string | null) {
   if (path && path.startsWith(`${charityId}/`) && !path.includes("..")) {
-    await createAdminClient().storage.from("charity-public").remove([path]);
+    await removePicture(createAdminClient().storage.from("charity-public"), path); // with its copies
   }
 }
 

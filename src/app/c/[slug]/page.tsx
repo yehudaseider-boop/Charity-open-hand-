@@ -15,6 +15,7 @@ import { videoFrom } from "@/lib/charity/video";
 import { sourceTag, withSource } from "@/lib/donations/source";
 import { initials } from "@/lib/charity/initials";
 import { publicImageUrl } from "@/lib/charity/queries";
+import { SLOTS } from "@/lib/charity/picture-slots";
 import { formatDate } from "@/lib/dates";
 import { Splash } from "@/components/splash";
 import { Bubbles } from "@/components/marketing";
@@ -104,8 +105,8 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
         />
       ) : null}
       <div className="mx-auto max-w-[75rem] px-4 pt-4 sm:px-6 sm:pt-6">
-        {cover ? (
-          <CharityImage src={cover} alt="" width={1200} height={675} sizes="(min-width: 640px) 2400px, calc(100vw - 32px)" priority className="aspect-[16/9] w-full rounded-[2rem] object-cover sm:aspect-[3/1]" />
+        {charity.cover_path ? (
+          <CharityImage path={charity.cover_path} alt="" width={1200} height={675} slots={SLOTS.pageCover} priority className="aspect-[16/9] w-full rounded-[2rem] object-cover sm:aspect-[3/1]" />
         ) : (
           // No cover photo yet: a blue colour block with bubbles and the logo's splash, whole, on the right.
           <div aria-hidden className="relative flex h-36 w-full items-center justify-end overflow-hidden rounded-[2rem] bg-brand pr-6 sm:h-52 sm:pr-14">
@@ -122,8 +123,8 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
           </div>
         )}
         <header className="flex flex-wrap items-end gap-x-5 gap-y-3 px-4 sm:px-8">
-          {logo ? (
-            <CharityImage src={logo} alt="" width={128} height={128} sizes="(min-width: 640px) 128px, 96px" priority className="relative z-10 -mt-12 h-24 w-24 shrink-0 rounded-[1.75rem] bg-surface object-cover shadow-[0_0_0_5px_var(--surface),0_12px_28px_rgba(9,37,119,0.14)] sm:-mt-16 sm:h-32 sm:w-32" />
+          {charity.logo_path ? (
+            <CharityImage path={charity.logo_path} alt="" width={128} height={128} slots={SLOTS.pageLogo} priority className="relative z-10 -mt-12 h-24 w-24 shrink-0 rounded-[1.75rem] bg-surface object-cover shadow-[0_0_0_5px_var(--surface),0_12px_28px_rgba(9,37,119,0.14)] sm:-mt-16 sm:h-32 sm:w-32" />
           ) : (
             <div aria-hidden className="relative z-10 -mt-12 flex h-24 w-24 shrink-0 items-center justify-center rounded-[1.75rem] bg-peach font-display text-3xl font-bold text-brand shadow-[0_0_0_5px_var(--surface),0_12px_28px_rgba(9,37,119,0.14)] sm:-mt-16 sm:h-32 sm:w-32 sm:text-4xl">
               {monogram}
@@ -216,13 +217,12 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
             <Section title="Latest from them">
               <ul className="relative space-y-4 pl-7 before:absolute before:bottom-4 before:left-[7px] before:top-4 before:w-0.5 before:rounded-full before:bg-honey">
                 {updates.map((u, i) => {
-                  const photo = publicImageUrl(u.photo_path);
                   return (
                     <li key={u.id} className="relative space-y-3 rounded-card bg-honey-soft p-5">
                       <span aria-hidden className={`absolute -left-7 top-6 h-4 w-4 rounded-full border-[3px] border-white ${i === 0 ? "bg-coral" : "bg-brand"}`} />
                       <p className="text-sm font-semibold text-muted">{formatDate(u.created_at)}</p>
                       <p className="whitespace-pre-line leading-relaxed">{u.body_en}</p>
-                      {photo ? <CharityImage src={photo} alt="" width={800} height={600} sizes="(min-width: 640px) 1280px, calc(100vw - 96px)" className="aspect-[4/3] w-full rounded-control object-cover" /> : null}
+                      {u.photo_path ? <CharityImage path={u.photo_path} alt="" width={800} height={600} slots={SLOTS.pageUpdate} className="aspect-[4/3] w-full rounded-control object-cover" /> : null}
                       {u.video ? <ProfileVideo video={u.video} charityName={charity.name_en} /> : null}
                     </li>
                   );
@@ -237,7 +237,7 @@ export default async function CharityPage({ params, searchParams }: PageProps<"/
                 {photos.map((p) => (
                   <li key={p.id}>
                     <figure className="space-y-1">
-                      <CharityImage src={publicImageUrl(p.storage_path)!} alt={p.caption_en ?? ""} width={600} height={600} sizes="(min-width: 640px) 700px, 50vw" className="aspect-square w-full rounded-control object-cover" />
+                      <CharityImage path={p.storage_path} alt={p.caption_en ?? ""} width={600} height={600} slots={SLOTS.pageGallery} className="aspect-square w-full rounded-control object-cover" />
                       {p.caption_en ? <figcaption className="text-sm text-muted">{p.caption_en}</figcaption> : null}
                     </figure>
                   </li>

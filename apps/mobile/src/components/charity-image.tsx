@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Image, StyleSheet, View, type ViewStyle } from "react-native";
+import { StyleSheet, View, type ViewStyle } from "react-native";
 import { initials } from "@shared/charity/initials";
 import type { Charity } from "@/data/sample";
 import { colors, fonts, radius } from "@/theme/tokens";
 import { Blob } from "./blob";
 import { PlaceholderImage } from "./placeholder-image";
+import { RemotePhoto } from "./remote-photo";
 import { Text } from "./text";
 
 /**
@@ -44,7 +45,7 @@ export function CharityImage({
   if (charity.coverUrl && broken !== charity.coverUrl) {
     return (
       <View style={shape}>
-        <Image source={{ uri: charity.coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={`Photo from ${charity.nameEn}`} onError={() => setBroken(charity.coverUrl ?? null)} />
+        <RemotePhoto uri={charity.coverUrl} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={`Photo from ${charity.nameEn}`} onError={() => setBroken(charity.coverUrl ?? null)} />
         {veil ? <View style={styles.veil} /> : null}
       </View>
     );

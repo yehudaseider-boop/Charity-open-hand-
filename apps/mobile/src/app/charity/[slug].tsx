@@ -1,12 +1,13 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Animated, Image, type NativeScrollEvent, type NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Animated, type NativeScrollEvent, type NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
 import { BackIcon, CheckIcon, HeartIcon } from "@/components/icons";
 import { InfoButton } from "@/components/info-button";
 import { CharityImage } from "@/components/charity-image";
+import { RemotePhoto } from "@/components/remote-photo";
 import { Sheet } from "@/components/sheet";
 import { CheckedBadge } from "@/components/charity-photo-card";
 import { Bubbles, People } from "@/components/people";
@@ -195,7 +196,7 @@ export default function CharityDetail() {
                   <Text style={styles.noteDate}>{ddmmyyyy(jhbDay(u.date))}</Text>
                   <Text>{u.body}</Text>
                   {u.photoUrl ? (
-                    <Image source={{ uri: u.photoUrl }} style={styles.updatePhoto} resizeMode="cover" accessibilityLabel={`Photo with ${charity.nameEn}'s update`} />
+                    <RemotePhoto uri={u.photoUrl} style={styles.updatePhoto} resizeMode="cover" accessibilityLabel={`Photo with ${charity.nameEn}'s update`} />
                   ) : null}
                   {u.video ? <ProfileVideo video={u.video} charityName={charity.nameEn} /> : null}
                   <ReportLink charityName={charity.nameEn} slug={charity.slug} updateId={u.id} />
@@ -210,7 +211,7 @@ export default function CharityDetail() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingRight: space.gutter, paddingVertical: 4 }} style={{ marginRight: -space.gutter }}>
                 {photos.map((ph) => (
                   <View key={ph.id} style={{ width: 220, gap: 8 }}>
-                    <Image source={{ uri: ph.url }} style={styles.photo} resizeMode="cover" accessibilityLabel={ph.caption ?? `Photo from ${charity.nameEn}`} />
+                    <RemotePhoto uri={ph.url} style={styles.photo} resizeMode="cover" accessibilityLabel={ph.caption ?? `Photo from ${charity.nameEn}`} />
                     {ph.caption ? <Text style={styles.caption} numberOfLines={2}>{ph.caption}</Text> : null}
                   </View>
                 ))}

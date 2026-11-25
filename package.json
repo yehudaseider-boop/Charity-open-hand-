@@ -15,6 +15,7 @@
     "db:reset": "supabase db reset && npm run db:seed",
     "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
     "receipts": "tsx --env-file=.env.local scripts/issue-receipts.ts",
+    "picture-copies": "tsx --conditions=react-server --env-file=.env.local scripts/make-picture-copies.ts",
     "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
   "dependencies": {

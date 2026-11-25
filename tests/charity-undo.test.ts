@@ -109,6 +109,30 @@ describe("undo", () => {
     expect(removedFiles).toEqual([`${C}/updates/x.jpg`]);
   });
 
+  // Resize at upload (25/11/2026): a picture's smaller copies go with it, so none stays reachable once it is removed.
+  it("removes a picture an action added with all its copies", async () => {
+    const pic = `${C}/photos/p1.2400x1800.jpg`;
+    tables.charity_photos = [{ id: "ph1", charity_id: C, storage_path: pic }];
+    tables.charity_actions = [action({ type: "delete", table: "charity_photos", id: "ph1", file: { bucket: "charity-public", path: pic } }, "photo_added")];
+    expect((await undoAction(C, A, "u1", "approved", now)).ok).toBe(true);
+    expect(removedFiles.sort()).toEqual([pic, `${C}/photos/p1.2400x1800.w640.webp`, `${C}/photos/p1.2400x1800.w1280.webp`, `${C}/photos/p1.2400x1800.w1920.webp`, `${C}/photos/p1.jpg`].sort());
+  });
+
+  it("removes the picture's new name and copies too when the one-off run renamed it after the action", async () => {
+    tables.charity_photos = [{ id: "ph1", charity_id: C, storage_path: `${C}/photos/p1.1000x750.jpg` }];
+    tables.charity_actions = [action({ type: "delete", table: "charity_photos", id: "ph1", file: { bucket: "charity-public", path: `${C}/photos/p1.jpg` } }, "photo_added")];
+    expect((await undoAction(C, A, "u1", "approved", now)).ok).toBe(true);
+    expect(removedFiles).toEqual(expect.arrayContaining([`${C}/photos/p1.jpg`, `${C}/photos/p1.1000x750.jpg`, `${C}/photos/p1.1000x750.w640.webp`]));
+  });
+
+  it("taking back a new logo removes the new logo's copies with it", async () => {
+    const logo = `${C}/logo-n.600x600.png`;
+    tables.charities[0].logo_path = logo;
+    tables.charity_actions = [action({ type: "restore", table: "charities", before: { logo_path: null }, after: { logo_path: logo }, dropFile: { bucket: "charity-public", path: logo } }, "logo_changed")];
+    expect((await undoAction(C, A, "u1", "approved", now)).ok).toBe(true);
+    expect(removedFiles.sort()).toEqual([logo, `${C}/logo-n.600x600.w128.webp`, `${C}/logo-n.600x600.w256.webp`, `${C}/logo-n.600x600.w512.webp`, `${C}/logo-n.png`].sort());
+  });
+
   it("puts back what an action removed, exactly as it was", async () => {
     const row = { id: "up1", charity_id: C, body_en: "Packed 120 parcels", photo_path: null, created_at: "2026-10-10T08:00:00Z" };
     tables.charity_actions = [action({ type: "reinsert", table: "charity_updates", row }, "update_removed")];
@@ -133,5 +157,13 @@ describe("undo", () => {
   it("registration changes can't be taken back once the application is submitted", async () => {
     tables.charity_actions = [action({ type: "restore", table: "charities", before: { name_en: "Old" }, after: { name_en: "New name" } }, "organisation_saved")];
     expect(await undoAction(C, A, "u1", "pending_review", now)).toMatchObject({ ok: false, why: "locked" });
+  });
+
+  it("after 30 days, a removed photo kept for Undo goes with all its copies", async () => {
+    const { recordAction } = await import("@/lib/charity/charity-actions");
+    const pic = `${C}/photos/old.2000x1500.webp`;
+    tables.charity_actions = [{ ...action({ type: "reinsert", table: "charity_photos", row: { id: "ph9", charity_id: C, storage_path: pic } }, "photo_removed"), created_at: "2026-01-01T00:00:00Z" }];
+    await recordAction(C, "u1", "profile_saved", {}, null);
+    expect(removedFiles.sort()).toEqual([pic, `${C}/photos/old.2000x1500.w640.webp`, `${C}/photos/old.2000x1500.w1280.webp`, `${C}/photos/old.2000x1500.w1920.webp`, `${C}/photos/old.webp`].sort());
   });
 });

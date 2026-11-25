@@ -77,8 +77,10 @@ const nextConfig: NextConfig = {
     "/receipt-fonts/\\[file\\]": ["./src/lib/receipts/fonts/BricolageGrotesque-Bold.ttf", "./node_modules/@fontsource/dm-sans/files/dm-sans-latin-{400,500,600}-normal.woff2"],
   },
   images: {
-    // Charity pictures from our public storage go through the image service on the live site (src/components/
-    // charity-image.tsx, 24/11/2026): only that one folder, only over https. 90 keeps them sharp (75 is the default).
+    // Vercel's image service for charity pictures (built 24/11/2026) is NOT the chosen way: it is billed per use, and
+    // since 25/11/2026 ("Resize at upload", Yehuda) the server makes lighter copies of each picture once, at upload
+    // (src/lib/charity/picture-copies.ts), served with srcset by src/components/charity-image.tsx. The switch stays,
+    // off: only CHARITY_IMAGE_SERVICE=yes (set nowhere) would allow that one folder, over https, at quality 90.
     remotePatterns: (() => {
       // Off unless CHARITY_IMAGE_SERVICE=yes: with no allowed address, Vercel's image endpoint refuses every request
       // (and bills nothing), whatever a visitor asks for (review 24/11/2026).

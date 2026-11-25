@@ -52,10 +52,29 @@ describe("storage writes", () => {
     expect(wrong).toEqual([]);
   });
 
+  // Charity pictures and their copies (25/11/2026) are stored by picture-copies.ts on the bucket it is handed: always
+  // the server's own.
+  const PICTURE_STORE = /\b(storePicture|removePicture)\(([^,]*),/g;
+  const SERVER_BUCKET = /^createAdminClient\(\)\.storage\.from\("charity-public"\)$/;
+  it("the picture store is only ever given the server's own client", () => {
+    const wrong: string[] = [];
+    let calls = 0;
+    for (const { p, code } of all) {
+      if (p === "lib/charity/picture-copies.ts") continue;
+      for (const m of code.matchAll(PICTURE_STORE)) {
+        calls++;
+        if (!SERVER_BUCKET.test(m[2].trim())) wrong.push(`${p}: ${m[0]}`);
+      }
+    }
+    expect(calls).toBeGreaterThan(0);
+    expect(wrong).toEqual([]);
+  });
+
   it("the three upload actions are among them", () => {
     for (const file of ["app/charity-admin/[id]/profile/actions.ts", "app/charity-admin/[id]/updates/actions.ts", "app/charity-admin/[id]/application/actions.ts"]) {
       const code = all.find((f) => f.p === file)!.code;
-      expect([...code.matchAll(WRITES)].some((m) => m[2] === "upload")).toBe(true);
+      const viaPictureStore = [...code.matchAll(PICTURE_STORE)].some((m) => m[1] === "storePicture" && SERVER_BUCKET.test(m[2].trim()));
+      expect([...code.matchAll(WRITES)].some((m) => m[2] === "upload") || viaPictureStore).toBe(true);
     }
   });
 });

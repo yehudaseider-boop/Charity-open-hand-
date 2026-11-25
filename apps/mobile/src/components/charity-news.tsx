@@ -1,9 +1,10 @@
 import { router } from "expo-router";
-import { Image, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { initials } from "@shared/charity/initials";
 import { openGiveScreen } from "@/lib/give-entry";
 import type { NewsItem } from "@/lib/charity-news";
 import { colors, fonts, radius } from "@/theme/tokens";
+import { RemotePhoto } from "./remote-photo";
 import { ReportLink } from "./report-link";
 import { Text } from "./text";
 
@@ -16,7 +17,7 @@ export function NewsCard({ item }: { item: NewsItem }) {
   const soft = [...item.slug].reduce((n, ch) => n + ch.charCodeAt(0), 0) % 2 === 1;
   return (
     <View style={styles.card}>
-      {item.photoUrl ? <Image source={{ uri: item.photoUrl }} style={styles.photo} resizeMode="cover" accessibilityLabel={`Photo with ${item.charityName}'s update`} /> : null}
+      {item.photoUrl ? <RemotePhoto uri={item.photoUrl} style={styles.photo} resizeMode="cover" accessibilityLabel={`Photo with ${item.charityName}'s update`} /> : null}
       <View style={styles.by}>
         <View style={[styles.mark, { backgroundColor: soft ? colors.lilacSoft : colors.peach }]}>
           <Text style={styles.markText}>{initials(item.charityName)}</Text>

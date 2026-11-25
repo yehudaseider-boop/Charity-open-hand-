@@ -9,7 +9,9 @@ import { causeHref, coverTone, emptyState, requestHref, resultsLine } from "@/li
 import { searchWords } from "@/lib/charity/search-text";
 import { charityRequestsOpen } from "@/config/app-links";
 import { initials } from "@/lib/charity/initials";
-import { loadCategories, publicImageUrl } from "@/lib/charity/queries";
+import { loadCategories } from "@/lib/charity/queries";
+import { CharityImage } from "@/components/charity-image";
+import { SLOTS } from "@/lib/charity/picture-slots";
 import { weekStart } from "@/lib/charity/thank-you";
 import { createPublicClient } from "@/lib/supabase/public";
 import { readPublicCharities } from "@/lib/charity/public-list";
@@ -187,8 +189,7 @@ function CauseChip({ name, onBlue = false }: { name: string; onBlue?: boolean })
 /** The charity's logo, or its initials on a soft tile when it has none. */
 function LogoTile({ name, logo, className }: { name: string; logo: string | null; className: string }) {
   return logo ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={logo} alt="" loading="lazy" className={`${className} bg-surface object-cover`} />
+    <CharityImage path={logo} alt="" width={64} height={64} slots={SLOTS.cardLogo} className={`${className} bg-surface object-cover`} />
   ) : (
     <span aria-hidden className={`${className} flex items-center justify-center bg-brand font-display font-bold text-white`}>{initials(name)}</span>
   );
@@ -199,7 +200,7 @@ function LogoTile({ name, logo, className }: { name: string; logo: string | null
  * is, a line about it, its s18A status and causes, and the way in. The whole card is one link to its page.
  */
 function CharityCard({ charity: c, causes, tone }: { charity: Row; causes: string[]; tone: string }) {
-  const cover = publicImageUrl(c.cover_path);
+  const cover = c.cover_path;
   const area = [c.suburb, c.city].filter(Boolean).join(", ");
   return (
     <Link
@@ -208,8 +209,7 @@ function CharityCard({ charity: c, causes, tone }: { charity: Row; causes: strin
     >
       <div className={`relative aspect-[16/9] w-full overflow-hidden ${cover ? "bg-honey-soft" : tone}`}>
         {cover ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={cover} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03] motion-reduce:transition-none" />
+          <CharityImage path={cover} alt="" width={640} height={360} slots={SLOTS.cardCover} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03] motion-reduce:transition-none" />
         ) : (
           <Bubbles
             items={[
@@ -222,7 +222,7 @@ function CharityCard({ charity: c, causes, tone }: { charity: Row; causes: strin
         )}
       </div>
       <div className="flex flex-1 flex-col gap-3 px-5 pb-5">
-        <LogoTile name={c.name_en} logo={publicImageUrl(c.logo_path)} className="relative z-10 -mt-8 h-16 w-16 shrink-0 rounded-[1.125rem] text-xl shadow-[0_0_0_4px_var(--surface),0_10px_24px_rgba(14,27,61,0.12)]" />
+        <LogoTile name={c.name_en} logo={c.logo_path} className="relative z-10 -mt-8 h-16 w-16 shrink-0 rounded-[1.125rem] text-xl shadow-[0_0_0_4px_var(--surface),0_10px_24px_rgba(14,27,61,0.12)]" />
         <div className="min-w-0 space-y-1">
           <BilingualName en={c.name_en} as="h2" className="line-clamp-3 text-[1.25rem] leading-tight text-navy" />
           {area ? <p dir="auto" className="truncate text-sm text-muted">{area}</p> : null}
@@ -245,7 +245,7 @@ function CharityCard({ charity: c, causes, tone }: { charity: Row; causes: strin
 
 /** The cause of the week: a blue colour block with splashes off the edges, and the page's one orange button. */
 function CauseOfTheWeek({ charity: c, causes }: { charity: Row; causes: string[] }) {
-  const cover = publicImageUrl(c.cover_path);
+  const cover = c.cover_path;
   return (
     <section aria-labelledby="cause-of-the-week" className="mx-auto max-w-[75rem] px-4 sm:px-6">
       <div className="relative isolate overflow-hidden rounded-[2rem] bg-brand text-white">
@@ -275,8 +275,7 @@ function CauseOfTheWeek({ charity: c, causes }: { charity: Row; causes: string[]
           </div>
           <div className="min-w-0">
             {cover ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={cover} alt="" className="aspect-[4/3] w-full rounded-[1.5rem] object-cover shadow-[0_24px_60px_rgba(14,27,61,0.28)]" />
+              <CharityImage path={cover} alt="" width={800} height={600} slots={SLOTS.weekCover} className="aspect-[4/3] w-full rounded-[1.5rem] object-cover shadow-[0_24px_60px_rgba(14,27,61,0.28)]" />
             ) : (
               <div aria-hidden className="flex aspect-[4/3] w-full items-center justify-center rounded-[1.5rem] bg-white/95 max-md:hidden">
                 <Splash className="h-auto w-[55%]" />

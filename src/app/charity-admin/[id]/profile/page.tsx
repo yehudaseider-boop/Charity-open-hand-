@@ -4,7 +4,9 @@ import { Card, Notice } from "@/components/card";
 import { ActionLink, PageHeader } from "@/components/dash";
 import { DonePanel, formKey } from "@/components/done-panel";
 import { requireViewer } from "@/lib/auth";
-import { loadCategories, loadCharityForManager, publicImageUrl } from "@/lib/charity/queries";
+import { loadCategories, loadCharityForManager } from "@/lib/charity/queries";
+import { CharityImage } from "@/components/charity-image";
+import { SLOTS } from "@/lib/charity/picture-slots";
 import { Badge } from "@/components/badge";
 import { ProfileVideo } from "@/components/profile-video";
 import { loadCampaigns } from "@/lib/charity/campaign-queries";
@@ -33,8 +35,6 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
   const focus = focusFrom(focusLoad.row);
   const status = focus ? focusStatus(focus, jhbToday(now)) : null;
   const approved = charity.status === "approved";
-  const logo = publicImageUrl(charity.logo_path);
-  const cover = publicImageUrl(charity.cover_path);
 
   return (
     <div className="space-y-5">
@@ -118,13 +118,11 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
         <DonationEmailsForm key={k} action={saveDonationEmails.bind(null, id)} on={priv?.notify_donations !== false} email={priv?.contact_email ?? null} />
       </Card>
       <Card title="Logo">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {logo ? <img src={logo} alt="" className="mb-3 h-20 w-20 rounded-card border-2 border-border object-cover" /> : null}
+        {charity.logo_path ? <CharityImage path={charity.logo_path} alt="" width={80} height={80} slots={SLOTS.adminLogo} className="mb-3 h-20 w-20 rounded-card border-2 border-border object-cover" /> : null}
         <ImageForm key={k} action={uploadImage.bind(null, id, "logo")} label="Square image works best" />
       </Card>
       <Card title="Cover image">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {cover ? <img src={cover} alt="" className="mb-3 aspect-[3/1] w-full rounded-card border-2 border-border object-cover" /> : null}
+        {charity.cover_path ? <CharityImage path={charity.cover_path} alt="" width={900} height={300} slots={SLOTS.adminCover} className="mb-3 aspect-[3/1] w-full rounded-card border-2 border-border object-cover" /> : null}
         <ImageForm key={k} action={uploadImage.bind(null, id, "cover")} label="Wide image, about 3 times wider than tall" />
       </Card>
       </fieldset>

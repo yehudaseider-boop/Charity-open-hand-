@@ -1,42 +1,65 @@
 import { getImageProps } from "next/image";
+import { publicImageUrl } from "@/lib/charity/queries";
+import { pictureSizes, pictureSrcSet, type PictureSlot } from "@/lib/charity/picture-sizes";
 
 /**
- * A charity's own picture (logo, cover, update or gallery photo) from our public storage (24/11/2026). On the live
- * site it goes through Next's image service: the right size for the screen, in a lighter format, at quality 90 so it
- * stays sharp. `sizes` says how wide it is shown: a phone gets the file for its own pixel density (three pixels per
- * one on an iPhone), and from 640 px up `sizes` states double the width it is shown at, so even a laptop at normal
- * density gets two pixels per one (the brand's "everything ultra HD" rule). The width and height are the picture's
- * shape, so nothing moves when it loads.
+ * A charity's own picture (logo, cover, update or gallery photo) from our public storage. Since 25/11/2026 ("Resize
+ * at upload", Yehuda) the server makes lighter copies of each picture once, when it is uploaded
+ * (src/lib/charity/picture-copies.ts), and this gives the browser the list (`srcset`) with how wide the picture is
+ * shown (`sizes`, from `slots`): a phone takes the copy for its own pixel density (three pixels per one on an
+ * iPhone), and from 640 px up `slots` ask for double the width, so even a laptop at normal density gets two pixels per
+ * one (the brand's "everything ultra HD" rule). A picture uploaded before copies were made is shown as it is stored,
+ * exactly as before. The width and height are the box's shape, so nothing moves when it loads.
  *
- * Built with getImageProps and a plain <img>, so no image script is sent to the browser for it.
+ * A plain <img>: no image script is sent to the browser for it.
  *
- * On a developer's machine the storage address is local (http://127.0.0.1), which the image service refuses to fetch
- * for safety, so the picture is shown as it is stored, exactly as before.
+ * Vercel's image service (billed per use) is not the chosen way and stays off: only CHARITY_IMAGE_SERVICE=yes (not
+ * set anywhere) would send pictures through it, as before 25/11/2026.
  */
 export function CharityImage({
-  src,
+  path,
   alt,
   width,
   height,
-  sizes,
+  slots,
   className,
   priority = false,
 }: {
-  src: string;
+  /** The picture's stored name in the charity's public folder. */
+  path: string;
   alt: string;
-  /** The picture's shape (not its size on screen): the real size comes from `sizes` and the screen. */
+  /** The box's shape (not its size on screen): the real size comes from `slots` and the screen. */
   width: number;
   height: number;
-  /** How wide it is shown, for each screen width: what the browser uses to pick the file. */
-  sizes: string;
+  /** Where it is shown, for each screen width: what the browser uses to pick the file. */
+  slots: PictureSlot[];
   className?: string;
   /** The first big picture on the page: fetched first. */
   priority?: boolean;
 }) {
-  // Vercel's image service is billed by use, so it stays off until Yehuda says yes (CHARITY_IMAGE_SERVICE=yes,
-  // 24/11/2026). Off, the picture is shown as it is stored, exactly as before.
-  const service = process.env.CHARITY_IMAGE_SERVICE === "yes" && src.startsWith("https://");
-  const { props } = getImageProps({ src, alt, width, height, sizes, quality: 90, priority, unoptimized: !service });
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img {...props} alt={alt} className={className} />;
+  const src = publicImageUrl(path)!;
+  const sizes = pictureSizes(slots, path);
+  if (process.env.CHARITY_IMAGE_SERVICE === "yes" && src.startsWith("https://")) {
+    const { props } = getImageProps({ src, alt, width, height, sizes, quality: 90, priority });
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img {...props} alt={alt} className={className} />;
+  }
+  const srcSet = pictureSrcSet(path, (p) => publicImageUrl(p)!);
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      srcSet={srcSet || undefined}
+      sizes={srcSet ? sizes : undefined}
+      alt={alt}
+      width={width}
+      height={height}
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : undefined}
+      decoding="async"
+      // As next/image drew it before: no alt text flashes while the picture loads.
+      style={{ color: "transparent" }}
+      className={className}
+    />
+  );
 }
