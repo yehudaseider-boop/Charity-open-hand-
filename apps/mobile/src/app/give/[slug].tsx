@@ -339,6 +339,9 @@ export default function Give() {
       setAmount(p.summary.amountText ?? centsToInput(p.summary.cents));
       if (p.summary.extraChoice !== undefined) setExtraPick(p.summary.extraChoice);
       setExtraAmount(p.summary.extraText ?? "");
+      // The card charge comes back too (fresh review, 25/11/2026): without it the resent total differed from the held
+      // one, and a saved-card gift could never be resolved.
+      setCoverCharge((p.summary.cardChargeCents ?? 0) > 0);
       setEmail(p.summary.email);
       if (p.summary.label) setLabel(p.summary.label);
       if (p.attemptId) {
@@ -877,6 +880,7 @@ export default function Give() {
         setAmount(held.amountText ?? amount);
         setExtraPick(held.extraChoice ?? extraChoice);
         setExtraAmount(held.extraText ?? extraAmount);
+        setCoverCharge((held.cardChargeCents ?? 0) > 0);
         setEmail(held.email);
         setMonthly(false);
         setMessage(
@@ -1212,6 +1216,7 @@ export default function Give() {
                 }
                 value={coverCharge}
                 onChange={setCoverCharge}
+                disabled={locked}
               />
             </View>
           ) : null}
@@ -1374,7 +1379,7 @@ export default function Give() {
               <SwitchRow
                 label="Save my card"
                 description="Charged only when you tap Give."
-                more="Our payment partner keeps your card, not Givezy and not this app. It is only charged when you tap Give, and you can remove it any time in Account."
+                more="Our payment provider keeps your card, not Givezy and not this app. It is only charged when you tap Give, and you can remove it any time in Account."
                 value={saveCard}
                 onChange={setSaveCard}
               />
@@ -1500,7 +1505,7 @@ export default function Give() {
               <View style={styles.safeDot}><CheckIcon size={16} color={colors.onInk} /></View>
               <Text variant="bodyMuted" style={{ flex: 1, fontSize: 15, lineHeight: 22 }}>
                 <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 15, color: colors.navy }}>Kept safe. </Text>
-                You enter your card on our payment partner&apos;s own secure page. Givezy never sees it, and never holds the money: it goes straight to the charity.
+                You enter your card on our payment provider&apos;s own secure page. Givezy never sees it, and never holds the money: it goes straight to the charity.
               </Text>
             </View>
           ) : null}

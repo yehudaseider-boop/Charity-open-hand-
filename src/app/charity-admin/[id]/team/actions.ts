@@ -37,11 +37,14 @@ export async function addTeamMember(charityId: string, _prev: FormState, formDat
   redirect(`/charity-admin/${charityId}/team?done=${done}`);
 }
 
-/** Take away someone's access. Owner only; asked first on the page. */
+/**
+ * Take away someone's access: the owner removes anyone, and anyone can remove themselves (fresh security review,
+ * 25/11/2026: someone added to a team couldn't leave it, which also blocked deleting their own account). Asked first.
+ */
 export async function removeTeamMember(charityId: string, userId: string, _prev: FormState, _formData: FormData): Promise<FormState> {
   const viewer = await requireViewer();
   const { charity } = await loadCharityForManager(charityId);
-  if (!(await isOwner(charityId))) return NOT_OWNER;
+  if (userId !== viewer.userId && !(await isOwner(charityId))) return NOT_OWNER;
   if (!/^[0-9a-f-]{36}$/i.test(userId)) return { ok: false, message: "That person no longer has access." };
   const r = await removeMember(charityId, viewer.userId, userId);
   if (!r.ok) return { ok: false, message: r.message };

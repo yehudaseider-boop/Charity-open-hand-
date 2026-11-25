@@ -54,7 +54,7 @@ export function SavedCardRow() {
     <View style={styles.card} accessible={false}>
       <Text variant="label">Saved card</Text>
       <Text style={styles.name}>{cardLabel(card)}</Text>
-      {card.expires ? <Text variant="bodyMuted" style={{ fontSize: 15 }}>Expires {card.expires}. Kept by our payment partner, not by Givezy.</Text> : null}
+      {card.expires ? <Text variant="bodyMuted" style={{ fontSize: 15 }}>Expires {card.expires}. Kept by our payment provider, not by Givezy.</Text> : null}
       <TextLink label={busy ? "Removing…" : "Remove card"} onPress={remove} disabled={busy} />
     </View>
   );

@@ -29,6 +29,22 @@ const footerGroups = [
   { title: "Your privacy", links: [["Privacy policy", "/privacy"], ["Terms", "/terms"], ["Your information", "/account/data"]] },
 ] as const;
 
+/** A person to reach from every page (fresh review, 25/11/2026: only the home page had a contact link). */
+function FooterContact() {
+  const email = legalConfig.supportEmail;
+  const chat = whatsAppChat(legalConfig.supportWhatsApp);
+  if (!email && !chat) return null;
+  const link = "text-white underline underline-offset-4 hover:text-honey";
+  return (
+    <p className="max-w-[18rem] text-[15px] leading-relaxed text-white/70">
+      Need a person?{" "}
+      {email ? <a href={`mailto:${email}`} className={link}>{email}</a> : null}
+      {email && chat ? " or WhatsApp " : chat ? "WhatsApp " : null}
+      {chat ? <a href={chat} rel="noopener" className={`${link} whitespace-nowrap`}>{legalConfig.supportWhatsApp}</a> : null}
+    </p>
+  );
+}
+
 export function SiteFooter() {
   return (
     <footer className="relative mt-auto overflow-hidden bg-navy text-white print:hidden">
@@ -42,6 +58,7 @@ export function SiteFooter() {
             <img src="/brand/logo-400.png" alt="Givezy" width={97} height={32} className="h-8 w-auto" />
           </Link>
           <p className="max-w-[18rem] text-[15px] leading-relaxed text-white/70">Good starts here. Give to checked South African charities and keep every gift in one place.</p>
+          <FooterContact />
         </div>
         {footerGroups.map((g) => (
           <nav key={g.title} aria-label={g.title} className="flex flex-col gap-1">

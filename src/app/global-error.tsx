@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import "./globals.css";
+import { legalConfig } from "@/config/legal";
 
 /**
  * The last resort when the root layout itself fails. It replaces the whole document, so it brings
@@ -21,7 +22,9 @@ export default function GlobalError({ error, retry }: { error: Error & { digest?
             <h1 className="text-xl font-semibold">Something went wrong</h1>
             <p className="text-sm text-muted">
               Givezy couldn&apos;t load this page. Please try again in a moment. If it keeps happening, let us know
-              {error.digest ? ` and quote reference ${error.digest}` : ""}.
+              {legalConfig.supportEmail ? <> at <a href={`mailto:${legalConfig.supportEmail}`} className="text-brand underline">{legalConfig.supportEmail}</a></> : null}
+              {legalConfig.supportWhatsApp ? ` or on WhatsApp ${legalConfig.supportWhatsApp}` : ""}
+              {error.digest ? `, and quote reference ${error.digest}` : ""}.
             </p>
             <div className="flex flex-wrap gap-3">
               <button onClick={() => retry()} className="rounded-control bg-brand px-4 py-2.5 font-medium text-brand-contrast">Try again</button>

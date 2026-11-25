@@ -29,7 +29,7 @@ const papers: { icon: IconName; title: string; body: string; when?: string }[] =
   { icon: "bank", title: "Bank confirmation letter", body: "A letter from your bank showing the account is in the organisation's name, with the account number and branch code. Donations are paid into this account." },
   { icon: "user", title: "A contact person", body: "Who we email about your application and your page. You can change it later." },
   { icon: "shield", title: "PBO approval letter", body: "The SARS letter confirming your PBO status.", when: "If you have PBO status" },
-  { icon: "receipt", title: "s18A approval and our mandate", body: "The SARS letter that lets you issue s18A receipts, and our receipting mandate, signed. The mandate lets us issue receipts in your name.", when: "Only for s18A receipts" },
+  { icon: "receipt", title: "s18A approval", body: "The SARS letter that lets you issue s18A receipts. After you apply, we email you our receipting mandate to sign: it lets us issue receipts in your name.", when: "Only for s18A receipts" },
 ];
 
 export default async function ApplyPage({ searchParams }: PageProps<"/apply">) {

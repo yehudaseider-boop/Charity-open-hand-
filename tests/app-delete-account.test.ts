@@ -109,10 +109,11 @@ describe("what the phone forgets", () => {
     const keys = phoneKeysFor("user-1");
     expect(keys.length).toBeGreaterThan(4);
     for (const k of keys) {
-      expect(k).toMatch(/^nediv-lev\..+\.u\.user-1$/);
+      expect(k).toMatch(/^nediv-lev\.(.+\.u\.user-1|seen\.user-1)$/);
       expect(k).not.toContain("user-2");
     }
     expect(keys).toContain("nediv-lev.giving-goals.u.user-1");
     expect(keys).toContain("nediv-lev.income-log.u.user-1");
+    expect(keys).toContain("nediv-lev.seen.user-1");
   });
 });

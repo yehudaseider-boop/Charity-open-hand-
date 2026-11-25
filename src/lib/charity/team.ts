@@ -125,7 +125,7 @@ export async function removeMember(charityId: string, actorId: string, userId: s
   if (error) throw error;
   if (outcome === "gone") return { ok: false, message: "That person no longer has access." };
   if (outcome === "last_owner") return { ok: false, message: "You're the only owner, so you can't remove yourself. Ask Givezy to make someone else the owner first." };
-  await logAudit({ actorUserId: actorId, action: "charity.admin_removed", entityType: "charity", entityId: charityId, details: { user_id: userId, by: "owner" } });
+  await logAudit({ actorUserId: actorId, action: "charity.admin_removed", entityType: "charity", entityId: charityId, details: { user_id: userId, by: userId === actorId ? "self" : "owner" } });
   return { ok: true, email: target.email };
 }
 

@@ -423,7 +423,7 @@ export default function Giving() {
           <ErrorState body={GIVING_LOAD_ERROR} onRetry={() => (preview ? router.replace("/giving") : account.refresh())} />
         ) : (
           <>
-            {account.live?.fromCache && account.loadError ? <OfflineNote savedAt={account.live.loadedAt} /> : null}
+            {account.live && account.loadError ? <OfflineNote savedAt={account.live.loadedAt} /> : null}
             {preview || signedIn ? <InsightsLink /> : null}
             {account.status === "signed-out" ? (
               <View style={styles.blueCard}>

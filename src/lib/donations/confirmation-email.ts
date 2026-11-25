@@ -59,7 +59,8 @@ export function confirmationEmail(d: {
         : "You did not ask for an s18A receipt for this donation.",
     "",
     ...monthlyLines(d),
-    "You can see all your donations, and your giving goal, in the Givezy app. Sign in with this email address.",
+    // The website account first: the app isn't in the stores yet, and not everyone sets a goal (fresh review, 25/11/2026).
+    `You can see all your donations in your Givezy account${d.accountUrl ? ` at ${d.accountUrl}` : ""}, or in the Givezy app. Sign in with this email address.`,
     "",
     "Givezy",
   ];
@@ -72,7 +73,7 @@ export function confirmationEmail(d: {
 }
 
 function monthlyLines(d: { monthly?: Parameters<typeof confirmationEmail>[0]["monthly"]; manageUrl?: string; totalCents: number }): string[] {
-  const manage = `You can pause or cancel at any time in the Givezy app (Progress tab)${d.manageUrl ? ` or at ${d.manageUrl}` : ""}.`;
+  const manage = `You can pause or cancel at any time${d.manageUrl ? ` at ${d.manageUrl}, or` : ""} in the Givezy app (Progress tab).`;
   if (!d.monthly) return [];
   if (d.monthly.kind === "first") {
     return [

@@ -14,7 +14,13 @@ const fetchSend: Send = (method, url, token, body) =>
     method,
     headers: { authorization: `Bearer ${token}`, ...(body === undefined ? {} : { "content-type": "application/json" }) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  });
+  }, method === "POST" ? DELETE_TIMEOUT_MS : undefined);
+
+/**
+ * The delete itself may run up to the server's 60 second limit (src/app/api/app/delete-account/route.ts): the phone
+ * waits longer than that (fresh review, 25/11/2026), so it never gives up while the server is still deleting.
+ */
+export const DELETE_TIMEOUT_MS = 75_000;
 
 const endpoint = (site: string) => `${site.replace(/\/+$/, "")}/api/app/delete-account`;
 
@@ -75,7 +81,8 @@ export function phoneKeysFor(userId: string): string[] {
     "nediv-lev.maaser-target",
     "nediv-lev.maaser-target.set-aside",
   ];
-  return bases.map((b) => `${b}.u.${userId}`);
+  // Which gifts they had already seen arrive (account.tsx seenKey), named without the ".u." part (fresh review, 25/11/2026).
+  return [...bases.map((b) => `${b}.u.${userId}`), `nediv-lev.seen.${userId}`];
 }
 
 /**

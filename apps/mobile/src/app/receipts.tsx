@@ -147,7 +147,7 @@ export default function Receipts() {
           <ErrorState body="We couldn't load your receipts. Check your connection and try again." onRetry={() => (preview ? router.replace("/receipts") : account.refresh())} />
         ) : (
           <>
-            {account.live?.fromCache && account.loadError ? <OfflineNote savedAt={account.live.loadedAt} /> : null}
+            {account.live && account.loadError ? <OfflineNote savedAt={account.live.loadedAt} /> : null}
             {/* This tax year so far: what will be on next year's receipts, and when they come. */}
             {/* Signed out (live), there is nothing of theirs to total, so no card. */}
             {preview || signedIn ? (

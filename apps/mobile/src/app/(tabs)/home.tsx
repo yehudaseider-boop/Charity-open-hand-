@@ -143,7 +143,7 @@ export default function Home() {
         </View>
 
         {/* Offline or the refresh failed: say these are the numbers saved last time, as Progress and Receipts do. */}
-        {!preview && account.live?.fromCache && account.loadError ? (
+        {!preview && account.live && account.loadError ? (
           <View style={styles.gutter}><OfflineNote savedAt={account.live.loadedAt} /></View>
         ) : !preview && directory.offlineSince ? (
           <View style={styles.gutter}><OfflineNote savedAt={directory.offlineSince} /></View>

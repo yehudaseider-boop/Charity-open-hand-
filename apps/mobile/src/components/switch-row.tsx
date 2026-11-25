@@ -9,20 +9,21 @@ import { Text } from "./text";
  * behind a small "More" tap (13/11/2026, Yehuda: "too much writing ... short, and then they can read more"), so
  * nothing is lost but the screen stays light. A screen reader reads the full text with the switch.
  */
-export function SwitchRow({ label, description, more, value, onChange }: { label: string; description?: string; more?: string; value: boolean; onChange: (v: boolean) => void }) {
+export function SwitchRow({ label, description, more, value, onChange, disabled = false }: { label: string; description?: string; more?: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <View style={{ gap: 2 }}>
       <Pressable
         accessibilityRole="switch"
-        accessibilityState={{ checked: value }}
+        accessibilityState={{ checked: value, disabled }}
+        disabled={disabled}
         accessibilityLabel={label}
         accessibilityHint={[description, more].filter(Boolean).join(" ") || undefined}
         onPress={() => {
           haptic.tap();
           onChange(!value);
         }}
-        style={styles.row}
+        style={[styles.row, disabled && { opacity: 0.55 }]}
       >
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={styles.label}>{label}</Text>

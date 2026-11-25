@@ -274,7 +274,8 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   if (outcome === "review") {
     return (
       <Result tone="wait" title="We're checking this payment">
-        <p>Something about this payment needs a person to look at it. Please don&apos;t pay again. A person will look at it. To ask about it, contact us.</p>
+        {/* Says what may have happened to the money, once (fresh review, 25/11/2026: it repeated itself and said nothing about the card). */}
+        <p>Your card may have been charged, but something about this payment needs a person on our team to check it before the gift goes through. <strong className="font-semibold text-navy">Please don&apos;t pay again.</strong></p>
         <p className="mt-3 text-sm text-muted">Questions in the meantime: <HelpLine /></p>
         <p className="mt-4 flex flex-wrap gap-4 text-sm">
           <Link href={elsewhere.href} className="font-semibold text-brand underline underline-offset-4">{elsewhere.label}</Link>

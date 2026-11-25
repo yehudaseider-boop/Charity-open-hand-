@@ -127,6 +127,10 @@ export function DonateFlow({
   // are shown instead until the donor changes the amount again, so Give always sends the total on screen.
   const [serverQuote, setServerQuote] = useState<Quote | null>(null);
   const quote = serverQuote ?? (live.ok ? live.quote : null);
+  // What ticking "Cover the card charge" adds, in Rand, ticked or not (fresh review, 25/11/2026: it said "the total
+  // below includes it" while unticked). The same sum the total uses; null until there is an amount to work it out from.
+  const coverWith = cardChargeAvailable ? (coverCharge ? live : quoteFromTyped(amountText, contribChoice, contributionText, true)) : null;
+  const coverAdds = coverWith?.ok && coverWith.quote.cardChargeCents > 0 ? coverWith.quote.cardChargeCents : null;
   const changed = () => setServerQuote(null);
   const chooseContribution = (c: ContributionChoice) => {
     setContribChoice(c);
@@ -391,7 +395,7 @@ export function DonateFlow({
                   changed();
                 }}
               />
-              <span>Cover the card charge, so <bdi>{charityName}</bdi> gets your full donation. Optional. The total below includes it.</span>
+              <span>Cover the card charge, so <bdi>{charityName}</bdi> gets your full donation. Optional.{coverAdds !== null ? (coverCharge ? ` Adds ${formatRand(coverAdds)}, shown in the total below.` : ` It adds ${formatRand(coverAdds)}.`) : ""}</span>
             </label>
           </div>
         ) : null}

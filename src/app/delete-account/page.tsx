@@ -77,7 +77,7 @@ export default function DeleteAccountInfoPage() {
           <li>{CANT_UNDO}</li>
           <li>Your monthly donations are cancelled before anything is deleted, so you are never charged after deleting.</li>
           <li>If you manage a charity on Givezy, hand it over to someone else first. Get in touch and we will help.</li>
-          <li>Your card details are kept by our payment partner, never by Givezy. Deleting your account removes the saved card from us.</li>
+          <li>Your card details are kept by our payment provider, never by Givezy. Deleting your account removes the saved card from us.</li>
         </ul>
       </Section>
 

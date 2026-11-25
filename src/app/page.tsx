@@ -273,7 +273,7 @@ export default function HomePreview() {
           <ul className="mt-14 grid gap-10 md:grid-cols-3 md:gap-8">
             {([
               ["1", "s18A receipt a year from each charity that issues them, checked by the charity before it goes out."],
-              ["0", "rand of a charity's gift held by Givezy. Your gift is paid to the charity, not to us."],
+              ["0", "rand of a gift passes through Givezy's bank account. Gifts go straight to the charity's own account."],
               ["100%", "of charities are looked at by a person: registration documents and bank details are checked before they can take a gift."],
             ] as [string, string][]).map(([big, text]) => (
               <li key={big} className="flex flex-col gap-4 border-t-2 border-navy/15 pt-6">

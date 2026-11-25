@@ -466,7 +466,18 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         await forgetGivingCache(session?.user.id);
         await forgetDetails(session?.user.id ?? null).catch(() => undefined);
         lastCached.current = null;
-        await supabase?.auth.signOut();
+        if (supabase) {
+          // Offline with an expired sign-in, Supabase's sign-out answers with an error and keeps the session on the
+          // phone (fresh review, 25/11/2026): once back online the same person would be signed in again, and on a
+          // shared phone the next person would be in their account. So the session is removed from the phone here
+          // too, and the app shows signed out whatever the server said.
+          const { error } = await supabase.auth.signOut().catch((e: unknown) => ({ error: e }));
+          if (error) {
+            const key = (supabase.auth as unknown as { storageKey?: string }).storageKey;
+            if (key) await secureStorage.removeItem(key).catch(() => undefined);
+            await settle(null);
+          }
+        }
         setLive(null);
         setLoadError(false);
         setArrived([]);
@@ -500,7 +511,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         return { ok: true };
       },
     }),
-    [status, session, live, loadError, refreshing, refresh, arrived, accessToken, demo, enterDemo, exitDemo],
+    [status, session, live, loadError, refreshing, refresh, arrived, accessToken, demo, enterDemo, exitDemo, settle],
   );
 
   return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>;

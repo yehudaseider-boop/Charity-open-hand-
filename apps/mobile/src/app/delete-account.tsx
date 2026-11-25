@@ -37,7 +37,8 @@ import { colors, fonts, radius, space } from "@/theme/tokens";
  * for design review.
  */
 type Stage = "check" | "intro" | "confirm" | "code" | "working" | "done";
-type ProblemInfo = { title: string; message: string };
+/** `signOutHere`: the account may already be gone, so the phone can let go of it without another try. */
+type ProblemInfo = { title: string; message: string; signOutHere?: boolean };
 
 export default function DeleteAccount() {
   const insets = useSafeAreaInsets();
@@ -88,7 +89,9 @@ export default function DeleteAccount() {
     }
   }, [account, preview]);
 
-  const signedIn = preview || account.status === "signed-in";
+  // Someone who hasn't agreed to the current Terms can still delete their account here (fresh review, 25/11/2026;
+  // Apple 5.1.1(v)): deleting needs no agreement, and the server doesn't ask for one.
+  const signedIn = preview || account.status === "signed-in" || account.status === "agreeing";
   useEffect(() => {
     if (!signedIn || preview) return;
     // Started after this render (not inside it), so the screen's states are set from a callback.
@@ -119,6 +122,14 @@ export default function DeleteAccount() {
     await startAgainAsNewDonor().catch(() => undefined);
     haptic.success();
     setStage("done");
+  };
+
+  /** The account may already be deleted: sign out and forget this phone's copy, without claiming it is done. */
+  const letGo = async () => {
+    const id = account.userId;
+    await account.signOut().catch(() => undefined);
+    if (id) await Promise.all(phoneKeysFor(id).map((k) => secureStorage.removeItem(k).catch(() => undefined)));
+    router.navigate("/account");
   };
 
   const run = async () => {
@@ -162,12 +173,13 @@ export default function DeleteAccount() {
         setProblem({ title: "Your account wasn't deleted", message: o.message });
         return setStage("confirm");
       case "maybe_done":
-        setProblem({ title: "We're not sure it went through", message: o.message });
+        setProblem({ title: "We're not sure it went through", message: o.message, signOutHere: true });
         return setStage("confirm");
       case "no_answer":
-        // No answer: it may or may not have gone through, so a later 401 is read as "maybe already deleted".
+        // No answer: it may or may not have gone through, so a later 401 is read as "maybe already deleted". The
+        // title says only that no answer came (fresh review, 25/11/2026: it said "wasn't deleted", which we can't know).
         attempted.current = true;
-        setProblem({ title: "Your account wasn't deleted", message: o.message });
+        setProblem({ title: "We didn't hear back", message: o.message });
         return setStage("confirm");
     }
   };
@@ -280,7 +292,7 @@ export default function DeleteAccount() {
               </View>
             ) : stage === "confirm" ? (
               <>
-                {problem ? <Problem problem={problem} onReach={reach} onRetry={pressDelete} /> : null}
+                {problem ? <Problem problem={problem} onReach={reach} onRetry={pressDelete} onSignOutHere={() => void letGo()} /> : null}
                 <View style={styles.card}>
                   <Text variant="h2">Type DELETE to confirm</Text>
                   <Text variant="bodyMuted">Your monthly donations will be cancelled and your account deleted for good. {CANT_UNDO}</Text>
@@ -368,13 +380,14 @@ function Intro({ onContinue, onKeep }: { onContinue: () => void; onKeep: () => v
 }
 
 /** What went wrong, what was kept, what to do, and a way to reach a person. */
-function Problem({ problem, onReach, onRetry }: { problem: ProblemInfo; onReach: () => void; onRetry?: () => void }) {
+function Problem({ problem, onReach, onRetry, onSignOutHere }: { problem: ProblemInfo; onReach: () => void; onRetry?: () => void; onSignOutHere?: () => void }) {
   return (
     <View style={styles.problem} accessibilityRole="alert">
       <Text style={styles.problemTitle}>{problem.title}</Text>
       <Text variant="body">{problem.message}</Text>
       <Text variant="bodyMuted">{helpLine()}</Text>
       {onRetry ? <Button label="Try again" onPress={onRetry} /> : null}
+      {problem.signOutHere && onSignOutHere ? <Button label="Sign out of this phone" variant="secondary" onPress={onSignOutHere} /> : null}
       {helpMailto() ? <TextLink label="Email a person" onPress={onReach} /> : null}
     </View>
   );

@@ -149,7 +149,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
               {recent.map((g) => (
                 <li key={g.id} className="flex items-center justify-between gap-4 py-3">
                   <span className="flex min-w-0 flex-col">
-                    <span className="truncate font-semibold">{g.charityName}</span>
+                    <span className="truncate font-semibold" dir="auto">{g.charityName}</span>
                     <span className="text-sm text-muted">{formatDate(g.paidAt)}{g.monthly ? " · Monthly" : ""}</span>
                   </span>
                   <span className="shrink-0 font-bold tabular-nums">{formatRand(g.cents)}</span>
@@ -184,7 +184,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
               <li key={g.id} className="rounded-control border-2 border-border p-3 text-sm">
                 <div className="flex items-start justify-between gap-3">
                   <span className="flex min-w-0 flex-col">
-                    <span className="truncate font-semibold">{g.charityName}</span>
+                    <span className="truncate font-semibold" dir="auto">{g.charityName}</span>
                     <span className="text-muted">{formatDate(g.paidAt)}{g.recurringId ? " · Monthly" : ""}</span>
                   </span>
                   <span className="shrink-0 font-bold tabular-nums">{formatRand(g.amountCents)}</span>

@@ -27,7 +27,7 @@ const needs = [
   "Registered address and a contact person",
   "Your bank account, with a bank confirmation letter",
   "Your PBO approval letter, if you have PBO status",
-  "For s18A receipts: your s18A approval and our signed receipting mandate",
+  "For s18A receipts: your s18A approval (we email you our receipting mandate to sign after you apply)",
 ];
 
 function Tick({ className = "stroke-sage" }: { className?: string }) {

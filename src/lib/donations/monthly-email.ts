@@ -31,7 +31,7 @@ export function monthlyFailedEmail(d: {
         "We will try the same card again within the next few days.",
         ...(newCard ? ["", newCard] : []),
       ];
-  lines.push("", `You can pause or cancel a monthly donation at any time in the Givezy app (Progress tab)${d.manageUrl ? ` or at ${d.manageUrl}` : ""}.`);
+  lines.push("", `You can pause or cancel a monthly donation at any time${d.manageUrl ? ` at ${d.manageUrl}, or` : ""} in the Givezy app (Progress tab).`);
   if (d.helpEmail) lines.push("", `Questions? Email us at ${d.helpEmail} and a person will help.`);
   lines.push("", "Givezy");
   return { subject: d.final ? `Your monthly donation to ${d.charityName} has stopped` : `We could not collect your monthly donation to ${d.charityName}`, text: lines.join("\n") };

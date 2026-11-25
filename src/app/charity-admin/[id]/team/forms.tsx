@@ -22,7 +22,7 @@ export function RemoveMemberForm({ action, email, self }: { action: (s: FormStat
       action={action}
       submitLabel={self ? "Remove myself" : "Remove"}
       pendingLabel="Removing…"
-      confirm={self ? "Remove yourself from this charity? You'll lose access to its dashboard straight away. Another owner can add you back." : `Remove ${email}? They lose access to your dashboard and donors' details straight away. You can add them again later.`}
+      confirm={self ? "Remove yourself from this charity? You'll lose access to its dashboard straight away. The charity's owner can add you back." : `Remove ${email}? They lose access to your dashboard and donors' details straight away. You can add them again later.`}
       confirmLabel="Yes, remove"
     />
   );

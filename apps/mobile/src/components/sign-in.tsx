@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { router } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useAccount } from "@/lib/account";
 import { cleanCode, looksLikeEmail } from "@/lib/live-giving";
@@ -149,7 +150,8 @@ export function Agree() {
         onPress={() => step(setBusy, setError, () => account.agree())}
       />
       <TextLink label="Sign out" onPress={() => account.signOut()} />
-      <TextLink label="Delete my account" onPress={() => open("/account/data/delete")} />
+      {/* Inside the app, never the browser (Apple 5.1.1(v); fresh review, 25/11/2026). */}
+      <TextLink label="Delete my account" onPress={() => router.push("/delete-account")} />
     </View>
   );
 }

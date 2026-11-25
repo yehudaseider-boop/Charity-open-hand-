@@ -36,9 +36,9 @@ describe("delete my account: where it is offered", () => {
     expect(src).not.toMatch(/open\("\/account\/data\/delete"\)/);
   });
 
-  it("the app's agreement screen offers it too", () => {
+  it("the app's agreement screen offers it too, inside the app (25/11/2026, Apple 5.1.1(v))", () => {
     const src = readFileSync("apps/mobile/src/components/sign-in.tsx", "utf8");
-    expect(src).toMatch(/<TextLink label="Delete my account" onPress=\{\(\) => open\("\/account\/data\/delete"\)\} \/>/);
+    expect(src).toMatch(/<TextLink label="Delete my account" onPress=\{\(\) => router\.push\("\/delete-account"\)\} \/>/);
   });
 
   it("the page asks first and files the existing delete request", () => {

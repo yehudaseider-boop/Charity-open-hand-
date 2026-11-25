@@ -41,7 +41,7 @@ export default async function TeamPage({ params, searchParams }: PageProps<"/cha
               </div>
               <div className="flex shrink-0 flex-wrap items-center gap-2 has-[[role=alertdialog]]:basis-full">
                 <Badge tone={m.role === "owner" ? "brand" : undefined}>{ROLE_LABEL[m.role]}</Badge>
-                {owner && (m.role !== "owner" || m.userId === viewer.userId) ? (
+                {(owner && m.role !== "owner") || m.userId === viewer.userId ? (
                   <RemoveMemberForm action={removeTeamMember.bind(null, id, m.userId)} email={m.email} self={m.userId === viewer.userId} />
                 ) : null}
               </div>
