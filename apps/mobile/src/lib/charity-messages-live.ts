@@ -49,7 +49,9 @@ export function useCharityMessages() {
   const preview = account.status === "preview";
   const signedIn = account.status === "signed-in";
   const live = supabase !== null && signedIn;
-  const { messages: which } = useLocalSearchParams<{ messages?: string }>();
+  // Same ?state=empty as the other screens (walk-through, 25/11/2026: it was ignored here); ?messages=none works as before.
+  const { messages: asked, state } = useLocalSearchParams<{ messages?: string; state?: string }>();
+  const which = asked ?? (state === "empty" ? "none" : undefined);
   const [loaded, setLoaded] = useState<{ owner: string; list: CharityMessage[] } | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);

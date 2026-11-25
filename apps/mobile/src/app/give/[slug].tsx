@@ -1127,7 +1127,8 @@ export default function Give() {
             </Pressable>
           ) : null}
           <View style={styles.chips} accessibilityLabel={!quick.length ? "Amount" : pastAmounts.length ? "Amounts you gave before" : `Amounts suggested by ${charity.nameEn}`}>
-            {quick.filter((c) => c !== lastGift?.cents).map((c) => {
+            {/* The last gift leads in its own button above; the rest smallest first (walk-through, 25/11/2026: R1 000 stood before R500). */}
+            {quick.filter((c) => c !== lastGift?.cents).sort((a, b) => a - b).map((c) => {
               const on = gift === c;
               return (
                 <Pressable key={c} disabled={locked} onPress={() => { haptic.tap(); setAmount(centsToInput(c)); }} accessibilityRole="button" accessibilityLabel={`${rand(c)}, set as the amount`} accessibilityState={{ selected: on, disabled: locked }} style={[styles.chip, styles.chipRow, on && styles.chipOn, locked && styles.chipOff]}>

@@ -42,7 +42,7 @@ async function step(
 
 /**
  * Sign in: Google or Apple when switched on, else an emailed code. No password. The same
- * account as the website. Sits under the blue "Let's get you set up." header on Account.
+ * account as the website. Sits under the blue "Let's get you set up." header on Account ("Welcome back." for someone who tapped "I already have an account").
  */
 export function SignIn() {
   const account = useAccount();

@@ -21,6 +21,7 @@ import { DemoEmailDonors, DemoThankDonors } from "./donor-tools";
 import { DemoApplication } from "./application";
 import { demoDeposits, dmyDay } from "./deposits";
 import { DemoRecordGift } from "./charity-tools";
+import { DemoReceiptsList } from "./receipts-list";
 import { ButtonBuilder } from "@/app/charity-admin/[id]/website-button/button-builder";
 import { STEPS } from "@/app/charity-admin/[id]/website-button/steps";
 import { PosterView } from "@/app/charity-admin/[id]/poster/view";
@@ -462,18 +463,11 @@ export function DemoReceipts({ data }: { data: DemoData }) {
         <MiniStat strong label="Asked for an s18A receipt" value={formatRand(sum(asked))} note={plural(asked.length, "donation")} />
         <MiniStat label="Donors to receive one" value={String(rows.length)} note="One receipt each for the tax year" />
       </div>
-      <Card lights title="Yearly list (draft)">
-        <ul className="divide-y divide-border">
-          {rows.map((r, i) => (
-            <li key={r.d.id}>
-              <Link href={`${base}/donors/${r.d.id}`} className={rowLink}>
-                <span className="flex min-w-0 items-center gap-3"><Avatar name={r.d.name} i={i} /><span className="min-w-0"><span className="block truncate font-semibold group-hover:text-brand">{r.d.name}</span><span className="block text-xs text-muted">{plural(r.gs.length, "donation")}</span></span></span>
-                <span className="shrink-0 font-semibold tabular-nums">{formatRand(r.total)}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </Card>
+      <DemoReceiptsList
+        taxYearName={taxYearName(ty)}
+        endsOn={formatDate(`${end}T12:00:00+02:00`)}
+        rows={rows.map((r) => ({ id: r.d.id, name: r.d.name, initials: initials(r.d.name), totalCents: r.total, gifts: [...r.gs].sort((a, b) => a.paidAt.localeCompare(b.paidAt)).map((g) => ({ date: formatDate(g.paidAt), cents: g.amountCents })) }))}
+      />
     </div>
   );
 }

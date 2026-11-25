@@ -26,7 +26,7 @@ import { colors, fonts, radius, space } from "@/theme/tokens";
 
 /**
  * Screen 9: Account. Live: email-code sign-in, then agreement, then the
- * account. Preview (no live database yet): the sample account, ?demo=signedin.
+ * account. Preview (no live database yet): the sample account (?demo=signedout shows the signed-out screen).
  */
 
 /** Asks first, then resets this phone's first-open choices and shows the welcome again. */
@@ -44,11 +44,13 @@ export default function Account() {
   const insets = useSafeAreaInsets();
   const status = useStatusCover();
   const { width } = useWindowDimensions();
-  const p = useLocalSearchParams<{ demo?: string }>();
+  const p = useLocalSearchParams<{ demo?: string; back?: string }>();
   const account = useAccount();
   // Messages from charities (24/11/2026): how many are new, for the link below the tiles.
   const charityMessages = useCharityMessages();
-  const [demoSignedIn, setDemoSignedIn] = useState(p.demo === "signedin");
+  // Preview (no live service): Home already shows the sample giving, so Account starts as that sample account too (walk-through,
+  // 25/11/2026: the two contradicted each other). ?demo=signedout shows the signed-out screen for review.
+  const [demoSignedIn, setDemoSignedIn] = useState(p.demo !== "signedout");
   // Signing out clears this phone and then waits for the sign-in service, so the button says so while it runs.
   const [signingOut, setSigningOut] = useState(false);
   const signingOutRef = useRef(false);
@@ -127,6 +129,8 @@ export default function Account() {
                   <Text style={styles.headTitle} accessibilityRole="header">
                     {account.status === "agreeing" ? (
                       <>Nearly <Text style={[styles.headTitle, styles.key]}>there</Text>.</>
+                    ) : p.back === "1" ? (
+                      <>Welcome <Text style={[styles.headTitle, styles.key]}>back</Text>.</>
                     ) : (
                       <>Let&apos;s get you <Text style={[styles.headTitle, styles.key]}>set up</Text>.</>
                     )}

@@ -24,7 +24,7 @@ export const TYPE_AN_AMOUNT = "Type an amount in Rand";
 export function giftAmountError(text: string, cents: number | null, minCents: number, maxCents: number | null, ownAmountOpen = false): string | null {
   if (!text.trim()) return ownAmountOpen ? TYPE_AN_AMOUNT : CHOOSE_AN_AMOUNT;
   if (cents === null || (cents === 0 && !minCents)) return amountProblem(text, "180 or 180.50") ?? "Enter an amount in Rand, for example 180 or 180.50";
-  if (cents < minCents) return `The minimum donation is ${keepTogether(minCents)}`;
+  if (cents < minCents) return `The minimum donation is ${keepTogether(minCents)}.`;
   if (maxCents !== null && cents > maxCents) return `The largest donation in the app is ${keepTogether(maxCents)}. For a bigger gift, please contact the charity directly.`;
   return null;
 }

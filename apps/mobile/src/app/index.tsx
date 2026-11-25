@@ -105,7 +105,7 @@ export default function Welcome() {
         </FadeUp>
         <View style={[styles.gutter, { gap: 6, marginTop: 28 }]}>
           <Button variant="cta" label="Get started" onPress={next} />
-          <Pressable onPress={() => { markWelcomed(); router.replace("/account"); }} accessibilityRole="link" style={styles.alreadyLink}>
+          <Pressable onPress={() => { markWelcomed(); router.replace({ pathname: "/account", params: { back: "1" } }); }} accessibilityRole="link" style={styles.alreadyLink}>
             <Text style={styles.alreadyText}>I already have an account</Text>
           </Pressable>
         </View>

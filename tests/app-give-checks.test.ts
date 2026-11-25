@@ -16,8 +16,8 @@ describe("the gift amount", () => {
   it("can be given only from the minimum to the maximum", () => {
     expect(amountErr("180")).toBeNull();
     expect(amountErr("30")).toBeNull();
-    expect(amountErr("29.99")).toBe("The minimum donation is R30");
-    expect(amountErr("0")).toBe("The minimum donation is R30");
+    expect(amountErr("29.99")).toBe("The minimum donation is R30.");
+    expect(amountErr("0")).toBe("The minimum donation is R30.");
     expect(amountErr("1000001")).toMatch(/^The largest donation in the app is R1\u00a0000\u00a0000\./);
     expect(amountErr("abc")).toMatch(/^Enter an amount in Rand/);
   });
@@ -29,7 +29,7 @@ describe("the gift amount", () => {
   it("with the own-amount box open and empty, asks for an amount in Rand, not to tap Other amount", () => {
     expect(giftAmountError("", null, MIN, MAX, true)).toBe("Type an amount in Rand");
     expect(giftAmountError("  ", null, MIN, MAX, true)).toBe(TYPE_AN_AMOUNT);
-    expect(giftAmountError("0", 0, MIN, MAX, true)).toBe("The minimum donation is R30");
+    expect(giftAmountError("0", 0, MIN, MAX, true)).toBe("The minimum donation is R30.");
   });
   it("with no minimum, 0 still needs an amount", () => {
     expect(giftAmountError("0", 0, 0, null)).toMatch(/^Enter an amount in Rand/);
@@ -162,5 +162,20 @@ describe("leaving the give screen (23/11/2026)", () => {
       const p = leavePrompt(s)!;
       expect(`${p.title} ${p.body} ${p.leave} ${p.stay}`).not.toContain("!");
     }
+  });
+});
+
+describe("amounts as the app shows them once the donor moves on (25/11/2026)", () => {
+  it("groups the thousands with a space and keeps cents only when there are some", async () => {
+    const { groupedAmountInput } = await import("../apps/mobile/src/lib/amount-input");
+    expect(groupedAmountInput(180_00)).toBe("180");
+    expect(groupedAmountInput(1_234_50)).toBe("1 234.50");
+    expect(groupedAmountInput(100_000_000)).toBe("1 000 000");
+    expect(groupedAmountInput(34_57)).toBe("34.57");
+  });
+
+  it("stays as typed when the spaced form would not fit the box", async () => {
+    const { groupedAmountInput } = await import("../apps/mobile/src/lib/amount-input");
+    expect(groupedAmountInput(99_999_999_99)).toBeNull();
   });
 });
