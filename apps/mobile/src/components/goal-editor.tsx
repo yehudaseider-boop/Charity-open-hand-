@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { parseRandToCents, percentToPpm } from "@shared/money";
+import { formatRand, parseRandToCents, percentToPpm } from "@shared/money";
 import { AMOUNT_MAX_LENGTH, amountProblem } from "@/lib/amount-input";
-import { ppmToPercentText, type Goal, type GoalPeriod } from "@/lib/goals";
+import { GOAL_CEILING_PER_MONTH_CENTS, ppmToPercentText, type Goal, type GoalPeriod } from "@/lib/goals";
 import { haptic } from "@/lib/haptics";
 import { centsToInput } from "@/lib/pay-api";
 import { colors, fonts, radius } from "@/theme/tokens";
@@ -29,6 +29,11 @@ const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
  * Set or change a giving goal: a share of income or a set amount, per month or per tax year,
  * counting all giving or only gifts with certain labels.
  */
+/** The most one goal can be: the largest gift Givezy takes, for each month of it. */
+function goalCeilingCents(period: GoalPeriod): number {
+  return GOAL_CEILING_PER_MONTH_CENTS * (period === "year" ? 12 : 1);
+}
+
 export function GoalEditor({
   initial,
   labels,
@@ -71,6 +76,9 @@ export function GoalEditor({
     if (!name.trim()) e.name = "Give your goal a name";
     if (basis === "income" && !ppm) e.percent = "Enter a percentage, for example 10 or 12.5";
     if (basis === "fixed" && !(cents && cents > 0)) e.amount = amountProblem(amount, "12000") ?? "Enter an amount in Rand, for example 12000";
+    // An extra zero or two is far likelier than a goal this big (walk-through, 25/11/2026: R999 999 999 a year was
+    // taken). The ceiling is the largest gift Givezy takes (R1 000 000) for each month of the goal.
+    else if (basis === "fixed" && cents && cents > goalCeilingCents(period)) e.amount = `That looks like a typo. A goal can be up to ${formatRand(goalCeilingCents(period))} a ${period}`;
     if (some && chosen.length === 0) e.counts = "Choose at least one label, or count all your giving";
     setErrors(e);
     if (Object.keys(e).length || saving) return;

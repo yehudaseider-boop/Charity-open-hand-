@@ -2,7 +2,7 @@
 
 import { SOURCE_PARAM, type SourceTag } from "@/lib/donations/source";
 import { GIVE_GAVE_UP_MESSAGE, GIVE_GIVE_UP_MS, giveButtonLabel, giveWaitingLine, SLOW_AFTER_MS } from "@/lib/donations/give-feel";
-import { startTransition, useActionState, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useFormDraft } from "@/components/forms/use-form-draft";
 import { FormStateProvider } from "@/components/forms/action-form";
 import { Info } from "@/components/info";
@@ -18,6 +18,8 @@ import { quoteFromTyped, type Quote } from "@/lib/donations/quote";
 import { CONTRIBUTION_EXPLAINER, NO_CONTRIBUTION_NOTE, contributionLabel, startingChoice, type ContributionChoice } from "@/lib/donations/contribution";
 import { LABEL_MAX } from "@/lib/donations/labels";
 import { registrationNumberProblem } from "@/lib/donations/s18a-rules";
+import { givePrecheck } from "@/lib/donations/donor-details";
+import { saIdProblem } from "@/lib/sa-id";
 import { BotCheck, type BotCheckHandle } from "@/components/forms/bot-check";
 import { botCheckConfig } from "@/config/bot-check";
 
@@ -220,20 +222,29 @@ export function DonateFlow({
    */
   const chooseDonorType = (t: "individual" | "company" | "trust") => {
     setDonorType(t);
-    if (!state.fieldErrors?.registration_number) return;
+    const errorsNow = precheck && precheck.answer === state ? precheck.errors : state.fieldErrors;
+    if (!errorsNow?.registration_number) return;
     const typed = formRef.current?.querySelector<HTMLInputElement>('input[name="registration_number"]')?.value ?? "";
     const problem = registrationNumberProblem(t, typed, { want18a, detailsNow });
     setRechecked((r) => ({ answer: state, errors: { ...(r?.answer === state ? r.errors : {}), registration_number: problem } }));
   };
-  const shownState: CheckoutState = useMemo(() => {
-    if (!rechecked || rechecked.answer !== state || !state.fieldErrors) return state;
-    const fieldErrors: Record<string, string> = { ...state.fieldErrors };
+  // What the form itself found when Give was pressed (25/11/2026): empty or impossible fields, all at once, in the
+  // server's words, before the bot check or anything is sent. Only for that answer: the server's next answer replaces it.
+  const [precheck, setPrecheck] = useState<{ answer: CheckoutState; errors: Record<string, string> } | null>(null);
+  const shownState: CheckoutState = (() => {
+    const base: CheckoutState =
+      precheck && precheck.answer === state
+        ? { ok: false, fieldErrors: precheck.errors, message: fixLine(Object.keys(precheck.errors).length) }
+        : state;
+    if (!rechecked || rechecked.answer !== state || !base.fieldErrors) return base;
+    const fieldErrors: Record<string, string> = { ...base.fieldErrors };
     for (const [k, m] of Object.entries(rechecked.errors)) {
       if (m) fieldErrors[k] = m;
       else delete fieldErrors[k];
     }
-    return { ...state, fieldErrors };
-  }, [rechecked, state]);
+    // The count follows what is still marked (a trust number fixed by switching to "A trust" is one fewer).
+    return { ...base, fieldErrors, ...(base === state ? {} : { message: fixLine(Object.keys(fieldErrors).length) }) };
+  })();
   // Coming back from the payment provider (declined, Try again, Back) finds the details still filled in.
   useFormDraft(formRef, `donate:${slug}`);
   // Give works once the page has loaded: before that a press would send the form the browser's own way.
@@ -241,15 +252,15 @@ export function DonateFlow({
   // The folded extras (label, dedication, message): open from the start when the app sent a label.
   const [extrasOpen, setExtrasOpen] = useState(Boolean(initialLabel));
   // How many things needed fixing at the last press of Give (the count is refreshed on the next press).
-  const fixCount = Object.keys(state.fieldErrors ?? {}).length;
-  const extrasNeedFixing = ["giving_label", "dedication_kind", "dedication_name", "message"].some((k) => Boolean(state.fieldErrors?.[k]));
+  const fixCount = Object.keys(shownState.fieldErrors ?? {}).length;
+  const extrasNeedFixing = ["giving_label", "dedication_kind", "dedication_name", "message"].some((k) => Boolean(shownState.fieldErrors?.[k]));
   // After a refusal, take the donor to the first thing to fix (it may be far above the Give button).
   useEffect(() => {
-    if (!state.fieldErrors) return;
+    if (!state.fieldErrors && !(precheck && precheck.answer === state)) return;
     const first = formRef.current?.querySelector<HTMLElement>(FIX_TARGET);
     first?.focus();
     first?.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [state]);
+  }, [state, precheck]);
 
   const amountError = !live.ok && live.field === "amount" && amountTouched && !serverQuote ? live.message : null;
   const contributionError = !live.ok && live.field === "contribution" && contributionTouched && !serverQuote ? live.message : null;
@@ -272,6 +283,17 @@ export function DonateFlow({
             return;
           }
           const fd = new FormData(e.currentTarget);
+          const typed: Record<string, string> = {};
+          fd.forEach((v, k) => {
+            if (typeof v === "string") typed[k] = v;
+          });
+          const problems = givePrecheck(typed, { receiptsAvailable, singleTick: singleAgreementTick });
+          if (Object.keys(problems).length) {
+            setPrecheck({ answer: state, errors: problems });
+            setRechecked(null);
+            return;
+          }
+          setPrecheck(null);
           fd.set("$shown", JSON.stringify(quote));
           // The browser's Back from the payment provider's page returns here with the amount filled in.
           try {
@@ -534,8 +556,8 @@ export function DonateFlow({
                         <p className="text-xs text-muted">From your last s18A gift. Give with your account&apos;s email ({account.email}) to use it.</p>
                         {/* There's no ID box to mark in red here, so a problem with the saved number is said in words,
                             and Give's "take me to it" lands on these words. */}
-                        {state.fieldErrors?.id_number ? (
-                          <p role="alert" tabIndex={-1} data-fix className="text-xs font-medium text-danger">{state.fieldErrors.id_number}</p>
+                        {shownState.fieldErrors?.id_number ? (
+                          <p role="alert" tabIndex={-1} data-fix className="text-xs font-medium text-danger">{shownState.fieldErrors.id_number}</p>
                         ) : null}
                       </>
                     ) : null}
@@ -544,7 +566,7 @@ export function DonateFlow({
                 {/* Hidden and disabled rather than removed, so a number typed here survives switching back and forth. */}
                 <fieldset hidden={!idBoxesShown} disabled={!idBoxesShown} className="space-y-3">
                   <fieldset hidden={org} disabled={org}>
-                    <TextField name="id_number" label="SA ID number" required={detailsNow && !org} inputMode="numeric" hint="13 digits. SARS needs it to match your s18A receipt to you." maxLength={17} />
+                    <TextField name="id_number" label="SA ID number" required={detailsNow && !org} inputMode="numeric" check={saIdProblem} hint="13 digits. SARS needs it to match your s18A receipt to you." maxLength={17} />
                   </fieldset>
                   <TextField name="tax_reference" label="Income tax number" inputMode="numeric" maxLength={12} hint="10 digits, if you have one." />
                 </fieldset>
@@ -596,7 +618,7 @@ export function DonateFlow({
               hint="Only you see it, in your giving records. For example: Work giving, Family, or Birthday."
             />
 
-            <Dedicate error={state.fieldErrors?.dedication_name} />
+            <Dedicate error={shownState.fieldErrors?.dedication_name} />
 
             <TextArea name="message" label={`Message to ${charityName}`} rows={3} maxLength={500} />
           </div>
@@ -616,7 +638,7 @@ export function DonateFlow({
               </p>
               {quote && quote.totalCents !== quote.amountCents ? <p className="text-sm text-muted">{monthlyParts(quote, charityName)}</p> : null}
               {quote ? (
-                <Check key={quote.totalCents} name="monthly_authorised" error={state.fieldErrors?.monthly_authorised}>
+                <Check key={quote.totalCents} name="monthly_authorised" error={shownState.fieldErrors?.monthly_authorised}>
                   I authorise Givezy to collect {formatRand(quote.totalCents)} from my card every month until I cancel.
                 </Check>
               ) : (
@@ -635,7 +657,7 @@ export function DonateFlow({
           receiptsAvailable={receiptsAvailable}
           org={org}
           singleAgreementTick={singleAgreementTick}
-          fieldErrors={state.fieldErrors}
+          fieldErrors={shownState.fieldErrors}
         />
 
         {/* Hidden from people; bots fill it in. */}
@@ -672,9 +694,9 @@ export function DonateFlow({
             </p>
           </div>
         ) : null}
-        {state.message && !pending ? (
+        {shownState.message && !pending ? (
           <div role="alert" className="space-y-1 rounded-control border-2 border-danger-soft p-4 text-sm">
-            <p className="flex items-start gap-1.5 font-semibold text-danger"><ErrorMark /><span>{state.message}</span></p>
+            <p className="flex items-start gap-1.5 font-semibold text-danger"><ErrorMark /><span>{shownState.message}</span></p>
             {/* The page has already jumped to the first problem; this takes the donor back to it after scrolling down. */}
             {fixCount > 0 ? (
               <button
@@ -771,3 +793,8 @@ function monthlyParts(q: { amountCents: number; contributionCents: number; cardC
 }
 
 const charityLabel = (kind: "honour" | "memory") => (kind === "honour" ? "Shown as “In honour of” this person." : "Shown as “In memory of” this person.");
+
+/** The line by the Give button when fields need fixing (the server's words, src/app/c/[slug]/donate/actions.ts). */
+function fixLine(n: number): string {
+  return n === 1 ? "Please fix the field marked in red above." : `Please fix the ${n} fields marked in red above.`;
+}

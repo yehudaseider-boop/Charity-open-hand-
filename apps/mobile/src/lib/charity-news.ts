@@ -19,7 +19,7 @@ export type NewsItem = {
   photoUrl: string | null;
   /** When it was posted, in plain words: "Today", "Yesterday" or dd/mm/yyyy. */
   when: string;
-  /** How the donor is connected to it: "You give every month" or "You gave in October". */
+  /** How the donor is connected to it: "You give every month" or "Your last gift: October". */
   relation: string;
   postedAt: Date;
 };
@@ -67,12 +67,13 @@ export function postedWhen(posted: Date, today: Date): string {
   return ddmmyyyy(day);
 }
 
-/** "You give every month", or "You gave in October" (with the year when it wasn't this year). */
+/** "You give every month", or "Your last gift: October" (with the year when it wasn't this year). */
 export function relationLine(c: GaveTo, today: Date): string {
   if (c.monthly) return "You give every month";
   if (!c.lastGift) return "You gave before";
   const month = MONTHS[c.lastGift.getMonth()];
-  return c.lastGift.getFullYear() === today.getFullYear() ? `You gave in ${month}` : `You gave in ${month} ${c.lastGift.getFullYear()}`;
+  // "Your last gift": next to an update's own date, "You gave in October" read as if the update came in October (25/11/2026).
+  return c.lastGift.getFullYear() === today.getFullYear() ? `Your last gift: ${month}` : `Your last gift: ${month} ${c.lastGift.getFullYear()}`;
 }
 
 /** Newest first, at most NEWS_LIMIT, nothing older than NEWS_MAX_AGE_DAYS, and no empty updates. */

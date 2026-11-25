@@ -638,3 +638,21 @@ body:has([data-chrome="landing"]) .chrome-full {
     radial-gradient(60rem 36rem at 85% 10%, rgba(201, 180, 250, 0.28), transparent 60%),
     radial-gradient(44rem 30rem at 0% 100%, rgba(11, 42, 115, 0.85), transparent 65%);
 }
+
+/*
+ * A charity picture that fails to load (a weak connection, 25/11/2026 walk-through) shows a soft lilac panel instead
+ * of the browser's broken-picture icon. Browsers draw ::before on an <img> only when the picture didn't load.
+ */
+@layer base {
+  /* In the base layer, so a picture placed with Tailwind's "absolute" keeps it (any position works for ::before). */
+  .picture-soft-fail {
+    position: relative;
+  }
+  .picture-soft-fail::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--honey-soft);
+  }
+}

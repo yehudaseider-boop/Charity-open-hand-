@@ -109,7 +109,7 @@ export async function CharitiesView({ q, categorySlug }: { q: string; categorySl
             </p>
             <CharitySearch initial={q} category={category?.slug ?? ""} />
             {categories.length > 0 ? (
-              <nav aria-label="Causes" className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+              <nav aria-label="Causes" className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto pl-4 pr-16 pb-1 [mask-image:linear-gradient(to_right,black_82%,transparent)] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:[mask-image:none]">
                 <Link href={causeHref(null, q)} className={chip(!category)} aria-current={!category ? "page" : undefined}>All</Link>
                 {categories.map((c) => (
                   <Link key={c.id} href={causeHref(c.slug, q)} className={chip(c.id === category?.id)} aria-current={c.id === category?.id ? "page" : undefined}>

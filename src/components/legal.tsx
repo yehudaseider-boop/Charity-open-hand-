@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { legalConfig } from "@/config/legal";
+import { whatsAppChat } from "@/lib/whatsapp";
 
 /** Shown on legal pages until Yosef has approved the wording. */
 export function DraftNotice() {
@@ -80,12 +81,22 @@ export function Section({ title, children }: { title: string; children: React.Re
   );
 }
 
-/** How a charity reaches us: the support address once there is one, until then a reply to our emails. */
+/**
+ * How anyone reaches a person: the support address and, since 25/11/2026, WhatsApp too (the journey walk-through
+ * found failed-payment and help lines offered email only, while /delete-account offered both). Until there is an
+ * address, a reply to our emails.
+ */
 export function SupportContact() {
   const email = legalConfig.supportEmail;
-  return email ? (
-    <a href={`mailto:${email}`} className="text-brand underline">{email}</a>
-  ) : (
-    <>reply to any email we&apos;ve sent you</>
+  const chat = whatsAppChat(legalConfig.supportWhatsApp);
+  const whatsApp = chat && legalConfig.supportWhatsApp ? (
+    <>WhatsApp <a href={chat} rel="noopener" className="whitespace-nowrap text-brand underline">{legalConfig.supportWhatsApp}</a></>
+  ) : null;
+  if (!email) return whatsApp ? <>reply to any email we&apos;ve sent you, or {whatsApp}</> : <>reply to any email we&apos;ve sent you</>;
+  return (
+    <>
+      <a href={`mailto:${email}`} className="text-brand underline">{email}</a>
+      {whatsApp ? <> or {whatsApp}</> : null}
+    </>
   );
 }

@@ -28,7 +28,7 @@ describe("month panel", () => {
     expect(detail(k(2026, 7)).line).toBe("No gifts in July.");
   });
   it("this month says what is left to go", () => {
-    expect(detail(k(2026, 10))).toMatchObject({ when: "current", line: "R140 to go this month." });
+    expect(detail(k(2026, 10))).toMatchObject({ when: "current", line: "R140 to go to this month's share (your yearly goal spread evenly over its months)." });
   });
   it("a future month shows the plan to reach the goal", () => {
     // R12 000 - R3 780 = R8 220 over the 5 months left (Oct to Feb) = R1 644 a month.

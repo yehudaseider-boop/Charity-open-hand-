@@ -20,8 +20,8 @@ type Base = {
   required?: boolean;
 };
 
-function Wrapper({ id, name, label, hint, required, children }: Base & { id: string; children: React.ReactNode }) {
-  const error = useFieldError(name);
+function Wrapper({ id, name, label, hint, required, children, localError }: Base & { id: string; children: React.ReactNode; localError?: string | null }) {
+  const error = useFieldError(name) ?? localError ?? undefined;
   return (
     <div className="space-y-1">
       <label htmlFor={id} className="block text-sm font-semibold">
@@ -49,8 +49,14 @@ export function TextField({
   maxLength,
   placeholder,
   shape,
+  check,
   ...base
 }: Base & {
+  /**
+   * Checked when the person leaves the box with something typed (25/11/2026: a wrong SA ID number was only caught
+   * after Give). Returns what is wrong, in the same words the server uses, or null. Cleared as soon as they type again.
+   */
+  check?: (value: string) => string | null;
   defaultValue?: string | null;
   type?: "text" | "email" | "tel" | "url";
   /** What the box shows while it is empty (the shape of what to type). */
@@ -64,7 +70,8 @@ export function TextField({
   /** Stops typing past what the server accepts. */
   maxLength?: number;
 }) {
-  const error = useFieldError(base.name);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const error = useFieldError(base.name) ?? localError ?? undefined;
   const id = useFieldId(base.name);
   // A typed name (a free-text box) that reaches its limit says so, rather than stop taking letters with no word why
   // (22/11/2026). Not for boxes of a fixed size (a postal code is full at 4 digits).
@@ -73,11 +80,20 @@ export function TextField({
   const watchLimit = Boolean(autoDirection && maxLength);
   const hint = watchLimit && full ? `That's the most this box takes: ${maxLength} characters.` : base.hint;
   return (
-    <Wrapper {...base} hint={hint} id={id}>
+    <Wrapper {...base} hint={hint} id={id} localError={localError}>
       <input
         id={id}
         name={base.name}
         type={type}
+        {...(check
+          ? {
+              onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+                const v = e.currentTarget.value.trim();
+                setLocalError(v ? check(v) : null);
+              },
+              onChange: () => setLocalError(null),
+            }
+          : {})}
         defaultValue={defaultValue ?? ""}
         required={base.required}
         aria-invalid={error ? true : undefined}

@@ -78,7 +78,13 @@ export default async function CharityReceiptsPage({ params, searchParams }: Page
         </Notice>
       ) : (
         <Notice tone="warning">
-          Your charity can&apos;t issue s18A receipts yet: it needs confirmed s18A approval and a signed receipting mandate.
+          Your charity can&apos;t issue s18A receipts yet: it needs confirmed s18A approval and a signed receipting mandate.{" "}
+          {/* The way on (journey walk-through, 25/11/2026: this said what was missing but not how to fix it). */}
+          {charity.status === "draft" || charity.status === "rejected" ? (
+            <>Add them under <Link href={`/charity-admin/${id}/application?step=documents`} className="font-semibold underline underline-offset-4">Documents</Link> in your application.</>
+          ) : (
+            <>Send us your SARS s18A approval letter and your signed mandate, and we&apos;ll set up receipts: <SupportContact />.</>
+          )}
         </Notice>
       )}
 

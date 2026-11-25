@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SupportContact } from "@/components/legal";
 import { Illustration } from "@/components/illustration";
 import { Bubbles, Icon, Key, Steps, type IconName } from "@/components/marketing";
 import { platformConfig } from "@/config/platform";
@@ -67,6 +68,7 @@ export default async function ApplyPage({ searchParams }: PageProps<"/apply">) {
             <p className="max-w-[34rem] text-[17px] leading-relaxed text-muted">
               Apply in one sitting or save and come back any time. We check every application by hand and review it within {reviewWithin()}.
             </p>
+            <p className="max-w-[34rem] text-[15px] text-muted">Questions before you start, or stuck on a step? <SupportContact />.</p>
             <Illustration name="checklist" sparkle="stars" className="hidden w-full max-w-[22rem] lg:block" />
           </div>
 

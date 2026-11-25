@@ -64,7 +64,17 @@ async function tick(name: string) {
   await act(async () => $<HTMLInputElement>(`input[name="${name}"]`).click());
 }
 const giveButton = () => [...host.querySelectorAll("button")].find((b) => b.textContent?.startsWith("Give"))!;
+/** The donor's details and ticks, so the form's own check before sending (25/11/2026) lets Give through. */
+async function fillDetails() {
+  for (const [name, value] of [["first_name", "Thandi"], ["last_name", "Mokoena"], ["email", "thandi@example.co.za"]]) {
+    if (!$<HTMLInputElement>(`input[name="${name}"]`).value) await type(`input[name="${name}"]`, value);
+  }
+  for (const name of ["age_confirmed", "popia_consent"]) {
+    if (!$<HTMLInputElement>(`input[name="${name}"]`).checked) await tick(name);
+  }
+}
 async function give() {
+  await fillDetails();
   await act(async () => {
     $<HTMLFormElement>("form").requestSubmit();
   });

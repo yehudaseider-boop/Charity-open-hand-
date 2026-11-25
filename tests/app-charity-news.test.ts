@@ -35,8 +35,8 @@ describe("plain words on each card", () => {
 
   it("says how the donor is connected, with the year only when it isn't this year", () => {
     expect(relationLine({ slug: "a", name: "A", monthly: true, lastGift: d(2026, 1, 1) }, today)).toBe("You give every month");
-    expect(relationLine({ slug: "a", name: "A", monthly: false, lastGift: d(2026, 10, 2) }, today)).toBe("You gave in October");
-    expect(relationLine({ slug: "a", name: "A", monthly: false, lastGift: d(2025, 11, 3) }, today)).toBe("You gave in November 2025");
+    expect(relationLine({ slug: "a", name: "A", monthly: false, lastGift: d(2026, 10, 2) }, today)).toBe("Your last gift: October");
+    expect(relationLine({ slug: "a", name: "A", monthly: false, lastGift: d(2025, 11, 3) }, today)).toBe("Your last gift: November 2025");
   });
 });
 
@@ -52,7 +52,7 @@ describe("the news on Home", () => {
     const feed = newsFeed(gaveTo, updates, today);
     expect(feed.map((n) => n.id)).toEqual(["m1", "a1", "m2"]);
     expect(feed).toHaveLength(NEWS_LIMIT);
-    expect(feed[0]).toMatchObject({ charityName: "Meals Fund", relation: "You gave in October", when: "06/11/2026" });
+    expect(feed[0]).toMatchObject({ charityName: "Meals Fund", relation: "Your last gift: October", when: "06/11/2026" });
   });
 
   it("is empty when there is no news, so Home shows no section at all", () => {

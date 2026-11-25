@@ -8,6 +8,13 @@
 import { taxYearFor, taxYearName } from "./tax-year";
 
 export type GoalPeriod = "month" | "year";
+
+/**
+ * A goal's ceiling for each month it covers (25/11/2026): R1 000 000, the largest single gift Givezy takes online
+ * (maxDonationCents in the website's src/config/platform.ts). A sanity check against a typed extra zero, not a rule
+ * about money: goals stay on the phone.
+ */
+export const GOAL_CEILING_PER_MONTH_CENTS = 100_000_000;
 /**
  * The SARS tax year, 1 March to end February. Goals saved by older versions with another kind of
  * year are read back as tax-year goals (nothing else about them changes).

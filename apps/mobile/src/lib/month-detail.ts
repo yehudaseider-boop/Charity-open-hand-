@@ -64,7 +64,10 @@ export function monthDetail(goal: Goal, rows: MonthRow[], today: Date, monthKey:
   } else if (shareCents === null) {
     line = noShare;
   } else if (when === "current") {
-    line = givenCents < shareCents ? `${formatRand(shareCents - givenCents)} to go this month.` : "This month's share reached.";
+    // Says what the share is (walk-through, 25/11/2026): next to the catch-up figure below, a bare "R1 000 to go"
+    // read as a second, different target.
+    const what = goal.period === "year" ? " (your yearly goal spread evenly over its months)" : "";
+    line = givenCents < shareCents ? `${formatRand(shareCents - givenCents)} to go to this month's share${what}.` : "This month's share reached.";
   } else if (givenCents === 0) {
     line = `No gifts in ${name}.`;
   } else if (givenCents < shareCents) {

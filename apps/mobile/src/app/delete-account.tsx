@@ -228,7 +228,7 @@ export default function DeleteAccount() {
             )}
             <Text style={styles.headTitle} accessibilityRole="header">{stage === "done" ? "Your account is deleted" : "Delete my account"}</Text>
             <Text style={styles.headLine}>
-              {stage === "done" ? "We&apos;ve emailed you a confirmation." : stage === "confirm" || stage === "code" || working ? "Nearly done. One more check." : "Read this first. It takes a minute."}
+              {stage === "done" ? "We’ve emailed you a confirmation." : stage === "confirm" || stage === "code" || working ? "Nearly done. One more check." : "Read this first. It takes a minute."}
             </Text>
           </BlueHeader>
 

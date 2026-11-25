@@ -2,7 +2,7 @@ import { GIVING_PAUSED_MESSAGE } from "@shared/giving-pause";
 import { parseRandToCents } from "@shared/money";
 import { cardChargeToCover } from "@shared/fees";
 import { impactLine, impactSource } from "@shared/charity/impact";
-import { AMOUNT_MAX_LENGTH } from "@/lib/amount-input";
+import { AMOUNT_MAX_LENGTH, groupedAmountInput } from "@/lib/amount-input";
 import { footerAmountLine, GIVE_STILL_CONNECTING_MS, giftAmountError, givableTotal, waitingGiftLine } from "@/lib/give-checks";
 import { saIdProblem } from "@shared/sa-id";
 import { InfoButton } from "@/components/info-button";
@@ -72,6 +72,14 @@ const FIELD_NAMES: Record<string, string> = {
   postal_code: "your postal code", dedication_kind: "the dedication", dedication_name: "the dedication", monthly_authorised: "the monthly authorisation",
   agreed: "the agreement tick", age_confirmed: "the agreement tick", popia_consent: "the agreement tick", message: "your message",
 };
+/** "2 things to fix: your surname and postal code.", or null when nothing is left to fix. */
+function fixListText(e: Record<string, string>): string | null {
+  const names = [...new Set(Object.keys(e).map((k) => FIELD_NAMES[k] ?? "a highlighted field"))];
+  if (!names.length) return null;
+  const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0];
+  return names.length === 1 ? `One thing to fix: ${list}.` : `${names.length} things to fix: ${list}.`;
+}
+
 /** Which part of the form a problem is in, for scrolling to it. */
 const SECTION_OF: Record<string, string> = {
   amount: "amount", extra: "extra", first_name: "details", last_name: "details", email: "details", phone: "more",
@@ -216,19 +224,9 @@ export default function Give() {
   // The monthly authorisation names an exact total: it counts only for the total that was ticked.
   const [authorisedTotal, setAuthorisedTotal] = useState<number | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  // A changed amount is checked afresh (below, as it is typed): an earlier "fix the amount" doesn't hang on.
-  // Reset while rendering, the way React asks for state that follows another value.
-  const [errorsAmount, setErrorsAmount] = useState(amount);
-  if (errorsAmount !== amount) {
-    setErrorsAmount(amount);
-    if (errors.amount) {
-      const { amount: _gone, ...rest } = errors;
-      setErrors(rest);
-    }
-  }
   // What happened, as a red error or a calm note while we wait; `help` adds how to reach a person.
   // `signIn`: the message also offers "Sign in to see your gifts" (a gift whose check link has expired, signed out).
-  const [message, setMessageState] = useState<{ text: string; tone: MessageTone | "info"; help?: boolean; signIn?: boolean } | null>(null);
+  const [message, setMessageState] = useState<{ text: string; tone: MessageTone | "info"; help?: boolean; signIn?: boolean; fix?: boolean } | null>(null);
   // iPhone VoiceOver often doesn't speak a live region that appears on its own, so each message (what went wrong, "checking
   // your payment", "declined") is also spoken. Android reads the live region itself.
   useEffect(() => {
@@ -238,6 +236,21 @@ export default function Give() {
     setMessageState(text ? { text, tone, help, signIn } : null);
     setMessageAtEnd(false);
   };
+  // A changed amount is checked afresh (below, as it is typed): an earlier "fix the amount" doesn't hang on.
+  // Reset while rendering, the way React asks for state that follows another value.
+  const [errorsAmount, setErrorsAmount] = useState(amount);
+  if (errorsAmount !== amount) {
+    setErrorsAmount(amount);
+    if (errors.amount) {
+      const { amount: _gone, ...rest } = errors;
+      setErrors(rest);
+      // The "things to fix" line follows (journey walk-through, 25/11/2026: it still said "the amount" after a good R30).
+      if (message?.fix) {
+        const text = fixListText(rest);
+        setMessageState(text ? { ...message, text } : null);
+      }
+    }
+  }
   // Whether the pinned message has more below what shows, so it can say "Scroll for more".
   const [messageBox, setMessageBox] = useState(0);
   const [messageContent, setMessageContent] = useState(0);
@@ -690,9 +703,11 @@ export default function Give() {
   /** "2 things to fix: your surname and postal code." and scroll up to the first of them. */
   function showProblems(e: Record<string, string>) {
     const keys = Object.keys(e);
-    const names = [...new Set(keys.map((k) => FIELD_NAMES[k] ?? "a highlighted field"))];
-    const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0];
-    setMessage(names.length === 1 ? `One thing to fix: ${list}.` : `${names.length} things to fix: ${list}.`);
+    const text = fixListText(e);
+    if (text) {
+      setMessageState({ text, tone: "error", fix: true });
+      setMessageAtEnd(false);
+    }
     if (keys.some((k) => SECTION_OF[k] === "more")) setMore(true);
     const ys = keys.map((k) => sectionY[SECTION_OF[k] ?? ""]).filter((y): y is number => typeof y === "number");
     if (ys.length) scrollRef.current?.scrollTo({ y: Math.max(0, Math.min(...ys) - 12), animated: true });
@@ -1059,22 +1074,29 @@ export default function Give() {
             <Text style={styles.amountKicker}>Your gift</Text>
             <AmountSwipe cents={gift} min={minGift} max={maxGift} disabled={locked} onChange={(c) => setAmount(centsToInput(c))}>
             <View style={styles.amountRow}>
-              <Text style={styles.amountR}>R</Text>
+              {/* Before an amount is chosen: "Choose an amount", never an "R0" that reads like a R0 gift (walk-through, 25/11/2026). */}
+              {amount ? <Text style={styles.amountR}>R</Text> : null}
               <TextInput
                 ref={amountRef}
                 editable={!locked}
                 value={amount}
                 onChangeText={setAmount}
                 onFocus={() => setOwnAmountOpen(true)}
+                // Shown the way amounts are written everywhere else once the donor moves on: "1234.5" becomes "1 234.50".
+                onBlur={() => {
+                  const c = parseRandToCents(amount);
+                  const shown = c !== null && c > 0 ? groupedAmountInput(c) : null;
+                  if (shown && shown !== amount) setAmount(shown);
+                }}
                 keyboardType="decimal-pad"
                 maxLength={AMOUNT_MAX_LENGTH}
                 // Lets a sideways slide across the digits nudge the amount (AmountSwipe); iOS otherwise keeps the touch.
                 rejectResponderTermination={false}
-                placeholder="0"
+                placeholder="Choose an amount"
                 placeholderTextColor={colors.lilacSoft}
                 accessibilityLabel="Amount in Rand"
                 accessibilityHint={minGift ? `At least ${rand(minGift)}` : undefined}
-                style={[styles.amountInput, amount.length > (width < 340 ? 7 : 9) ? { fontSize: 34, lineHeight: 44 } : amount.length > (width < 340 ? 5 : 6) ? { fontSize: 44, lineHeight: 54 } : null]}
+                style={[styles.amountInput, !amount ? { fontSize: 28, lineHeight: 64 } : amount.length > (width < 340 ? 7 : 9) ? { fontSize: 34, lineHeight: 44 } : amount.length > (width < 340 ? 5 : 6) ? { fontSize: 44, lineHeight: 54 } : null]}
               />
             </View>
             </AmountSwipe>

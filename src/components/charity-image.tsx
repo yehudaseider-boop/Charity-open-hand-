@@ -59,7 +59,7 @@ export function CharityImage({
       decoding="async"
       // As next/image drew it before: no alt text flashes while the picture loads.
       style={{ color: "transparent" }}
-      className={className}
+      className={`picture-soft-fail${className ? ` ${className}` : ""}`}
     />
   );
 }

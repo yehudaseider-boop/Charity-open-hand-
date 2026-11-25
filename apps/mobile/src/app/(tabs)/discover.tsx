@@ -42,7 +42,6 @@ export default function Discover() {
   // Live: the state comes from loading the directory; preview keeps the design-review states.
   const state = !live ? demoState : directory.data ? "ready" : directory.failed ? "error" : "loading";
   const charities = useMemo(() => directory.data?.charities ?? [], [directory.data]);
-  const causes = directory.data?.causes ?? [{ id: "all", label: "All" }];
   const [query, setQuery] = useState(state === "empty" ? "Moon base" : "");
   const [cause, setCause] = useState("all");
   // The charity whose "Give" was tapped in the list: the same give sheet as on its page.
@@ -54,6 +53,13 @@ export default function Discover() {
   useEffect(() => {
     loadCausePrefs().then(setPicked);
   }, []);
+  // The causes picked on first open come straight after "All" in the chip row (walk-through, 25/11/2026: they were
+  // further along, so the first screen didn't look like it had listened).
+  const directoryCauses = directory.data?.causes;
+  const causes = useMemo(() => {
+    const allCauses = directoryCauses ?? [{ id: "all", label: "All" }];
+    return [...allCauses.filter((c) => c.id === "all"), ...allCauses.filter((c) => c.id !== "all" && picked.includes(c.id)), ...allCauses.filter((c) => c.id !== "all" && !picked.includes(c.id))];
+  }, [directoryCauses, picked]);
   const searching = query.trim().length > 0;
   // "Ask us to add a charity" (15/11/2026): shown only once our server says requests are open.
   const requestsOpen = useRequestsOpen();

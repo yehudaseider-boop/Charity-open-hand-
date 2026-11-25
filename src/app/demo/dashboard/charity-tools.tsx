@@ -49,7 +49,7 @@ export function DemoTeam() {
   };
   return (
     <div className="space-y-5">
-      <PageHeader title="Team" intro="People who can sign in to this dashboard. Admins can do everything here except add or remove people, and send emails to your donors. Only the owner can do those." />
+      <PageHeader title="Team" intro="People who can sign in to this dashboard, and what each person's role lets them do. Only the owner adds or removes people and changes roles." />
       <Card title={`Who has access (${team.length})`}>
         <ul className="divide-y divide-border text-sm">
           {team.map((m) => (
@@ -67,7 +67,7 @@ export function DemoTeam() {
         </ul>
       </Card>
       <Card title="Give someone access">
-        <p className="mb-3 text-sm text-muted">They become an admin. They&apos;ll see your donations and donors&apos; details, so add only people you trust with them. The first time they sign in they set up a second step on their phone.</p>
+        <p className="mb-3 text-sm text-muted">Choose their role below. They&apos;ll see your donations and donors&apos; details, so add only people you trust with them. The first time they sign in they set up a second step on their phone.</p>
         <AddMemberForm action={add} />
       </Card>
     </div>

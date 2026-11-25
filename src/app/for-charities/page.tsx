@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SupportContact } from "@/components/legal";
 import { Confetti, Floating, Icon, Key } from "@/components/marketing";
 import { platformConfig } from "@/config/platform";
 import { LiveWindow } from "@/components/live-window";
@@ -299,7 +300,7 @@ export default function ForCharitiesPage() {
 
       <Closing
         title={<>Ready to <Key>list your charity</Key>?</>}
-        body="Apply in one sitting or save and come back. We check every application by hand and email you the outcome."
+        body={<>Apply in one sitting or save and come back. We check every application by hand and email you the outcome. Rather talk to a person first? <SupportContact />.</>}
         action={
           <>
             <Link href="/apply" className={orangeButton}>List your charity</Link>

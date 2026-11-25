@@ -303,9 +303,9 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
   return (
     <Result tone="neutral" title="Donation not found">
       <p className="text-sm text-muted">
-        We couldn&apos;t find that donation. If money left your account, send us the date and the amount and we&apos;ll find it: <HelpLine />
+        We couldn&apos;t find that donation. If you didn&apos;t finish on the payment page, nothing was charged and you can give again. If money left your account, send us the date and the amount and we&apos;ll find it: <HelpLine />
       </p>
-      <Link href={elsewhere.href} className="mt-4 inline-block font-semibold text-brand underline underline-offset-4">{elsewhere.label}</Link>
+      <Link href={elsewhere.href} className="mt-4 inline-block font-semibold text-brand underline underline-offset-4">{focus ? "Give again" : elsewhere.label}</Link>
     </Result>
   );
 }

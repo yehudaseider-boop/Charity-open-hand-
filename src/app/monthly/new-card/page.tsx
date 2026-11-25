@@ -47,8 +47,8 @@ export default async function NewCardPage({ searchParams }: PageProps<"/monthly/
 
   if (!allowed) {
     return (
-      <Shell title="This link has expired">
-        <p>For your safety, the link in our email works for 30 days. Sign in with the email you give with, and update your card from your account.</p>
+      <Shell title="This link has expired or isn't complete">
+        <p>For your safety, the link in our email works for 30 days, and only exactly as we sent it (a link copied in part won&apos;t open). Nothing was changed. Sign in with the email you give with, and update your card from your account.</p>
         <Link href={`/login?next=${encodeURIComponent("/account")}`} className="pressable mt-5 inline-block rounded-control bg-brand px-6 py-3 font-bold text-brand-contrast">
           Sign in
         </Link>

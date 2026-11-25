@@ -1,3 +1,4 @@
+import { legalConfig } from "@/config/legal";
 /**
  * Gifts a charity records itself (21/10/2026): EFT, cash, a debit order or another programme, typed in one at
  * a time or imported from a CSV file. Pure: no database, no clock (the caller passes "today"). Every rule here
@@ -99,7 +100,7 @@ export function parseGiftAmount(raw: string | undefined): { cents: number } | { 
   const cents = parseRandToCents(normal);
   if (cents === null) return { error: `"${raw?.trim()}" isn't an amount we can read. Write it as 1250 or 1250.00` };
   if (cents <= 0) return { error: "The amount must be more than R0" };
-  if (cents > platformConfig.maxDonationCents) return { error: `Over ${formatRand(platformConfig.maxDonationCents)}: please check it, or tell us and we'll add it` };
+  if (cents > platformConfig.maxDonationCents) return { error: `Over ${formatRand(platformConfig.maxDonationCents)}: please check it, or tell us and we'll add it (email ${legalConfig.supportEmail ?? "us"}${legalConfig.supportWhatsApp ? ` or WhatsApp ${legalConfig.supportWhatsApp}` : ""})` };
   return { cents };
 }
 

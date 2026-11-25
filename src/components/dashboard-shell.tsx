@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CharityNav } from "@/components/charity-nav";
 import { HelpAssistant } from "@/components/help-assistant";
+import { SupportContact } from "@/components/legal";
 import { legalConfig } from "@/config/legal";
 import { whatsAppChat } from "@/lib/whatsapp";
 import { initials } from "@/lib/charity/initials";
@@ -64,6 +65,11 @@ export function DashboardShell({
               <div aria-hidden className="pointer-events-none sticky bottom-0 hidden h-6 bg-gradient-to-t from-surface to-transparent lg:block" />
             </div>
           </div>
+          {/* A person to reach from every dashboard page (journey walk-through, 25/11/2026), Givy on or off. */}
+          <p className="rounded-card border-2 border-border bg-surface p-4 text-xs leading-relaxed text-muted lg:shrink-0 [overflow-wrap:anywhere]">
+            <span className="block font-bold text-navy">Need a person?</span>
+            <SupportContact />
+          </p>
         </aside>
         <div className="min-w-0 space-y-5">
           <div className="flex flex-wrap items-center gap-3 print:hidden">

@@ -524,7 +524,7 @@ export default function Giving() {
                         <Text variant="bodyMuted">{g.name} is a share of your income. Log your income below and we work out the amount.</Text>
                       ) : null}
                       {pr.perMonthCents > 0 ? (
-                        <Text variant="bodyMuted">{i === 0 ? `${g.name}: about` : "About"} {rand(pr.perMonthCents)} a month over the {pr.window.monthsLeft} {pr.window.monthsLeft === 1 ? "month" : "months"} left.</Text>
+                        <Text variant="bodyMuted">{i === 0 ? `${g.name}: to` : "To"} reach {pr.targetCents !== null ? rand(pr.targetCents) : "it"} by {pr.window.endLabel} from here, about {rand(pr.perMonthCents)} a month for the {pr.window.monthsLeft} {pr.window.monthsLeft === 1 ? "month" : "months"} left.</Text>
                       ) : null}
                       <Text variant="label">{g.counts ? `Counts gifts labelled ${g.counts.join(", ")}.` : "Counts all your giving, including giving you logged elsewhere."}</Text>
                     </View>
