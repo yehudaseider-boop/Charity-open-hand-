@@ -104,7 +104,7 @@ export function body({ cfg, logo, splash, today }) {
 
 <!-- 2 -->
 <div class="section">
-  ${head(2, `What it costs and <span class="k">how the money moves</span>`, "Short version: listing is free, Givezy takes nothing from your donations, and the payment provider's card fee comes off each donation.")}
+  ${head(2, `What it costs and <span class="k">how the money moves</span>`, "Short version: listing is free, and the payment provider's card fee comes off each donation.")}
 
   <table>
     <thead><tr><th>Cost</th><th>What you pay</th></tr></thead>

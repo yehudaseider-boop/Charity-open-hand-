@@ -87,8 +87,9 @@ describe("the words", () => {
     for (const line of [CONTRIBUTION_EXPLAINER, NO_CONTRIBUTION_NOTE]) {
       expect(line).not.toMatch(/!|sure|only|just|please|sad|miss/i);
     }
-    expect(CONTRIBUTION_EXPLAINER).toContain("Givezy takes nothing from your gift.");
-    expect(CONTRIBUTION_EXPLAINER).toContain("separate from it");
+    expect(CONTRIBUTION_EXPLAINER).toContain("separate from your gift");
+    // Nothing either way about whether Givezy takes from a gift (Yehuda, 25/11/2026).
+    expect(CONTRIBUTION_EXPLAINER).not.toMatch(/takes? (nothing|no cut|a cut)/i);
   });
 });
 
