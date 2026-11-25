@@ -6,6 +6,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Browser, BrowserContext } from "playwright-core";
+import { legalConfig } from "@/config/legal";
 import { BROKEN, ROBOT_EMAIL, SITE, canSignIn, charityId, charityViewerCookies, ensureRobot, openBrowser, removeRobotAuthenticators } from "./setup";
 
 let browser: Browser;
@@ -64,7 +65,9 @@ describe.skipIf(!canSignIn)("the charity dashboard, as a Viewer", () => {
 
   it("shows a Viewer no donor's email address", async () => {
     const { text } = await open(`/charity-admin/${id}/donors`);
-    const others = (text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) ?? []).filter((e) => e.toLowerCase() !== ROBOT_EMAIL);
+    const others = (text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) ?? [])
+      // Our own robot, and Givezy's support address (the "Need a person?" card on every dashboard page, 25/11/2026).
+      .filter((e) => e.toLowerCase() !== ROBOT_EMAIL && e.toLowerCase() !== (legalConfig.supportEmail ?? "").toLowerCase());
     expect(others).toEqual([]);
   });
 
