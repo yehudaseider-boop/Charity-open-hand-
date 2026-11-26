@@ -200,6 +200,9 @@ Questions only the charities or their advisers can answer. Bring these up whenev
 
 - [ ] Admin can't correct a charity's address or PBO number after approval (no form); add one before launch (21/11/2026 review). (The s18A reference number can be saved again in the s18A receipts box on the charity's admin page.)
 
+### Outside attack test before launch (26/11/2026, Yehuda: "Not now")
+- [ ] **Run an outside tool that tries to break in and proves each hole (for example Strix).** Offered on 26/11/2026; Yehuda chose to wait (the fresh review of 25/11/2026 found no blocker in money or security). Before launch in January, decide whether to run one: either in a session container against a local copy of the site and the local test database, with its own AI key added through the secure form and a spending cap he approves in Rand first, or on the tool's paid cloud, which sends our code to that company (price and privacy terms to him first). Never against the live site.
+
 ### Sign-in speed (24/11/2026, see decisions.md)
 - [ ] **Keep Supabase's signing key asymmetric (ES256) on the live project too.** The website's local token check (proxy, header, second-step check) needs it; with the old shared-secret key every such check silently becomes a trip to Supabase again (slower, still correct). Check Authentication, JWT signing keys when the live project is made.
 - [ ] **Decide the token life** (Supabase, Authentication, JWT expiry; now 3600 s). A revoked session is trusted by the proxy and the header for up to this long (pages and actions still ask Supabase). Shorter means fewer minutes of that, more renewals.
