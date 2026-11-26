@@ -36,7 +36,7 @@ describe("thisWeek", () => {
     expect(w.unavailable).toEqual([]);
     expect(w.items.map((i) => [i.key, i.href])).toEqual([
       ["thank", `${base}/donors?group=new`],
-      ["retry", `${base}/monthly?show=running`],
+      ["retry", `${base}/monthly?show=declined`],
       ["paused", `${base}/monthly?show=paused`],
       ["stopped", `${base}/monthly/stopped?period=30-days`],
       ["s18a", `${base}/donors?s18a=details_missing`],

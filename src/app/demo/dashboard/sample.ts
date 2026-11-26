@@ -60,7 +60,7 @@ export function demoOverview(now: Date = new Date(), data: DemoData = demoData(n
   const base = DEMO_BASE;
   const todo: OverviewProps["todo"] = [];
   if (newDonors) todo.push({ key: "new", text: `${newDonors} new ${newDonors === 1 ? "donor" : "donors"} this month`, href: `${base}/thank-donors`, link: "Say thank you" });
-  if (needs.retrying) todo.push({ key: "retry", text: `${needs.retrying} monthly ${needs.retrying === 1 ? "donation" : "donations"} declined this month and being tried again`, href: `${base}/monthly?show=running`, link: "See who" });
+  if (needs.retrying) todo.push({ key: "retry", text: `${needs.retrying} monthly ${needs.retrying === 1 ? "donation" : "donations"} declined this month and being tried again`, href: `${base}/monthly?show=declined`, link: "See who" });
   const refunded = data.gifts.filter((g) => g.status === "refunded");
   if (refunded.length) todo.push({ key: "refund", text: `${refunded.length} donations refunded (${formatRand(sum(refunded))})`, href: `${base}/donations?status=refunded`, link: "See them" });
 

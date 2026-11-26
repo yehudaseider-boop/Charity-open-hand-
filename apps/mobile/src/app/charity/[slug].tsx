@@ -108,7 +108,9 @@ export default function CharityDetail() {
     <View style={styles.screen}>
       <Animated.ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }} scrollEventThrottle={16} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true, listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => setClock(statusBarStyle(onDark, e.nativeEvent.contentOffset.y, CHARITY_LIGHT_UNTIL)) })}>
         <View style={styles.cover}>
-          <CharityImage charity={charity} live={live} rounded={false} bare={Boolean(charity.coverUrl)} style={StyleSheet.absoluteFill} />
+          {/* A sample picture's label sits at the top, under the back button, never under the "Checked" badge at the
+              bottom (QA 26/11/2026: the two overlapped). */}
+          <CharityImage charity={charity} live={live} rounded={false} bare={Boolean(charity.coverUrl)} labelPosition="top" labelOffset={insets.top + 64} style={StyleSheet.absoluteFill} />
           <CheckedBadge issues18a={charity.issues18a} style={styles.badgeOnCover} />
         </View>
 

@@ -374,8 +374,11 @@ export function DemoDonor({ data, id }: { data: DemoData; id: string }) {
 // Monthly donations ------------------------------------------------------------------------------------------
 
 export function DemoMonthly({ data, sp }: { data: DemoData; sp: Params }) {
-  const show = ["running", "paused", "ended"].includes(one(sp.show)) ? one(sp.show) : "running";
-  const of = (s: string) => data.monthly.filter((m) => (s === "running" ? m.status === "active" : s === "paused" ? m.status === "paused" : m.status === "cancelled" || m.status === "failed"));
+  const show = ["running", "declined", "paused", "ended"].includes(one(sp.show)) ? one(sp.show) : "running";
+  const of = (s: string) =>
+    data.monthly.filter((m) =>
+      s === "running" ? m.status === "active" : s === "declined" ? m.status === "active" && m.retrying : s === "paused" ? m.status === "paused" : m.status === "cancelled" || m.status === "failed",
+    );
   const running = of("running");
   const rows = of(show);
   const donorId = (email: string | null) => data.donors.find((d) => d.email === email)?.id;
@@ -386,7 +389,7 @@ export function DemoMonthly({ data, sp }: { data: DemoData; sp: Params }) {
         <MiniStat strong label="Running" value={formatRand(running.reduce((t, m) => t + m.amount_cents, 0))} note={`a month, from ${plural(running.length, "monthly donor")}`} />
         <MiniStat label="Collected so far" value={formatRand(data.monthly.reduce((t, m) => t + m.paid_cents, 0))} note={plural(data.monthly.reduce((t, m) => t + m.paid_count, 0), "monthly payment")} />
       </div>
-      <Tabs label="Show" items={[["running", "Running"], ["paused", "Paused"], ["ended", "Ended"]].map(([k, l]) => ({ href: `${base}/monthly?show=${k}`, label: l, active: show === k, count: of(k).length }))} />
+      <Tabs label="Show" items={[["running", "Running"], ["declined", "Declined, trying again"], ["paused", "Paused"], ["ended", "Ended"]].map(([k, l]) => ({ href: `${base}/monthly?show=${k}`, label: l, active: show === k, count: of(k).length }))} />
       {rows.length === 0 ? (
         <EmptyState title="None here">No monthly donations in this list.</EmptyState>
       ) : (

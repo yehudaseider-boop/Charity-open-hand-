@@ -65,7 +65,7 @@ export function thisWeek(f: ThisWeekFacts): ThisWeek {
 
   if (f.monthly === null) unavailable.push(WEEK_SOURCE_NAMES.monthly);
   else {
-    if (f.monthly.retrying > 0) items.push({ key: "retry", text: `${plural(f.monthly.retrying, "monthly donation")} declined this month and being tried again`, href: `${b}/monthly?show=running`, link: "See who" });
+    if (f.monthly.retrying > 0) items.push({ key: "retry", text: `${plural(f.monthly.retrying, "monthly donation")} declined this month and being tried again`, href: `${b}/monthly?show=declined`, link: "See who" });
     if (f.monthly.pausedRecently > 0) items.push({ key: "paused", text: `${plural(f.monthly.pausedRecently, "monthly donor")} paused in the last 30 days`, href: `${b}/monthly?show=paused`, link: "See who" });
   }
 

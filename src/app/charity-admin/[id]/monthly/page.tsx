@@ -21,13 +21,15 @@ const PAGE = 25;
 const filters = [
   { key: "", label: "All" },
   { key: "running", label: "Running" },
+  // "Needs you this week" links here for its declined line (QA 26/11/2026: it opened every running donation).
+  { key: "declined", label: "Declined, trying again" },
   { key: "paused", label: "Paused" },
   { key: "ended", label: "Stopped or cancelled" },
 ] as const;
 type Filter = (typeof filters)[number]["key"];
 
 const matches = (f: Filter, s: MonthlyState) =>
-  f === "" || (f === "running" && (s === "running" || s === "retrying")) || (f === "paused" && s === "paused") || (f === "ended" && (s === "stopped" || s === "cancelled"));
+  f === "" || (f === "running" && (s === "running" || s === "retrying")) || (f === "declined" && s === "retrying") || (f === "paused" && s === "paused") || (f === "ended" && (s === "stopped" || s === "cancelled"));
 
 
 export default async function MonthlyPage({ params, searchParams }: PageProps<"/charity-admin/[id]/monthly">) {

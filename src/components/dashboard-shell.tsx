@@ -61,15 +61,17 @@ export function DashboardShell({
           <div className="lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden lg:rounded-card lg:border-2 lg:border-border lg:bg-surface">
             <div className="lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:px-3 lg:pt-3">
               <CharityNav id={id} base={base} hidden={hiddenTabs} />
+              {/* A person to reach from every dashboard page (journey walk-through, 25/11/2026), Givy on or off. At the end
+                  of the menu's own scroll, so on a laptop the menu itself gets the room (QA 26/11/2026: "Application" was
+                  hidden below the fold of the menu). */}
+              <p className="mt-4 rounded-card border-2 border-border bg-surface p-4 text-xs leading-relaxed text-muted lg:mb-3 lg:mt-3 lg:border-0 lg:bg-honey-soft lg:p-3 [overflow-wrap:anywhere]">
+                <span className="block font-bold text-navy">Need a person?</span>
+                <SupportContact />
+              </p>
               {/* Sticks to the bottom of the box while there is more below; at the very end it lies over empty space. */}
               <div aria-hidden className="pointer-events-none sticky bottom-0 hidden h-6 bg-gradient-to-t from-surface to-transparent lg:block" />
             </div>
           </div>
-          {/* A person to reach from every dashboard page (journey walk-through, 25/11/2026), Givy on or off. */}
-          <p className="rounded-card border-2 border-border bg-surface p-4 text-xs leading-relaxed text-muted lg:shrink-0 [overflow-wrap:anywhere]">
-            <span className="block font-bold text-navy">Need a person?</span>
-            <SupportContact />
-          </p>
         </aside>
         <div className="min-w-0 space-y-5">
           <div className="flex flex-wrap items-center gap-3 print:hidden">

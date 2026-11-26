@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/dash";
 import { DocumentList, OrganisationSummary, PrivateSummary } from "@/components/charity-summary";
 import { ContactForm } from "@/app/charity-admin/[id]/application/forms";
 import type { FormState } from "@/lib/form";
+import { normaliseSaPhone, SA_PHONE } from "@/lib/phone";
 import { DEMO_CHARITY } from "./sample";
 import { pause, useDemo } from "./store";
 
@@ -23,11 +24,16 @@ export function DemoApplication({ approvedOn, uploadedOn }: { approvedOn: string
     const name = String(f.get("contact_name") ?? "").trim();
     const email = String(f.get("contact_email") ?? "").trim();
     const errors: Record<string, string> = {};
+    // The real dashboard's rules (QA 26/11/2026: the demo saved a 400-character name and the phone "hello").
+    const typedPhone = String(f.get("contact_phone") ?? "").trim();
+    const phone = typedPhone ? normaliseSaPhone(typedPhone) : "";
     if (name.length < 2) errors.contact_name = "Enter the contact person's full name";
+    else if (name.length > 200) errors.contact_name = "Please keep it to 200 characters or fewer";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.contact_email = "Enter an email address, for example name@example.co.za";
+    if (phone && !SA_PHONE.test(phone)) errors.contact_phone = "Use a South African number, for example 082 123 4567";
     if (Object.keys(errors).length) return { ok: false, message: "Some details need fixing. Nothing was saved yet.", fieldErrors: errors };
     await pause();
-    setContact({ contact_name: name, contact_email: email, contact_phone: String(f.get("contact_phone") ?? "").trim() || null });
+    setContact({ contact_name: name, contact_email: email, contact_phone: typedPhone || null });
     return { ok: true, message: "Saved. In the real dashboard we'd let the old address know too. Kept in this browser only." };
   };
   const docs = (["npo_certificate", "pbo_approval", "s18a_approval", "bank_confirmation", "receipting_mandate"] as const).map((t, i) => ({
