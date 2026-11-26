@@ -74,6 +74,12 @@ export type VerifiedTransaction = {
    * never marks it failed, counts it as a decline or closes a monthly donation over it.
    */
   reversed?: boolean;
+  /**
+   * The accounts at the gateway this payment names as getting a share (a charity's subaccount), as the gateway reports
+   * them; an empty list when it names none. Only from gateways with `reportsSplit`. confirm.ts holds a split payment
+   * that doesn't name the charity's own account (fresh review, 25/11/2026: nothing checked where the money landed).
+   */
+  settledTo?: string[];
 };
 
 export type ChargeRequest = {
@@ -177,6 +183,11 @@ export interface PaymentGateway {
    * before anything is recorded. Left out, it means it can.
    */
   readonly supportsSavedCards?: boolean;
+  /**
+   * True when `verifyTransaction` says which account a split payment went to (`settledTo`). Then a split payment is
+   * only marked paid if it names the charity's own account; a gateway that can't say yet is left unchecked.
+   */
+  readonly reportsSplit?: boolean;
   /** Start a hosted checkout. Returns the page to send the donor to. */
   createCheckout(req: CheckoutRequest): Promise<{ redirectUrl: string }>;
   /**

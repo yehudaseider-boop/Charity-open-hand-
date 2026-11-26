@@ -26,7 +26,9 @@ export async function completeTestPayment(formData: FormData) {
   // A successful card payment returns a reusable authorisation, like a real gateway (monthly donations use it).
   const authorization =
     outcome === "success" ? { code: `AUTH_test_${reference.slice(0, 8)}`, reusable: true, last4: "4081", brand: "visa", expires: "12/2030" } : undefined;
-  const body = JSON.stringify({ id: randomUUID(), outcome, reference, amount, authorization });
+  // The account the payment was split to, as a real gateway would report it (only when splitting).
+  const account = signed.get("account") || undefined;
+  const body = JSON.stringify({ id: randomUUID(), outcome, reference, amount, account, authorization });
   const site = process.env.SITE_URL ?? "http://127.0.0.1:3000";
   const res = await fetch(`${site}/api/webhooks/test`, {
     method: "POST",

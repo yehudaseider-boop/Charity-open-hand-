@@ -1,6 +1,7 @@
 /** What each held item is, in plain words. */
 export const heldLabel: Record<string, string> = {
   "donation.amount_mismatch": "Amount did not match",
+  "donation.split_mismatch": "The payment provider didn't say this payment went to the charity's own account, so it isn't marked paid. Check where the money landed at the provider before anything else",
   "webhook.unmatched_payment": "Payment with no matching donation",
   "donation.refund_review": "Refund to check (partial, the amount was not given, or it came before the payment was confirmed)",
   "donation.gateway_mismatch": "Payment on a payment provider we no longer use: check it there",

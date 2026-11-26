@@ -72,7 +72,7 @@ export async function confirmPayment(reference: string, opts: ConfirmOptions = {
   const db = createAdminClient();
   const { data: donation, error: readError } = await db
     .from("donations")
-    .select("id, status, gateway, total_charged_cents, recurring_id, created_at")
+    .select("id, status, gateway, total_charged_cents, recurring_id, created_at, charity_id")
     .eq("gateway_ref", reference)
     .maybeSingle();
   if (readError) throw new PersistenceError("read the donation", readError);
@@ -140,6 +140,16 @@ export async function confirmPayment(reference: string, opts: ConfirmOptions = {
           entityId: donation.id,
           details: { expected: donation.total_charged_cents, got: tx.amountCents, currency: tx.currency },
         });
+      }
+      return "review";
+    }
+    // Where the money went (fresh review, 25/11/2026): a split payment counts as paid only if the provider says it
+    // went to this charity's own account. Otherwise (the split was ignored, or went elsewhere) the whole payment may
+    // sit with Givezy: held for a person once, like an amount that doesn't match, never marked paid unchecked.
+    const split = await splitProblem(donation as { charity_id: string; gateway: string }, tx);
+    if (split) {
+      if (!(await alreadyNoted("donation.split_mismatch", donation.id))) {
+        await logAudit({ actorUserId: null, action: "donation.split_mismatch", entityType: "donation", entityId: donation.id, details: split });
       }
       return "review";
     }
@@ -388,4 +398,24 @@ async function currentStatus(donationId: string): Promise<string> {
   if (error) throw new PersistenceError("re-read the donation", error);
   if (!data) throw new PersistenceError("re-read the donation");
   return data.status;
+}
+
+/**
+ * Why a successful split payment can't be marked paid yet, or null when it can. Only for a gateway that splits
+ * payments and says where a payment went (`reportsSplit`): the charity must have an account at that gateway, and the
+ * provider must name it. The account is the charity's as it is now: a charity that changed bank account between the
+ * gift and this check is held too, for a person to look at (safe, and rare).
+ */
+export async function splitProblem(
+  donation: { charity_id: string; gateway: string },
+  tx: Pick<VerifiedTransaction, "settledTo">,
+): Promise<{ expected: string | null; reported: string[] } | null> {
+  const gateway = gatewayByName(donation.gateway);
+  if (!gateway.splitsPayments || !gateway.reportsSplit) return null;
+  const { data, error } = await createAdminClient().from("charities").select("gateway, gateway_subaccount_ref").eq("id", donation.charity_id).maybeSingle();
+  if (error) throw new PersistenceError("read the charity's payment account", error);
+  const expected = data && data.gateway === gateway.name ? ((data.gateway_subaccount_ref as string | null) ?? null) : null;
+  const reported = tx.settledTo ?? [];
+  if (expected && reported.includes(expected)) return null;
+  return { expected, reported };
 }

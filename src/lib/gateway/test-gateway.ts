@@ -45,6 +45,8 @@ export const testGateway: PaymentGateway = {
   get splitsPayments() {
     return process.env.TEST_GATEWAY_SPLITS === "yes";
   },
+  /** It records the account each payment was split to, and says so when asked (like a real gateway's verify). */
+  reportsSplit: true,
 
   async createCheckout(req) {
     const params = new URLSearchParams({
@@ -72,7 +74,7 @@ export const testGateway: PaymentGateway = {
       .limit(1)
       .maybeSingle();
     const p = data?.payload as
-      | { outcome?: string; amount?: number; reference?: string; authorization?: { code: string; reusable: boolean; last4: string; brand: string; expires: string } }
+      | { outcome?: string; amount?: number; reference?: string; account?: string; authorization?: { code: string; reusable: boolean; last4: string; brand: string; expires: string } }
       | undefined;
     return {
       reference,
@@ -85,6 +87,7 @@ export const testGateway: PaymentGateway = {
       authorization: p?.authorization ?? null,
       // The test gateway only ever "takes" cards.
       channel: p?.outcome === "success" ? "card" : null,
+      settledTo: p?.account ? [p.account] : [],
     };
   },
 
@@ -96,6 +99,7 @@ export const testGateway: PaymentGateway = {
       outcome,
       reference: req.reference,
       amount: req.totalCents,
+      ...(req.charityAccountRef ? { account: req.charityAccountRef } : {}),
       authorization: { code: req.authorizationCode, reusable: true, last4: "4081", brand: "visa", expires: "12/2030" },
     };
     const { error } = await createAdminClient()

@@ -142,6 +142,30 @@ function splitOrNone(req: Pick<CheckoutRequest | ChargeRequest, "charityAccountR
   return {};
 }
 
+/**
+ * Every subaccount code the provider's answer names, wherever it puts it: the single-subaccount form (`subaccount`) or
+ * an inline split (`split`, with its `subaccounts`). VERIFY in test mode: the exact shape of `split` on a verified
+ * payment is not in Paystack's public spec, so this reads any `subaccount_code` (or a `subaccount` given as a code)
+ * under either. A payment that names none is held for a person, never marked paid unchecked (confirm.ts).
+ */
+export function splitAccounts(data: unknown): string[] {
+  const found = new Set<string>();
+  const walk = (v: unknown, depth: number) => {
+    if (depth > 6 || v === null || typeof v !== "object") return;
+    if (Array.isArray(v)) return v.forEach((x) => walk(x, depth + 1));
+    for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+      if ((k === "subaccount_code" || k === "subaccount") && typeof x === "string" && x.trim()) found.add(x.trim());
+      else walk(x, depth + 1);
+    }
+  };
+  const d = (data ?? {}) as Record<string, unknown>;
+  walk(d.subaccount, 0);
+  walk(d.split, 0);
+  // A plain code straight under `subaccount` (not an object).
+  if (typeof d.subaccount === "string" && d.subaccount.trim()) found.add(d.subaccount.trim());
+  return [...found];
+}
+
 /** The method word the provider reports, kept only if it is plain (lower case letters, digits, underscores, up to 40). */
 export function cleanChannel(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
@@ -236,6 +260,8 @@ function ownerOf(x: { subaccount?: string | { subaccount_code?: string } | null;
 
 export const paystackGateway: PaymentGateway = {
   name: "paystack",
+  /** Its verify answer names the subaccount a split payment went to (see splitAccounts; VERIFY the shape). */
+  reportsSplit: true,
   /** Off until PAYSTACK_SPLITS=yes, set once splitting is confirmed for South African merchants in test mode. */
   get splitsPayments() {
     return process.env.PAYSTACK_SPLITS === "yes";
@@ -296,6 +322,7 @@ export const paystackGateway: PaymentGateway = {
       abandoned: data.status === "abandoned",
       // "reversed": taken and then refunded. Still "failed" above (no money is held), but never a declined card.
       reversed: data.status === "reversed",
+      settledTo: splitAccounts(data),
     };
   },
 
