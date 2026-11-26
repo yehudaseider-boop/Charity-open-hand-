@@ -656,3 +656,22 @@ body:has([data-chrome="landing"]) .chrome-full {
     background: var(--honey-soft);
   }
 }
+
+/* The home page's try-a-gift hero (redesign preview, 26/11/2026): the amount pops in when picked, and a soft pulse
+   on the hint says the phone can be tapped. */
+@keyframes ring-amount-in {
+  from { opacity: 0; transform: scale(0.86); }
+}
+.ring-amount {
+  animation: ring-amount-in 320ms cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+@keyframes tap-hint {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 138, 61, 0.55); }
+  60% { box-shadow: 0 0 0 10px rgba(255, 138, 61, 0); }
+}
+.tap-hint {
+  animation: tap-hint 1.8s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring-amount, .tap-hint { animation: none; }
+}
