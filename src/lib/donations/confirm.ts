@@ -48,6 +48,12 @@ export async function savedOutcome(reference: string): Promise<ConfirmOutcome> {
 
 export type ConfirmOptions = {
   /**
+   * A platform admin checked at the payment provider that this held payment did reach the charity's own account
+   * (Admin, Payments): the split check is skipped for this one call, and who did it is logged. Everything else (the
+   * amount, the provider's own "paid") is still checked.
+   */
+  splitCheckedBy?: string;
+  /**
    * The daily check only: a checkout started before this time that the provider says was abandoned (the donor
    * left its payment page) or never received is closed as failed, so it stops counting as a stuck payment. It can
    * still become paid later if the provider says so. Never a new card, and a monthly collection only with
@@ -146,7 +152,10 @@ export async function confirmPayment(reference: string, opts: ConfirmOptions = {
     // Where the money went (fresh review, 25/11/2026): a split payment counts as paid only if the provider says it
     // went to this charity's own account. Otherwise (the split was ignored, or went elsewhere) the whole payment may
     // sit with Givezy: held for a person once, like an amount that doesn't match, never marked paid unchecked.
-    const split = await splitProblem(donation as { charity_id: string; gateway: string }, tx);
+    const split = opts.splitCheckedBy ? null : await splitProblem(donation as { charity_id: string; gateway: string }, tx);
+    if (opts.splitCheckedBy) {
+      await logAudit({ actorUserId: opts.splitCheckedBy, action: "donation.split_accepted", entityType: "donation", entityId: donation.id, details: { reported: tx.settledTo ?? [] } });
+    }
     if (split) {
       if (!(await alreadyNoted("donation.split_mismatch", donation.id))) {
         await logAudit({ actorUserId: null, action: "donation.split_mismatch", entityType: "donation", entityId: donation.id, details: split });

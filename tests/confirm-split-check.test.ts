@@ -124,6 +124,23 @@ describe("a split payment is only paid when it reached the charity's own account
   });
 });
 
+describe("a held payment a person has checked", () => {
+  it("an admin who checked at the provider can confirm it: paid, emailed, and who did it is logged", async () => {
+    verify.mockResolvedValue(paidTx([]));
+    expect(await confirmPayment(REF)).toBe("review");
+    expect(await confirmPayment(REF, { splitCheckedBy: "admin-1" })).toBe("paid");
+    expect(donation.status).toBe("paid");
+    expect(events).toContain("emailed");
+    expect(audits).toContainEqual(expect.objectContaining({ action: "donation.split_accepted", entityId: REF }));
+  });
+
+  it("the admin's check skips only the split: a wrong amount is still held", async () => {
+    verify.mockResolvedValue({ ...paidTx([]), amountCents: 1 });
+    expect(await confirmPayment(REF, { splitCheckedBy: "admin-1" })).toBe("review");
+    expect(donation.status).toBe("pending");
+  });
+});
+
 describe("reading the provider's answer for the split account", () => {
   it("finds the code in the single-subaccount form", () => {
     expect(splitAccounts({ subaccount: { id: 1, subaccount_code: "ACCT_a" }, split: {} })).toEqual(["ACCT_a"]);

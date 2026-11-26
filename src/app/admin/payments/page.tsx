@@ -9,7 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { RemoveButton } from "@/components/forms/remove-button";
 import { ActionForm } from "@/components/forms/action-form";
 import { TextField } from "@/components/forms/fields";
-import { clearHold, closeRefundedEarly, markDonation, recordPartRefund, releaseHold } from "./actions";
+import { acceptSplit, clearHold, closeRefundedEarly, markDonation, recordPartRefund, releaseHold } from "./actions";
 import { givingGuardSummary } from "@/lib/donations/giving-guard";
 import { GUARD_REASON_LABEL } from "@/lib/donations/giving-guard-rules";
 
@@ -183,6 +183,18 @@ export default async function PaymentsPage() {
                   <span className="text-muted">Donation {donationId.slice(0, 8)} was refunded before it was confirmed</span>
                   <form action={closeRefundedEarly.bind(null, donationId)}>
                     <RemoveButton label="Close: nothing owed" what={`donation ${donationId.slice(0, 8)}`} confirmText="Close this payment as refunded before it was confirmed? It ends unpaid, nothing is owed, and it isn't counted as a declined card. Only do this once the gateway shows the refund." />
+                  </form>
+                </div>
+              ) : donationId && status === "pending" && a.action === "donation.split_mismatch" ? (
+                // Held because the provider didn't say the money reached the charity's own account (25/11/2026): check
+                // at the provider first, then one of these two.
+                <div className="flex flex-wrap gap-3 pt-1 text-xs">
+                  <span className="text-muted">Donation {donationId.slice(0, 8)}: check at the payment provider where the money landed</span>
+                  <form action={acceptSplit.bind(null, donationId)}>
+                    <RemoveButton label="It reached the charity: mark paid" what={`donation ${donationId.slice(0, 8)}`} confirmText="Mark this payment paid? Only do this once the payment provider shows the charity's share went into the charity's own account. The donor then gets their confirmation, and the gift counts for the charity and on its s18A receipt." />
+                  </form>
+                  <form action={closeRefundedEarly.bind(null, donationId)}>
+                    <RemoveButton label="Refunded to the donor: close" what={`donation ${donationId.slice(0, 8)}`} confirmText="Close this payment unpaid? Only do this once you have refunded the donor at the payment provider. Nothing is owed, and it isn't counted as a declined card." />
                   </form>
                 </div>
               ) : donationId && status ? (
