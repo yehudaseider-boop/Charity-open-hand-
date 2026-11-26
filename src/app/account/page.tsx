@@ -234,7 +234,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
                     {m.status === "failed" ? (
                       <MonthlyButton id={m.id} status="cancelled" from="failed" label="Remove" confirmText="Remove this stopped monthly donation? You won't be able to put in a new card for it afterwards." />
                     ) : (
-                      <MonthlyButton id={m.id} status="cancelled" label="Cancel for good" danger confirmText="Cancel this monthly donation for good? We will forget your card and collect nothing more." />
+                      <MonthlyButton id={m.id} status="cancelled" label="Cancel monthly donation" danger confirmText="Cancel this monthly donation for good? We will forget your card and collect nothing more." />
                     )}
                   </div>
                   {needsIdNudge(m, m.first_donation_id ? sourceDetails.get(m.first_donation_id) : null) ? <MonthlyIdForm id={m.id} /> : null}

@@ -115,7 +115,7 @@ describe("Stop emails pages (news/stop and thanks/stop)", () => {
   }
 });
 
-describe("Monthly donation buttons (Pause, Resume, Cancel for good)", () => {
+describe("Monthly donation buttons (Pause, Resume, Cancel monthly donation)", () => {
   it("post before the script loads, with the donation and the new status", () => {
     const html = renderToStaticMarkup(createElement(MonthlyButton, { id: "m-1", status: "paused", label: "Pause" }));
     pagePost(html);
@@ -123,13 +123,13 @@ describe("Monthly donation buttons (Pause, Resume, Cancel for good)", () => {
   });
 
   it("one that asks first can't be sent before the script loads: no post and the button off, so the question is never skipped (review 21/11/2026)", () => {
-    const html = renderToStaticMarkup(createElement(MonthlyButton, { id: "m-1", status: "cancelled", label: "Cancel for good", danger: true, confirmText: "Cancel this monthly donation for good?" }));
+    const html = renderToStaticMarkup(createElement(MonthlyButton, { id: "m-1", status: "cancelled", label: "Cancel monthly donation", danger: true, confirmText: "Cancel this monthly donation for good?" }));
     const form = html.match(/<form[^>]*>/)?.[0] ?? "";
     expect(form).not.toMatch(/method=/i);
     expect(form).not.toMatch(/action=/i);
     expect(html).not.toContain("$ACTION_ID_");
     expect(html.match(/<button[^>]*>/)?.[0]).toMatch(/ disabled=""/);
-    expect(html).toContain(">Cancel for good</button>");
+    expect(html).toContain(">Cancel monthly donation</button>");
     // Without a question, the same button posts before the script loads, as before.
     const plain = renderToStaticMarkup(createElement(MonthlyButton, { id: "m-1", status: "paused", label: "Pause" }));
     pagePost(plain);
@@ -138,7 +138,7 @@ describe("Monthly donation buttons (Pause, Resume, Cancel for good)", () => {
   });
 
   it("once the script has taken over the server's markup, the button is on and asks first", async () => {
-    const el = createElement(MonthlyButton, { id: "m-1", status: "cancelled", label: "Cancel for good", danger: true, confirmText: "Cancel this monthly donation for good?" });
+    const el = createElement(MonthlyButton, { id: "m-1", status: "cancelled", label: "Cancel monthly donation", danger: true, confirmText: "Cancel this monthly donation for good?" });
     await act(async () => root.unmount());
     host.innerHTML = renderToStaticMarkup(el);
     expect(host.querySelector("button")!.disabled).toBe(true);
@@ -152,7 +152,7 @@ describe("Monthly donation buttons (Pause, Resume, Cancel for good)", () => {
 
   it("still ask first where it can't be taken back, and send nothing on No", async () => {
     const ask = vi.spyOn(window, "confirm").mockReturnValue(false);
-    await render(createElement(MonthlyButton, { id: "m-1", status: "cancelled", label: "Cancel for good", danger: true, confirmText: "Cancel this monthly donation for good?" }));
+    await render(createElement(MonthlyButton, { id: "m-1", status: "cancelled", label: "Cancel monthly donation", danger: true, confirmText: "Cancel this monthly donation for good?" }));
     await submit();
     expect(ask).toHaveBeenCalledWith("Cancel this monthly donation for good?");
     expect(ctl.state.sent).toHaveLength(0);

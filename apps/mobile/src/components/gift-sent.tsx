@@ -205,7 +205,7 @@ export function GiftSent({
           <View style={styles.invite}>
             <Bubbles items={[{ size: 120, color: colors.peach, at: { right: -44, top: -50 } }, { size: 12, color: colors.orange, float: true, at: { right: 30, top: 24 } }]} />
             <Text variant="h2" accessibilityRole="header">Make it <Text variant="h2" style={styles.key}>monthly</Text>?</Text>
-            <Text variant="bodyMuted">{offer.amount} a month to {charityName}. Next you check the details and confirm. You can pause or stop it any time.</Text>
+            <Text variant="bodyMuted">{offer.amount} a month to {charityName}. Next you check the details and confirm. You can pause or cancel it any time.</Text>
             <Button variant="cta" label={`Give ${offer.amount} every month`} onPress={offer.onPress} />
           </View>
         ) : null}
