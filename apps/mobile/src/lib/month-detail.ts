@@ -49,7 +49,17 @@ export function monthDetail(goal: Goal, rows: MonthRow[], today: Date, monthKey:
   const when = monthKey < now ? "past" : monthKey === now ? "current" : "future";
   const inMonth = rows.filter((r) => key(r.date) === monthKey && counts(goal, r.label));
   const givenCents = inMonth.reduce((n, r) => n + r.cents, 0);
-  const shareCents = monthShare(goal, progress.targetCents, months);
+  const evenShare = monthShare(goal, progress.targetCents, months);
+  // This month on a yearly goal: the catch-up figure, the same one the goal shows ("about R2 265 a month for the 4
+  // months left"), not the even split, so the donor sees one number to follow (QA 26/11/2026, Yehuda: "catch up").
+  // What is still to go this month is exactly that "a month" figure; the bar runs to it from what is already given.
+  const catchUp =
+    when === "current" && goal.period === "year" && evenShare !== null && progress.targetCents !== null
+      ? progress.leftCents > 0
+        ? givenCents + progress.perMonthCents
+        : 0
+      : null;
+  const shareCents = catchUp !== null ? (catchUp > 0 ? catchUp : null) : evenShare;
   const gifts = [...inMonth]
     .sort((a, b) => b.date.getTime() - a.date.getTime())
     .map((r) => ({ id: r.id, date: r.date, cents: r.cents, label: r.label, name: r.charityName ?? r.recipient ?? "", elsewhere: r.charityName === undefined }));
@@ -61,13 +71,13 @@ export function monthDetail(goal: Goal, rows: MonthRow[], today: Date, monthKey:
     else if (progress.leftCents === 0) line = "Goal reached. Anything more is extra.";
     else if (goal.period === "month") line = shareCents === null ? null : `Your goal is ${formatRand(shareCents)} a month.`;
     else line = `About ${formatRand(progress.perMonthCents)} a month gets you to ${formatRand(progress.targetCents)} by ${dmy(w.end)}.`;
+  } else if (catchUp === 0) {
+    line = "Goal reached. Anything more is extra.";
   } else if (shareCents === null) {
     line = noShare;
   } else if (when === "current") {
-    // Says what the share is (walk-through, 25/11/2026): next to the catch-up figure below, a bare "R1 000 to go"
-    // read as a second, different target.
-    const what = goal.period === "year" ? " (your yearly goal spread evenly over its months)" : "";
-    line = givenCents < shareCents ? `${formatRand(shareCents - givenCents)} to go to this month's share${what}.` : "This month's share reached.";
+    const what = goal.period === "year" ? " to stay on track for your goal" : "";
+    line = givenCents < shareCents ? `${formatRand(shareCents - givenCents)} to go this month${what}.` : goal.period === "year" ? "On track this month." : "This month's share reached.";
   } else if (givenCents === 0) {
     line = `No gifts in ${name}.`;
   } else if (givenCents < shareCents) {

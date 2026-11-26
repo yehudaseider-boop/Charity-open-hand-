@@ -27,8 +27,10 @@ describe("month panel", () => {
     expect(detail(k(2026, 9)).line).toBe("September's share reached.");
     expect(detail(k(2026, 7)).line).toBe("No gifts in July.");
   });
-  it("this month says what is left to go", () => {
-    expect(detail(k(2026, 10))).toMatchObject({ when: "current", line: "R140 to go to this month's share (your yearly goal spread evenly over its months)." });
+  it("this month uses the catch-up figure the goal shows, never a second, even-split target (26/11/2026)", () => {
+    // R12 000 goal, R3 780 given (R860 of it in October): the goal says about R1 644 a month for the 5 months left
+    // (Oct to Feb), so October shows R860 of R2 504, with R1 644 to go: the same figure.
+    expect(detail(k(2026, 10))).toMatchObject({ when: "current", shareCents: 250_400, line: "R1 644 to go this month to stay on track for your goal." });
   });
   it("a future month shows the plan to reach the goal", () => {
     // R12 000 - R3 780 = R8 220 over the 5 months left (Oct to Feb) = R1 644 a month.
