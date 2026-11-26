@@ -269,6 +269,10 @@ export function BotCheck({
         window.setTimeout(used, 0);
         return;
       }
+      // A field the server will turn down anyway (an empty or mistyped email): let the press through without waiting for
+      // the check, so the person hears what's wrong first, not "please tick the box" (QA 26/11/2026). The server checks
+      // the fields before the token and sends nothing without one, so this never lets anything out unchecked.
+      if (!form.checkValidity()) return;
       // Not ready: this press sends nothing yet (and the form's own code never sees it).
       e.preventDefault();
       e.stopImmediatePropagation();

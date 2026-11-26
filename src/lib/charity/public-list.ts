@@ -16,17 +16,28 @@ export const PUBLIC_LIST_COLUMNS =
  * The cause is matched on the charity's own categories, read with it, rather than a list of ids in the request:
  * a cause with thousands of charities would make that request too long.
  */
-export async function readPublicCharities<T extends { charity_categories: { category_id: string }[] }>(
+export async function readPublicCharities<T extends { id: string; charity_categories: { category_id: string }[] }>(
   db: SupabaseClient,
-  { pattern, categoryId }: { pattern: string | null; categoryId: string | null },
+  { pattern, categoryId, causeIds = [] }: { pattern: string | null; categoryId: string | null; causeIds?: readonly string[] },
 ): Promise<T[]> {
-  const rows = await readPages<T>((from, to) => {
-    let q = db.from("charities").select(PUBLIC_LIST_COLUMNS).eq("status", "approved");
-    // search_text is the name, legal name, description, suburb and city in lower case without accents (migration
-    // 20261121000001). cleanQuery has already removed quotes, commas, % and _, so the only wildcards are ours.
-    if (pattern) q = q.like("search_text", pattern);
-    // By name, then id: a stable order that ends in a unique column, so no charity is skipped or shown twice between pages.
-    return q.order("name_en").order("id").range(from, to);
-  });
+  const read = (withPattern: boolean) =>
+    readPages<T>((from, to) => {
+      let q = db.from("charities").select(PUBLIC_LIST_COLUMNS).eq("status", "approved");
+      // search_text is the name, legal name, description, suburb and city in lower case without accents (migration
+      // 20261121000001). cleanQuery has already removed quotes, commas, % and _, so the only wildcards are ours.
+      if (withPattern && pattern) q = q.like("search_text", pattern);
+      // By name, then id: a stable order that ends in a unique column, so no charity is skipped or shown twice between pages.
+      return q.order("name_en").order("id").range(from, to);
+    });
+  let rows: T[];
+  if (pattern && causeIds.length) {
+    // The search also names a cause ("food", "welfare", 26/11/2026: a donor searching by cause found nothing, though
+    // the box says "Name, cause or area"): charities whose text matches, and charities in the causes it names.
+    const [byText, every] = await Promise.all([read(true), read(false)]);
+    const matched = new Set(byText.map((c) => c.id));
+    rows = every.filter((c) => matched.has(c.id) || c.charity_categories.some((cc) => causeIds.includes(cc.category_id)));
+  } else {
+    rows = await read(true);
+  }
   return categoryId ? rows.filter((c) => c.charity_categories.some((cc) => cc.category_id === categoryId)) : rows;
 }

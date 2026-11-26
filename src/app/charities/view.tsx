@@ -6,7 +6,7 @@ import { Illustration } from "@/components/illustration";
 import { Bubbles, Key } from "@/components/marketing";
 import { Splash } from "@/components/splash";
 import { causeHref, coverTone, emptyState, requestHref, resultsLine } from "@/lib/charity/browse";
-import { searchWords } from "@/lib/charity/search-text";
+import { matchesSearch, searchWords } from "@/lib/charity/search-text";
 import { charityRequestsOpen } from "@/config/app-links";
 import { initials } from "@/lib/charity/initials";
 import { loadCategories } from "@/lib/charity/queries";
@@ -73,7 +73,12 @@ export async function CharitiesView({ q, categorySlug }: { q: string; categorySl
   // Typed something, but nothing in it can be searched for: nothing matches (and there's no need to ask).
   const charities: Row[] = q && !search
     ? []
-    : await readPublicCharities<Row>(supabase, { pattern: search ? searchPattern(search) : null, categoryId: category?.id ?? null });
+    : await readPublicCharities<Row>(supabase, {
+        pattern: search ? searchPattern(search) : null,
+        categoryId: category?.id ?? null,
+        // Causes whose name holds every typed word, in order ("food", "welfare", "food welfare"): their charities match too.
+        causeIds: search ? categories.filter((c) => matchesSearch(search, [c.name_en])).map((c) => c.id) : [],
+      });
 
   // The cause of the week (picked in Admin, the same one the app shows), on the plain list only. It is a bonus: if it
   // can't be read, the list shows without it. Only an approved charity can be it, as it must be in this list.

@@ -85,4 +85,23 @@ describe("the demo's yearly s18A list", () => {
     await click("Show fewer");
     expect(host.querySelectorAll("li").length).toBe(6);
   });
+
+  it("Undo after Approve all takes back only what Approve all approved, never an earlier one (QA 26/11/2026)", async () => {
+    await act(async () => button("Approve")!.click());
+    expect(text()).toContain("1 to check · 1 approved");
+    await click("Approve all");
+    await click("Yes, approve all");
+    expect(text()).toContain("0 to check · 2 approved");
+    expect(text()).toContain("Approved 1 receipt.");
+    await click("Undo");
+    expect(text()).toContain("1 to check · 1 approved");
+  });
+
+  it("an approved donor can be taken back on its own row, and a name ending in a full stop gets just one", async () => {
+    await act(async () => button("Approve")!.click());
+    await click("Take back");
+    expect(text()).toContain("2 to check · 0 approved");
+    expect(text()).toContain("Approval taken back for Thandi Mokoena. Nothing had been sent.");
+    expect(text()).not.toContain("..");
+  });
 });

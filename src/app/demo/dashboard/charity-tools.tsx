@@ -16,6 +16,7 @@ import { formatRand, parseRandToCents } from "@/lib/money";
 import { platformConfig } from "@/config/platform";
 import { DEMO_BASE as base, DEMO_CHARITY } from "./sample";
 import { demoId, demoNow, pause, useDemo } from "./store";
+import { useState } from "react";
 
 /**
  * Team, Public profile, Photos and updates, Record a gift and Import in the public demo: the real dashboard's own
@@ -236,7 +237,7 @@ export function DemoUpdates() {
                 {u.photo ? <img src={u.photo} alt="" className="aspect-[4/3] w-full max-w-sm rounded-card border-2 border-border object-cover" /> : null}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                   <Link href={`${base}/email-donors`} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand underline hover:text-indigo">Email this to your donors</Link>
-                  <button type="button" className={secondaryAction} onClick={() => setUpdates(updates.filter((x) => x.id !== u.id))}>Remove</button>
+                  <AskFirstRemove what="this update" onRemove={() => setUpdates(updates.filter((x) => x.id !== u.id))} />
                 </div>
               </li>
             ))}
@@ -251,7 +252,7 @@ export function DemoUpdates() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={ph.data} alt={ph.caption ?? ""} className="aspect-square w-full rounded-card border-2 border-border object-cover" />
                 {ph.caption ? <p className="text-xs text-muted [overflow-wrap:anywhere]">{ph.caption}</p> : null}
-                <button type="button" className={secondaryAction} onClick={() => setPhotos(photos.filter((x) => x.id !== ph.id))}>Remove</button>
+                <AskFirstRemove what="this photo" onRemove={() => setPhotos(photos.filter((x) => x.id !== ph.id))} />
               </li>
             ))}
           </ul>
@@ -285,7 +286,7 @@ function RecordedList({ items, onRemove }: { items: Recorded[]; onRemove: (id: s
             </span>
             <span className="flex items-center gap-3">
               <span className="font-semibold tabular-nums">{formatRand(g.amountCents)}</span>
-              <button type="button" className={secondaryAction} onClick={() => onRemove(g.id)}>Remove</button>
+              <AskFirstRemove what="this gift" onRemove={() => onRemove(g.id)} />
             </span>
           </li>
         ))}
@@ -304,8 +305,12 @@ export function DemoRecordGift({ today, campaigns }: { today: string; campaigns:
     if (!checked.ok) return { ok: false, message: "Some details need fixing. Nothing was recorded yet.", fieldErrors: checked.errors as Record<string, string> };
     const g = checked.gift;
     if (g.reference && recorded.some((r) => r.id === `ref:${g.reference}`)) return { ok: false, message: `You've already recorded a gift with the reference "${g.reference}". Nothing was recorded.` };
-    await pause();
     const who = g.donorType === "individual" ? `${g.firstName ?? ""} ${g.lastName ?? ""}`.trim() || g.email : g.organisationName ?? g.email;
+    // The same gift twice (a second tap, a slow connection): the real dashboard refuses it the same way (QA 26/11/2026).
+    if (!g.reference && recorded.some((r) => r.who === who && r.date === g.date && r.amountCents === g.amountCents)) {
+      return { ok: false, message: `You've already recorded a gift from ${who} for this amount on this date. If it's a second gift, add a reference (for example the bank reference) so the two can be told apart. Nothing was recorded.` };
+    }
+    await pause();
     setRecorded([{ id: g.reference ? `ref:${g.reference}` : demoId(), date: g.date, amountCents: g.amountCents, method: g.method, who, at: demoNow(), from: null }, ...recorded]);
     return { ok: true, message: `Recorded ${formatRand(g.amountCents)} from ${who}. In the real dashboard it counts in your totals and their history. ${KEPT}` };
   };
@@ -388,5 +393,23 @@ export function DemoImport({ today }: { today: string }) {
       </Card>
       <RecordedList items={recorded} onRemove={(id) => setRecorded(recorded.filter((r) => r.id !== id))} />
     </div>
+  );
+}
+
+/**
+ * Remove, asked first on the page, as the real dashboard does (QA 26/11/2026: the demo removed at once, with no
+ * question and no word of what happened, while the real Remove buttons ask).
+ */
+function AskFirstRemove({ what, onRemove }: { what: string; onRemove: () => void }) {
+  const [asking, setAsking] = useState(false);
+  if (!asking) {
+    return <button type="button" className={secondaryAction} onClick={() => setAsking(true)}>Remove</button>;
+  }
+  return (
+    <span role="alertdialog" aria-label="Please confirm" className="flex flex-wrap items-center gap-2 text-sm">
+      <span className="font-medium">Remove {what}? It can&apos;t be taken back.</span>
+      <button type="button" autoFocus className={secondaryAction} onClick={onRemove}>Yes, remove</button>
+      <button type="button" className="min-h-11 px-2 font-medium text-brand underline underline-offset-4" onClick={() => setAsking(false)}>Keep it</button>
+    </span>
   );
 }

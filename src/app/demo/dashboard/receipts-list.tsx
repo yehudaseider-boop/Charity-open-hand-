@@ -25,17 +25,28 @@ export function DemoReceiptsList({ rows, taxYearName, endsOn }: { rows: DemoRece
   const [asking, setAsking] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [all, setAll] = useState(false);
+  // What the last action approved, so Undo takes back only that (QA 26/11/2026: Undo after "Approve all" also took back
+  // approvals made one by one before it).
+  const [last, setLast] = useState<string[]>([]);
   const left = rows.filter((r) => !approved.ids.includes(r.id));
   const total = rows.reduce((t, r) => t + r.totalCents, 0);
   const approve = (ids: string[], said: string) => {
-    setApproved({ ids: [...new Set([...approved.ids, ...ids])], at: demoNow() });
+    const fresh = ids.filter((id) => !approved.ids.includes(id));
+    setApproved({ ids: [...approved.ids, ...fresh], at: demoNow() });
+    setLast(fresh);
     setNote(said);
     setAsking(false);
   };
-  const undo = () => {
-    setApproved({ ids: [], at: "" });
-    setNote("Approval taken back. Nothing had been sent.");
+  /** Takes back these approvals only; nothing had been sent. */
+  const takeBack = (ids: string[], said: string) => {
+    const rest = approved.ids.filter((id) => !ids.includes(id));
+    setApproved({ ids: rest, at: rest.length ? approved.at : "" });
+    setLast([]);
+    setNote(said);
   };
+  const undo = () => takeBack(last, last.length === 1 ? "Approval taken back. Nothing had been sent." : `${plural(last.length, "approval")} taken back. Nothing had been sent.`);
+  /** "Kagiso M." already ends with a full stop: never "Kagiso M..". */
+  const sentence = (text: string) => (text.endsWith(".") ? text : `${text}.`);
 
   return (
     <Card lights title={`Yearly list for the ${taxYearName} tax year`}>
@@ -50,7 +61,7 @@ export function DemoReceiptsList({ rows, taxYearName, endsOn }: { rows: DemoRece
         {note ? (
           <p role="status" className="rounded-control bg-success-soft p-3 font-medium text-navy">
             {note}{" "}
-            {approved.ids.length > 0 ? <button type="button" onClick={undo} className="min-h-11 font-bold text-brand underline underline-offset-4">Undo</button> : null}
+            {last.length > 0 ? <button type="button" onClick={undo} className="min-h-11 font-bold text-brand underline underline-offset-4">Undo</button> : null}
           </p>
         ) : null}
         {/* Approve all sits above the list here (the real page has it below): 48 rows is a long way to scroll to try it. */}
@@ -62,7 +73,7 @@ export function DemoReceiptsList({ rows, taxYearName, endsOn }: { rows: DemoRece
                 signs it off. You can take your approval back until then.
               </p>
               <div className="flex flex-wrap items-center gap-3">
-                <button type="button" autoFocus onClick={() => approve(rows.map((r) => r.id), `Approved ${plural(left.length, "receipt")}.`)} className={blueAction}>Yes, approve all</button>
+                <button type="button" autoFocus onClick={() => approve(left.map((r) => r.id), `Approved ${plural(left.length, "receipt")}.`)} className={blueAction}>Yes, approve all</button>
                 <button type="button" onClick={() => setAsking(false)} className="min-h-11 px-2 font-medium text-brand underline">Not yet</button>
               </div>
             </div>
@@ -93,9 +104,14 @@ export function DemoReceiptsList({ rows, taxYearName, endsOn }: { rows: DemoRece
                       {showing ? "Close preview" : "Preview"}
                     </button>
                     {done ? (
-                      <span className="inline-flex min-h-11 items-center px-2 font-semibold text-success">Approved</span>
+                      <>
+                        <span className="inline-flex min-h-11 items-center px-2 font-semibold text-success">Approved</span>
+                        <button type="button" onClick={() => takeBack([r.id], sentence(`Approval taken back for ${r.name}`) + " Nothing had been sent.")} className="min-h-11 px-2 font-medium text-brand underline underline-offset-4">
+                          Take back
+                        </button>
+                      </>
                     ) : (
-                      <button type="button" onClick={() => approve([r.id], `Approved the receipt for ${r.name}.`)} className={blueAction}>Approve</button>
+                      <button type="button" onClick={() => approve([r.id], sentence(`Approved the receipt for ${r.name}`))} className={blueAction}>Approve</button>
                     )}
                   </span>
                 </div>

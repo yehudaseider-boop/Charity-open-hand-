@@ -58,6 +58,15 @@ type Props = {
 };
 
 const noSubscribe = () => () => {};
+/** The browser's online and offline events, for the "You're offline" note by the Give button. */
+const onlineSubscribe = (change: () => void) => {
+  window.addEventListener("online", change);
+  window.addEventListener("offline", change);
+  return () => {
+    window.removeEventListener("online", change);
+    window.removeEventListener("offline", change);
+  };
+};
 
 /** The contribution buttons, from the config (never written into the page). */
 const contributionPresets: readonly number[] = platformConfig.contributionPresetsCents;
@@ -163,6 +172,8 @@ export function DonateFlow({
       if (!shown) return prev;
       const q = JSON.parse(String(shown)) as Quote;
       fd.delete("$shown");
+      // Known to be offline: say so at once, nothing is sent (the same words as when a send fails offline).
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return { ...offlineOrDown(new TypeError("offline")), failedToStart: true };
       // How long the form has been open, for the server's quiet bot check (bots send the form the instant it opens).
       if (openedAt.current !== null) fd.set("form_open_ms", String(Math.max(0, Date.now() - openedAt.current)));
       // The bot check (when on): almost always ready by now. If Cloudflare wants a tick or couldn't load, nothing is
@@ -253,6 +264,8 @@ export function DonateFlow({
   useFormDraft(formRef, `donate:${slug}`);
   // Give works once the page has loaded: before that a press would send the form the browser's own way.
   const ready = useSyncExternalStore(noSubscribe, () => true, () => false);
+  // Offline before the press (QA 26/11/2026: it was only said after about 9 seconds of "Securing your gift").
+  const online = useSyncExternalStore(onlineSubscribe, () => navigator.onLine, () => true);
   // The folded extras (label, dedication, message): open from the start when the app sent a label.
   const [extrasOpen, setExtrasOpen] = useState(Boolean(initialLabel));
   // How many things needed fixing at the last press of Give (the count is refreshed on the next press).
@@ -670,6 +683,11 @@ export function DonateFlow({
         {/* Cloudflare's bot check: nothing to see for most people; its tick box, if it wants one, shows here. */}
         {botCheckKey ? <BotCheck siteKey={botCheckKey} action="give" kind="give" button="Give" handleRef={botCheck} /> : null}
 
+        {!online ? (
+          <p role="status" className="rounded-control bg-warning-soft p-3 text-sm font-semibold text-warning">
+            You&apos;re offline. Nothing can be paid until you&apos;re back online. What you type here is kept.
+          </p>
+        ) : null}
         <button
           disabled={pending || !ready || Boolean(opening)}
           aria-busy={pending || Boolean(opening)}
