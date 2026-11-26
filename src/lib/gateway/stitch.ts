@@ -34,6 +34,12 @@ const TOKEN_URL = "https://secure.stitch.money/connect/token";
 const API = "https://api.stitch.money/graphql";
 /** How long to wait for Stitch before giving up on a call (it is then treated as unreachable, never as refused). */
 const TIMEOUT_MS = 20_000;
+/**
+ * How long a payment page stays open. Stitch "highly recommends" an expiry on every payment request: an unpaid one then
+ * becomes "expired" instead of staying pending for ever (closing the page does not cancel it). Two hours is our own
+ * choice: room for a slow 3DS step in a banking app, short enough that the daily check can close it the same day.
+ */
+const PAYMENT_PAGE_MINUTES = 120;
 /** A webhook older than this is refused (a captured message replayed later). Svix's own default. */
 const WEBHOOK_TOLERANCE_SECONDS = 5 * 60;
 
@@ -142,16 +148,18 @@ export function quantityToCents(v: unknown): number | null {
 type Money = { quantity?: unknown; currency?: string } | null | undefined;
 
 const CREATE_PAYMENT = `
-mutation CreatePaymentRequest($amount: MoneyInput!, $externalReference: String!, $payerReference: String!, $beneficiaryReference: String!, $splitSettlements: [SplitSettlementInput!], $paymentMethods: PaymentMethodsInput, $payerInformation: PayerInformationInput) {
+mutation CreatePaymentRequest($amount: MoneyInput!, $externalReference: String!, $payerReference: String!, $beneficiaryReference: String!, $expireAt: Date, $splitSettlements: [SplitSettlementInput!], $paymentMethods: PaymentMethodsInput, $payerInformation: PayerInformationInput) {
   clientPaymentInitiationRequestCreate(input: {
     amount: $amount, externalReference: $externalReference, payerReference: $payerReference,
-    beneficiaryReference: $beneficiaryReference, splitSettlements: $splitSettlements,
+    beneficiaryReference: $beneficiaryReference, expireAt: $expireAt, splitSettlements: $splitSettlements,
     paymentMethods: $paymentMethods, payerInformation: $payerInformation
   }) { paymentInitiationRequest { id url } }
 }`;
 
 /**
- * Look up a payment request by our own reference. VERIFY in the test system: the docs list the filter (an
+ * Look up a payment request by our own reference. `amount` is Stitch's `Money` scalar: it is asked for as a whole and
+ * comes back as `{ quantity, currency }` (selecting sub-fields on it is refused before the query runs; fixed 26/11/2026,
+ * see docs/stitch-docs-review.md). VERIFY in the test system: the docs list the filter (an
  * `externalReference` string filter) but show no worked example for payment requests, so this is the documented
  * filter in the documented connection shape.
  */
@@ -163,7 +171,7 @@ query FindPayment($ref: String!) {
         id externalReference
         state {
           __typename
-          ... on PaymentInitiationRequestCompleted { date amount { quantity currency } payer { ... on PaymentInitiationCardPayer { network last4 } } }
+          ... on PaymentInitiationRequestCompleted { date amount payer { ... on PaymentInitiationCardPayer { network last4 } } }
           ... on PaymentInitiationRequestCancelled { date reason }
           ... on PaymentInitiationRequestExpired { date }
         }
@@ -193,6 +201,9 @@ function hostedUrl(url: string, returnUrl: string): string {
   u.searchParams.set("failure_redirect_uri", returnUrl);
   return u.toString();
 }
+
+/** The `transaction` event kinds that are payments (Stitch's docs, webhooks/types). Everything else, refunds included, is not. */
+const PAYMENT_TRANSACTION_KINDS = new Set(["CARD", "APPLE_PAY", "GOOGLE_PAY", "SAMSUNG_PAY"]);
 
 /** Stitch's webhook signature (Svix): HMAC-SHA256 of "id.timestamp.body" with the secret's bytes, base64, "v1,<sig>". */
 export function webhookSignature(secret: string, id: string, timestamp: string, rawBody: string): string {
@@ -233,6 +244,7 @@ export const stitchGateway: PaymentGateway = {
         // Shown on the donor's statement and Stitch's records: at most 12 and 20 characters.
         payerReference: "Givezy",
         beneficiaryReference: `Gift ${req.reference.replace(/-/g, "").slice(0, 8)}`,
+        expireAt: new Date(Date.now() + PAYMENT_PAGE_MINUTES * 60_000).toISOString(),
         // Single destination, ZAR only. The destination goes inside the split, never as a top-level merchant.
         splitSettlements: [{ merchantId: req.charityAccountRef, amount: { quantity: centsToQuantity(req.lines.charityCents), currency: "ZAR" } }],
         // Cards and the phone wallets on Stitch's page. Pay by Bank is switched off (it needs a bank beneficiary).
@@ -279,9 +291,10 @@ export const stitchGateway: PaymentGateway = {
         channel: "card",
       };
     }
-    // A donor who closed the page, or a request that ran out of time, is not a declined card: pending, and "abandoned",
-    // so only the daily check closes it (and it is never counted against the donor). A card turned down on Stitch's
-    // page leaves the request open for another try. VERIFY in the test system.
+    // A cancelled request, or one that ran out of time, is not a declined card: pending, and "abandoned", so only the
+    // daily check closes it (and it is never counted against the donor). A donor who just closes the page leaves the
+    // request pending (Stitch's docs: it is cancelled only if we cancel it or Stitch switches on cancel-on-close),
+    // which is why every request has an expiry. A card turned down on Stitch's page also leaves it open for another try.
     const left = state === "PaymentInitiationRequestCancelled" || state === "PaymentInitiationRequestExpired";
     return { reference, status: "pending", amountCents: 0, currency: "ZAR", gatewayTransactionId: String(node.id ?? ""), paidAt: null, authorization: null, channel: null, abandoned: left };
   },
@@ -315,7 +328,10 @@ export const stitchGateway: PaymentGateway = {
     } catch {
       return null;
     }
-    const type = String(body.type ?? "");
+    // Stitch's own examples of the `payment` event carry no top-level `type`, only the GraphQL-shaped
+    // `data.client.paymentInitiationRequests.node`, so a body of that shape is read as a payment event too.
+    const paymentNode = (body.data as { client?: { paymentInitiationRequests?: { node?: PaymentNode } } } | undefined)?.client?.paymentInitiationRequests?.node;
+    const type = String(body.type ?? (paymentNode && typeof paymentNode === "object" ? "payment" : ""));
     // The message's own id (stable across Stitch's retries, different for every message): the body's id may be the
     // payment's own, shared by a first "pending" event and the later "completed" one, which would then be dropped as a repeat.
     const eventId = `${type}:${id}`;
@@ -324,15 +340,17 @@ export const stitchGateway: PaymentGateway = {
     if (type === "payment") {
       // data.client.paymentInitiationRequests.node: a completed payment request is the only thing that counts. A
       // cancelled or expired one is left to the daily check (the payment check would only say "pending" again).
-      const node = (body.data as { client?: { paymentInitiationRequests?: { node?: PaymentNode } } } | undefined)?.client?.paymentInitiationRequests?.node;
-      reference = typeof node?.externalReference === "string" ? node.externalReference : null;
-      if (node?.state?.__typename === "PaymentInitiationRequestCompleted") kind = "payment_succeeded";
+      reference = typeof paymentNode?.externalReference === "string" ? paymentNode.externalReference : null;
+      if (paymentNode?.state?.__typename === "PaymentInitiationRequestCompleted") kind = "payment_succeeded";
     } else if (type === "transaction") {
-      // A successful card transaction that carries our reference. A failed one is left alone: on Stitch's page a donor
-      // may try another card, so a failure is not the end of the payment. VERIFY in the test system.
-      const d = body.data as { status?: string; externalReference?: string | null } | undefined;
+      // A successful card or wallet payment that carries our reference. Refunds come on this same event with
+      // `status: "SUCCESS"` (`data.type` "CARD_REFUND" and the like), so only the payment kinds count, and a
+      // transaction that doesn't say its kind is not trusted. Refunds stay "other" (left for a person) until they
+      // are built and checked in Stitch's test system. A failed payment is left alone: on Stitch's page a donor may
+      // try another card, so a failure is not the end of the payment. VERIFY in the test system.
+      const d = body.data as { type?: string; status?: string; externalReference?: string | null } | undefined;
       reference = typeof d?.externalReference === "string" ? d.externalReference : null;
-      if (d?.status === "SUCCESS" && reference) kind = "payment_succeeded";
+      if (PAYMENT_TRANSACTION_KINDS.has(String(d?.type ?? "")) && d?.status === "SUCCESS" && reference) kind = "payment_succeeded";
     }
     return {
       eventId,

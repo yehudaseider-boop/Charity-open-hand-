@@ -17,6 +17,39 @@ let tokenAnswer: { status: number; json: unknown };
 
 const SECRET = "whsec_" + Buffer.from("a-long-random-signing-secret-for-tests").toString("base64");
 
+/**
+ * What real Stitch turns down before any answer is made, from its API reference (docs.stitch.money, read 26/11/2026;
+ * see docs/stitch-docs-review.md). The pretend Stitch below refuses the same, so a query that only works here fails here.
+ * - `Money` (amount, feeAmount, netAmount, originalAmount) is a scalar: selecting sub-fields on it is a validation error.
+ * - The payment request input takes only the fields of `ClientPaymentInitiationRequestCreateInput`.
+ * - A top-level `merchantId` or `externalMerchantId` cannot be combined with `splitSettlements`.
+ * - `payerReference` is at most 12 characters and `beneficiaryReference` at most 20.
+ */
+const PAYMENT_REQUEST_INPUT = new Set([
+  "amount", "merchantId", "externalMerchantId", "beneficiary", "payerReference", "payerInformation", "beneficiaryReference",
+  "externalReference", "expireAt", "merchant", "iframeAllowlist", "restrictPayerBank", "merchantDetails", "paymentMethods",
+  "metadata", "splitSettlements",
+]);
+function stitchRefuses(query: string, variables: Record<string, unknown>): { status: number; json: unknown } | null {
+  const money = /\b(amount|feeAmount|netAmount|originalAmount)\s*\{/.exec(query);
+  if (money) {
+    return { status: 400, json: { errors: [{ message: `Field "${money[1]}" must not have a selection since type "Money!" has no subfields.`, extensions: { code: "GRAPHQL_VALIDATION_FAILED" } }] } };
+  }
+  const input = /clientPaymentInitiationRequestCreate\(\s*input:\s*\{([\s\S]*?)\}\s*\)/.exec(query);
+  if (input) {
+    for (const [, field] of input[1].matchAll(/(\w+)\s*:/g)) {
+      if (!PAYMENT_REQUEST_INPUT.has(field)) {
+        return { status: 400, json: { errors: [{ message: `Field "${field}" is not defined by type "ClientPaymentInitiationRequestCreateInput".`, extensions: { code: "GRAPHQL_VALIDATION_FAILED" } }] } };
+      }
+    }
+    const bad = (code: string, message: string) => ({ status: 200, json: { errors: [{ message, extensions: { code } }] } });
+    if ((variables.merchantId || variables.externalMerchantId) && variables.splitSettlements) return bad("merchant_id_with_split_settlements", "A merchantId cannot be combined with splitSettlements.");
+    if (typeof variables.payerReference === "string" && variables.payerReference.length > 12) return bad("BAD_USER_INPUT", "payerReference is longer than 12 characters.");
+    if (typeof variables.beneficiaryReference === "string" && variables.beneficiaryReference.length > 20) return bad("BAD_USER_INPUT", "beneficiaryReference is longer than 20 characters.");
+  }
+  return null;
+}
+
 beforeEach(() => {
   process.env.STITCH_CLIENT_ID = "client-id";
   process.env.STITCH_CLIENT_SECRET = "client-secret";
@@ -36,7 +69,7 @@ beforeEach(() => {
       const next = graphqlAnswers.shift();
       if (!next) throw new Error("unexpected call");
       const parsed = JSON.parse(body) as { query: string; variables: Record<string, unknown> };
-      const a = next(parsed.query, parsed.variables);
+      const a = stitchRefuses(parsed.query, parsed.variables) ?? next(parsed.query, parsed.variables);
       return new Response(JSON.stringify(a.json), { status: a.status ?? 200 });
     }),
   );
@@ -57,6 +90,19 @@ const base = {
   description: "Donation to Meals Fund",
 };
 const made = (url = "https://secure.stitch.money/pay/abc") => ({ json: { data: { clientPaymentInitiationRequestCreate: { paymentInitiationRequest: { id: "req-1", url } } } } });
+
+describe("the pretend Stitch refuses what real Stitch refuses", () => {
+  it("sub-fields on a Money amount, unknown input fields, a merchant beside a split, long references", () => {
+    expect(stitchRefuses("query { a { amount { quantity } } }", {})?.status).toBe(400);
+    expect(stitchRefuses("query { a { amount feeAmount } }", {})).toBeNull();
+    expect(stitchRefuses("mutation { clientPaymentInitiationRequestCreate(input: { amount: $a, colour: $c }) { id } }", {})?.status).toBe(400);
+    const ok = "mutation { clientPaymentInitiationRequestCreate(input: { amount: $a, splitSettlements: $s }) { id } }";
+    expect(stitchRefuses(ok, { splitSettlements: [{}] })).toBeNull();
+    expect(stitchRefuses(ok, { splitSettlements: [{}], merchantId: "m" })).not.toBeNull();
+    expect(stitchRefuses(ok, { payerReference: "a".repeat(13) })).not.toBeNull();
+    expect(stitchRefuses(ok, { beneficiaryReference: "a".repeat(21) })).not.toBeNull();
+  });
+});
 
 describe("money", () => {
   it("writes whole cents as decimal rand without a float", () => {
@@ -136,6 +182,16 @@ describe("starting a gift", () => {
     expect(url.searchParams.get("redirect_uri")).toBe(base.returnUrl);
     expect(url.searchParams.get("failure_redirect_uri")).toBe(base.returnUrl);
     expect(calls[0].body).toContain("scope=client_paymentrequest");
+  });
+
+  it("sets an expiry on the payment request, as Stitch recommends, so an unpaid page ends as 'expired'", async () => {
+    vi.useFakeTimers({ now: new Date("2026-11-26T10:00:00.000Z"), toFake: ["Date"] });
+    graphqlAnswers.push(() => made());
+    await stitchGateway.createCheckout(base);
+    const gql = calls.find((c) => c.url === "https://api.stitch.money/graphql")!;
+    const { query, variables } = JSON.parse(gql.body);
+    expect(query).toContain("expireAt: $expireAt");
+    expect(variables.expireAt).toBe("2026-11-26T12:00:00.000Z");
   });
 
   it("refuses to start, and sends nothing, when the money could not reach the charity or the sums don't add up", async () => {
@@ -225,6 +281,14 @@ describe("what is not built yet says so, and charges nothing", () => {
 
 describe("looking a payment up by our reference", () => {
   const node = (state: Record<string, unknown>, ref = base.reference) => ({ json: { data: { client: { paymentInitiationRequests: { edges: [{ node: { id: "req-1", externalReference: ref, state } }] } } } } });
+
+  it("bug 1: asks for the amount as a whole (Money is a scalar), so Stitch accepts the lookup", async () => {
+    graphqlAnswers.push((q) => {
+      expect(q).not.toMatch(/\bamount\s*\{/);
+      return node({ __typename: "PaymentInitiationRequestCompleted", date: "2026-11-18T08:00:00Z", amount: { quantity: "203.45", currency: "ZAR" } });
+    });
+    expect(await stitchGateway.verifyTransaction(base.reference)).toMatchObject({ status: "success", amountCents: 20_345, currency: "ZAR" });
+  });
 
   it("a completed payment request is paid, with its amount in cents", async () => {
     graphqlAnswers.push((q, v) => {
@@ -344,18 +408,38 @@ describe("webhooks", () => {
     expect(await send(completed)).toBeNull();
   });
 
-  it("only a completed payment request, or a successful transaction carrying our reference, counts as paid", async () => {
+  it("bug 2: a payment event shaped like Stitch's own example (no top-level type or id) is still read", async () => {
+    const asDocumented = { data: completed.data };
+    expect(await send(asDocumented, { id: "msg_doc" })).toMatchObject({ type: "payment_succeeded", reference: base.reference, eventId: "payment:msg_doc" });
+    const cancelled = { data: { client: { paymentInitiationRequests: { node: { externalReference: base.reference, state: { __typename: "PaymentInitiationRequestCancelled" } } } } } };
+    expect(await send(cancelled)).toMatchObject({ type: "other", reference: base.reference });
+    // A body that is neither shape stays "other".
+    expect(await send({ data: { something: "else" } })).toMatchObject({ type: "other", reference: null });
+  });
+
+  it("bug 3: a successful refund on the transaction event is never read as a payment", async () => {
+    for (const refundType of ["CARD_REFUND", "APPLE_PAY_REFUND", "WALLET_REFUND"]) {
+      const e = await send({ type: "transaction", id: `transaction:status:success:${refundType}`, data: { type: refundType, status: "SUCCESS", externalReference: base.reference } });
+      expect(e!.type).not.toBe("payment_succeeded");
+    }
+    // A transaction without a stated kind is not trusted as a payment either.
+    expect(await send({ type: "transaction", id: "t-untyped", data: { status: "SUCCESS", externalReference: base.reference } })).toMatchObject({ type: "other" });
+  });
+
+  it("only a completed payment request, or a successful card or wallet payment carrying our reference, counts as paid", async () => {
     const cancelled = { ...completed, id: "p2", data: { client: { paymentInitiationRequests: { node: { externalReference: base.reference, state: { __typename: "PaymentInitiationRequestCancelled" } } } } } };
     expect(await send(cancelled)).toMatchObject({ type: "other", reference: base.reference });
-    expect(await send({ type: "transaction", id: "transaction:status:success:1", data: { status: "SUCCESS", externalReference: base.reference, card: { last4: "1111" } } })).toMatchObject({ type: "payment_succeeded", reference: base.reference });
-    expect(await send({ type: "transaction", id: "t2", data: { status: "SUCCESS", externalReference: null } })).toMatchObject({ type: "other", reference: null });
-    expect(await send({ type: "transaction", id: "t3", data: { status: "FAILURE", externalReference: base.reference } })).toMatchObject({ type: "other" });
+    for (const kind of ["CARD", "APPLE_PAY", "GOOGLE_PAY", "SAMSUNG_PAY"]) {
+      expect(await send({ type: "transaction", id: `transaction:status:success:${kind}`, data: { type: kind, status: "SUCCESS", externalReference: base.reference, card: { last4: "1111" } } })).toMatchObject({ type: "payment_succeeded", reference: base.reference });
+    }
+    expect(await send({ type: "transaction", id: "t2", data: { type: "CARD", status: "SUCCESS", externalReference: null } })).toMatchObject({ type: "other", reference: null });
+    expect(await send({ type: "transaction", id: "t3", data: { type: "CARD", status: "FAILURE", externalReference: base.reference } })).toMatchObject({ type: "other" });
     // Refunds and anything else are left for a person until they are checked in Stitch's test system.
     expect(await send({ type: "refund", id: "r1", data: {} })).toMatchObject({ type: "other" });
   });
 
   it("the card's details are never kept from a transaction event", async () => {
-    const e = await send({ type: "transaction", id: "t4", data: { status: "SUCCESS", externalReference: base.reference, card: { id: "card-secret", last4: "4242" }, authorizationCode: "A1B2C3" } });
+    const e = await send({ type: "transaction", id: "t4", data: { type: "CARD", status: "SUCCESS", externalReference: base.reference, card: { id: "card-secret", last4: "4242" }, authorizationCode: "A1B2C3" } });
     expect(JSON.stringify(e!.raw)).not.toMatch(/card-secret|4242|A1B2C3/);
   });
 });
