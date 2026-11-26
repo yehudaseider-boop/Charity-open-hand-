@@ -78,10 +78,10 @@ const lineBtnDark = "inline-flex min-h-12 items-center gap-1.5 rounded-[1.125rem
 
 function Step({ n, title, body }: { n: string; title: string; body: string }) {
   return (
-    <li className="flex gap-4">
-      <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand font-display text-[1.0625rem] font-extrabold text-white">{n}</span>
+    <li className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-4 border-t-2 border-navy/10 pt-5">
+      <span aria-hidden className="font-display text-[3.5rem] font-extrabold leading-[0.8] tracking-[-0.05em] text-brand">{n}</span>
       <span className="flex flex-col gap-1">
-        <span className="font-display text-[1.25rem] font-bold leading-tight">{title}</span>
+        <span className="font-display text-[1.375rem] font-bold leading-tight">{title}</span>
         <span className="text-[16px] leading-relaxed text-muted">{body}</span>
       </span>
     </li>
@@ -119,7 +119,7 @@ export default function HomeRedesignPreview() {
         </div>
       </header>
 
-      {/* 1. Hero: the promise on the left; on the right, one gift going full circle as Givezy's goal ring. */}
+      {/* 1. Hero: the promise on the left; on the right, one gift's story with a phone that is real to tap. */}
       <section className="relative overflow-hidden bg-brand text-white">
         <span aria-hidden className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full border-[40px] border-honey/20" />
         <div className="relative mx-auto grid max-w-[80rem] items-center gap-12 px-4 pb-14 pt-12 sm:px-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:gap-8 lg:py-20">
@@ -170,12 +170,12 @@ export default function HomeRedesignPreview() {
       </section>
 
       {/* 3. For donors: three steps, and the phone. */}
-      <section id="donors" className="scroll-mt-20 bg-honey-soft">
+      <section id="donors" className="scroll-mt-20 bg-white">
         <Reveal className="mx-auto grid max-w-[80rem] items-center gap-14 px-4 py-20 sm:px-6 md:grid-cols-2 md:gap-20 md:py-28">
           <div className="flex min-w-0 flex-col gap-8">
             <Eyebrow>For donors</Eyebrow>
             <H size="h2">Give in a few taps. <Em>Keep every receipt.</Em></H>
-            <ol className="flex flex-col gap-6">
+            <ol className="flex flex-col gap-7">
               <Step n="1" title="Find a charity you can trust" body="Search by name, cause or area. A person checks every charity before it can take a single rand." />
               <Step n="2" title="Give once or every month, and watch it grow" body={`In the ${appName} app, see how much you've given this tax year, set a giving goal if you like, and watch your ring fill up.`} />
               <Step n="3" title="Let tax time take care of itself" body="Sign in with the email you gave with: every gift is in one place, and your s18A receipt follows after the tax year ends." />
@@ -238,22 +238,23 @@ export default function HomeRedesignPreview() {
         </div>
       </section>
 
-      {/* 5. Big facts, no invented numbers. */}
+      {/* 5. Big facts, no invented numbers: three colour blocks, each with a dot bleeding off its corner. */}
       <section className="bg-white">
         <Reveal className="mx-auto max-w-[80rem] px-4 py-20 sm:px-6 md:py-28">
           <div className="mx-auto flex max-w-[48rem] flex-col items-center gap-6 text-center">
             <Eyebrow center>Built to be trusted with money</Eyebrow>
             <H size="h2">Safe for donors. <Em>Simple for charities.</Em></H>
           </div>
-          <ul className="mt-14 grid gap-10 md:grid-cols-3 md:gap-8">
+          <ul className="mt-14 grid gap-5 md:grid-cols-3">
             {([
-              ["1", "s18A receipt a year from each charity that issues them, checked by the charity before it goes out."],
-              ["0", "rand of a gift passes through Givezy's bank account. Gifts go straight to the charity's own account."],
-              ["100%", "of charities are looked at by a person: registration documents and bank details are checked before they can take a gift."],
-            ] as [string, string][]).map(([big, text]) => (
-              <li key={big} className="flex flex-col gap-4 border-t-2 border-navy/15 pt-6">
-                <span className="font-display text-[clamp(4.5rem,9vw,7.5rem)] font-bold leading-[0.9] tracking-[-0.045em] text-brand">{big}</span>
-                <span className="max-w-[22rem] text-[17px] leading-relaxed text-muted">{text}</span>
+              ["0", "rand of a gift passes through Givezy's bank account. Gifts go straight to the charity's own account.", "bg-brand text-white", "text-white", "text-white/85", "bg-coral"],
+              ["1", "s18A receipt a year from each charity that issues them, checked by the charity before it goes out.", "bg-honey-soft text-navy", "text-brand", "text-navy/80", "bg-peach"],
+              ["100%", "of charities are looked at by a person: registration documents and bank details are checked before they can take a gift.", "bg-peach text-navy", "text-brand", "text-navy/80", "bg-honey"],
+            ] as [string, string, string, string, string, string][]).map(([big, text, ground, bigTone, textTone, dotTone]) => (
+              <li key={big} className={`relative flex flex-col justify-between gap-8 overflow-hidden rounded-[2rem] p-8 md:min-h-[20rem] md:p-9 ${ground}`}>
+                <span aria-hidden className={`absolute -right-5 -top-5 h-14 w-14 rounded-full ${dotTone}`} />
+                <span className={`relative font-display text-[clamp(5rem,9vw,8rem)] font-extrabold leading-[0.85] tracking-[-0.05em] ${bigTone}`}>{big}</span>
+                <span className={`relative max-w-[22rem] text-[17px] leading-relaxed ${textTone}`}>{text}</span>
               </li>
             ))}
           </ul>
@@ -300,13 +301,19 @@ export default function HomeRedesignPreview() {
         width="max-w-[80rem]"
       />
 
-      {/* 8. The close. */}
-      <section className="hero-glow relative overflow-hidden bg-brand text-white">
-        <Reveal className="mx-auto flex max-w-[80rem] flex-col items-center gap-8 px-4 py-24 text-center sm:px-6 md:py-36">
-          <span className="flex h-28 w-28 items-center justify-center rounded-full bg-white shadow-[0_20px_50px_rgba(6,22,70,0.35)] md:h-32 md:w-32"><Splash className="w-16 md:w-20" /></span>
-          <H size="h1" dark className="max-w-[56rem]">January is close. <Em dark>Be there from day one.</Em></H>
-          <p className="max-w-[32rem] text-[clamp(1.0625rem,1.5vw,1.25rem)] leading-relaxed text-white/85">Find a charity you trust and give in a few taps, or list yours and let the receipts take care of themselves.</p>
-          <div className="flex flex-wrap justify-center gap-3">
+      {/* 8. The close: the hero's two-line headline, and the same two doors. */}
+      <section className="relative overflow-hidden bg-brand text-white">
+        <span aria-hidden className="absolute -right-24 -top-24 h-80 w-80 rounded-full border-[48px] border-honey/20" />
+        <span aria-hidden className="absolute -bottom-14 left-[12%] h-32 w-32 rounded-full bg-coral" />
+        <Reveal className="relative mx-auto flex max-w-[80rem] flex-col items-start gap-8 px-4 pb-32 pt-24 sm:px-6 md:pb-40 md:pt-32">
+          <span className="flex h-20 w-20 items-center justify-center rounded-full bg-white shadow-[0_20px_50px_rgba(6,22,70,0.35)] md:h-24 md:w-24"><Splash className="w-12 md:w-14" /></span>
+          <h2 className="font-display text-[clamp(3rem,6.6vw,6.25rem)] font-extrabold! leading-[0.92] tracking-[-0.045em]! text-white!">
+            January is close.
+            <br />
+            <span className="text-honey">Be there from day one.</span>
+          </h2>
+          <p className="max-w-[34rem] text-[clamp(1.0625rem,1.5vw,1.25rem)] leading-relaxed text-white/85">Find a charity you trust and give in a few taps, or list yours and let the receipts take care of themselves.</p>
+          <div className="flex flex-wrap gap-3">
             <Link href="/charities" className={orangeBtn}>Find a charity</Link>
             <Link href="/apply" className={lineBtnDark}>Apply to list your charity</Link>
           </div>
