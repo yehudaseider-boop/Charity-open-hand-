@@ -209,3 +209,30 @@ describe("a total the server refuses", () => {
     expect(giveButton().textContent).toBe("Give R310");
   });
 });
+
+describe("offline on the give form (QA 26/11/2026)", () => {
+  const setOnline = async (on: boolean) => {
+    Object.defineProperty(window.navigator, "onLine", { configurable: true, get: () => on });
+    await act(async () => {
+      window.dispatchEvent(new Event(on ? "online" : "offline"));
+    });
+  };
+
+  it("says so by the Give button as soon as the connection drops, and the note goes when it's back", async () => {
+    await setOnline(false);
+    expect(host.textContent).toContain("You're offline. Nothing can be paid until you're back online.");
+    await setOnline(true);
+    expect(host.textContent).not.toContain("You're offline.");
+  });
+
+  it("pressing Give while offline answers at once, sends nothing, and keeps what was typed", async () => {
+    await type('input[name="amount"]', "100");
+    await setOnline(false);
+    const before = sent.length;
+    await give();
+    expect(sent.length).toBe(before);
+    expect(host.textContent).toContain("Nothing was charged");
+    expect($<HTMLInputElement>('input[name="amount"]').value).toBe("100");
+    await setOnline(true);
+  });
+});
