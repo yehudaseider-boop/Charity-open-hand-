@@ -12,11 +12,12 @@ import { DonorPeekLink } from "./donor-peek";
 import { requireViewer } from "@/lib/auth";
 import { timed } from "@/lib/timing";
 import { ERASED_DONOR, donorMatches, isErasedEmail, safeSearch, shownEmail } from "@/lib/charity/dashboard";
-import { loadDonors, loadMonthlyDonations, loadMonthlyGifts } from "@/lib/charity/dashboard-queries";
+import { loadDonors } from "@/lib/charity/dashboard-queries";
+import { loadMonthlyStatusByDonor } from "@/lib/charity/monthly-status";
 import { loadCharityForManager } from "@/lib/charity/queries";
 import { formatDate } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
-import { donorGroup, donorGroupsFor, isDonorGroup, monthlyByDonor } from "@/lib/charity/insights";
+import { donorGroup, donorGroupsFor, isDonorGroup } from "@/lib/charity/insights";
 import { Card } from "@/components/card";
 import { ActionLink, EmptyState, PageHeader, Tabs, blueAction, field, secondaryAction } from "@/components/dash";
 import { lapsedDaysFor, listSegments, listTags, tagsByDonor } from "@/lib/charity/donor-care";
@@ -64,8 +65,9 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   const sort = parseDonorSort(sp.sort);
 
   const t = <T,>(read: string, work: PromiseLike<T>) => timed("donors", read, work);
-  const [all, monthlyGifts, monthly, tags, byDonor, segments, lapsedDays, contacts, missingRead, owner] = await t("all reads", Promise.all([
-    t("loadDonors", loadDonors(id)), t("loadMonthlyGifts", loadMonthlyGifts(id)), t("loadMonthlyDonations", loadMonthlyDonations(id)), t("listTags", listTags(id)),
+  const [all, givesMonthly, tags, byDonor, segments, lapsedDays, contacts, missingRead, owner] = await t("all reads", Promise.all([
+    // Access checked above (loadCharityForManager). One row per monthly donation (26/11/2026, was every monthly gift).
+    t("loadDonors", loadDonors(id)), t("loadMonthlyStatusByDonor", loadMonthlyStatusByDonor(id)), t("listTags", listTags(id)),
     t("tagsByDonor", tagsByDonor(id)), t("listSegments", listSegments(id)), t("lapsedDaysFor", lapsedDaysFor(id)), t("loadContacts", loadContacts(id)),
     // Read with the service role now that loadCharityForManager has checked access. Only what is missing comes back, never a number.
     t("loadS18aMissing", loadS18aMissing(id)).catch((e: unknown) => {
@@ -78,7 +80,6 @@ export default async function DonorsPage({ params, searchParams }: PageProps<"/c
   const donorGroups = donorGroupsFor(lapsedDays);
   const tagName = new Map(tags.map((t) => [t.id, t.name]));
   const tag = typeof sp.tag === "string" && tagName.has(sp.tag) ? sp.tag : null;
-  const givesMonthly = monthlyByDonor(monthlyGifts, monthly);
   const now = new Date();
   const needle = q.toLowerCase();
   const matching = all.filter(

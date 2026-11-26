@@ -11,10 +11,11 @@ import { hitRateLimit } from "@/lib/rate-limit";
 import { safeNextPath } from "@/lib/safe-path";
 import type { FormState } from "@/lib/form";
 import { ERASED_DONOR, donationStatus, isDonationStatus, isErasedEmail, shownEmail } from "@/lib/charity/dashboard";
-import { loadCampaignTitles, loadDonorPaidGifts, loadDonors, loadMonthlyDonations, loadMonthlyGifts } from "@/lib/charity/dashboard-queries";
+import { loadCampaignTitles, loadDonorPaidGifts, loadDonors } from "@/lib/charity/dashboard-queries";
+import { loadMonthlyStatusByDonor } from "@/lib/charity/monthly-status";
 import { donorGiving } from "@/lib/charity/donor-giving";
 import { lapsedDaysFor, listNotes, listReminders, listTags, tagsByDonor } from "@/lib/charity/donor-care";
-import { donorGroup, donorGroupsFor, monthlyByDonor } from "@/lib/charity/insights";
+import { donorGroup, donorGroupsFor } from "@/lib/charity/insights";
 import { formatDate, isoDateInJhb } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
 import { leftCents } from "@/lib/donations/what-is-left";
@@ -76,7 +77,7 @@ export async function peekDonor(charityId: string, donorId: string): Promise<Don
   const donor = (await loadDonors(charityId)).find((d) => d.donor_id === donorId);
   if (!donor) return null;
   const supabase = await createClient();
-  const [paid, titles, notes, reminders, tags, byDonor, lapsedDays, monthlyGifts, monthly, { data: recent }] = await Promise.all([
+  const [paid, titles, notes, reminders, tags, byDonor, lapsedDays, monthlyStatus, { data: recent }] = await Promise.all([
     loadDonorPaidGifts(charityId, donorId),
     loadCampaignTitles(charityId),
     listNotes(charityId, donorId),
@@ -84,15 +85,15 @@ export async function peekDonor(charityId: string, donorId: string): Promise<Don
     listTags(charityId),
     tagsByDonor(charityId),
     lapsedDaysFor(charityId),
-    loadMonthlyGifts(charityId),
-    loadMonthlyDonations(charityId),
+    // Access checked above (loadCharityForManager): this one donor's monthly donations only.
+    loadMonthlyStatusByDonor(charityId, donorId),
     supabase.from("charity_donations").select("status, amount_cents, refunded_cents, paid_at, created_at").eq("charity_id", charityId).eq("donor_id", donorId).order("paid_at", { ascending: false, nullsFirst: false }).limit(5),
   ]);
   const { largest } = donorGiving(paid, titles);
   const tagName = new Map(tags.map((t) => [t.id, t.name]));
   const today = isoDateInJhb();
   const group = donorGroupsFor(lapsedDays).find((g) => g.key === donorGroup(donor, new Date(), lapsedDays));
-  const givesMonthly = monthlyByDonor(monthlyGifts, monthly).get(donorId);
+  const givesMonthly = monthlyStatus.get(donorId);
   const statusLabel = (s: string) => (isDonationStatus(s) ? donationStatus[s].label : s);
   return {
     name: isErasedEmail(donor.email) ? ERASED_DONOR : donor.display_name,
