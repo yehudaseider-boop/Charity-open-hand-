@@ -5,6 +5,7 @@ import { requirePlatformAdmin } from "@/lib/auth";
 import { monthlyHealth, staleEvents, stalePending, totalsByCharity, MONTHLY_OVERDUE_HOURS, type PaidRow } from "@/lib/admin/payments-overview";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { formatRand } from "@/lib/money";
+import { refundsSoFar, type RecordedRefund } from "@/lib/admin/refunds-so-far";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { RemoveButton } from "@/components/forms/remove-button";
 import { ActionForm } from "@/components/forms/action-form";
@@ -63,6 +64,14 @@ export default async function PaymentsPage() {
       statusById.set(r.id as string, r.status as string);
       leftById.set(r.id as string, Number(r.amount_cents) - Number(r.refunded_cents ?? 0));
     }
+  }
+  // The part refunds already recorded on each gift shown here, so a person compares with the provider before typing one.
+  const refundGiftIds = [...new Set([...heldDonationIds, ...(holds.data ?? []).map((r) => r.id as string)])];
+  let refundLines = new Map<string, string[]>();
+  if (refundGiftIds.length) {
+    const { data: refundRows, error: refundError } = await db.from("donation_refunds").select("donation_id, amount_cents, source, created_at").in("donation_id", refundGiftIds);
+    if (refundError) throw refundError;
+    refundLines = refundsSoFar((refundRows ?? []) as RecordedRefund[]);
   }
   const held = (holds.data ?? []).filter((r) => r.receipt_hold).map((r) => ({
     id: r.id as string,
@@ -186,7 +195,7 @@ export default async function PaymentsPage() {
                     </form>
                   ) : null}
                   {a.action === "donation.refund_review" && (leftById.get(donationId) ?? 0) > 0 ? (
-                    <PartRefundForm donationId={donationId} leftCents={leftById.get(donationId) ?? 0} />
+                    <PartRefundForm donationId={donationId} leftCents={leftById.get(donationId) ?? 0} recorded={refundLines.get(donationId) ?? []} />
                   ) : null}
                 </div>
               ) : donationId && status === "pending" && a.action === "donation.refund_review" ? (
@@ -235,7 +244,7 @@ export default async function PaymentsPage() {
               <form action={clearHold.bind(null, h.id)}>
                 <RemoveButton label="Release the hold" what={`the s18A receipt hold on donation ${h.id.slice(0, 8)}`} confirmText={`Release the hold? ${formatRand(h.leftCents)} of this gift goes back on the charity's s18A receipts. Only do this once the gateway shows nothing more is owed back.`} />
               </form>
-              {h.leftCents > 0 ? <PartRefundForm donationId={h.id} leftCents={h.leftCents} /> : null}
+              {h.leftCents > 0 ? <PartRefundForm donationId={h.id} leftCents={h.leftCents} recorded={refundLines.get(h.id) ?? []} /> : null}
             </div>
           </div>
         ))}
@@ -281,7 +290,7 @@ export default async function PaymentsPage() {
  * Record the part of a paid gift that was refunded. A fresh entry id each time the page is shown, so pressing the
  * button twice records it once. Asks first: it can't be taken back here.
  */
-function PartRefundForm({ donationId, leftCents }: { donationId: string; leftCents: number }) {
+function PartRefundForm({ donationId, leftCents, recorded }: { donationId: string; leftCents: number; recorded: string[] }) {
   return (
     <ActionForm
       action={recordPartRefund.bind(null, donationId, randomUUID())}
@@ -290,6 +299,18 @@ function PartRefundForm({ donationId, leftCents }: { donationId: string; leftCen
       confirm="Record this part of the gift as refunded? It comes off the s18A receipt and can't be taken back here. Only do this once the gateway shows the refund."
       className="w-full max-w-sm"
     >
+      <div className="text-xs">
+        <p className="font-medium">Part refunds already recorded on this gift</p>
+        {recorded.length ? (
+          <ul className="list-disc pl-4 text-muted">
+            {recorded.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-muted">None yet.</p>
+        )}
+      </div>
       <TextField
         name="amount"
         label="Part of the gift refunded, in Rand"
