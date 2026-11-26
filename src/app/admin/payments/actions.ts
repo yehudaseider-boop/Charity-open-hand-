@@ -63,13 +63,15 @@ export async function recordPartRefund(donationId: string, entry: string, _prev:
   if (d.status !== "paid") return { ok: false, message: `This donation is now ${String(d.status).replace("_", " ")}, so nothing was recorded.` };
   const left = Number(d.amount_cents) - Number(d.refunded_cents);
   if (cents > left) return wrong(`That is more than what is left of the gift (${formatRand(left)})`);
-  // The payment provider may already have told us about this refund: never counted twice unless a person says it is a
-  // second, separate one (fresh review, 25/11/2026).
+  // A refund of this same amount may already be recorded on the gift, by the payment provider or by hand (also when
+  // the provider's report was held because it matched a hand entry): never counted twice unless a person says it is
+  // a second, separate one (fresh review, 25/11/2026; code review, 26/11/2026).
   const same = await sameAmountRefunds(donationId, cents);
-  if (same.provider > same.person && formData.get("separate") !== "on") {
+  if (same.provider + same.person > 0 && formData.get("separate") !== "on") {
+    const by = same.provider > 0 ? "the payment provider told us about it" : "it was recorded here by hand";
     return {
       ok: false,
-      message: `The payment provider already told us about a refund of ${formatRand(cents)} on this gift, and it is recorded. If it's the same refund, there's nothing more to do. If it's a second, separate refund, tick the box and save again.`,
+      message: `A refund of ${formatRand(cents)} is already recorded on this gift (${by}). If it's the same refund, there's nothing more to record. If it's a second, separate refund, tick the box and save again.`,
     };
   }
 

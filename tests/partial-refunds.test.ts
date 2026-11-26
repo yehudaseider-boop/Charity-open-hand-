@@ -165,19 +165,23 @@ describe("an admin records part of a gift refunded", () => {
     expect(await send("400")).toEqual({ ok: true, message: "This was already recorded. Nothing more was changed." });
   });
 
-  it("a refund of the same amount the payment provider already told us about is not counted again (fresh review, 25/11/2026)", async () => {
+  it("a refund of the same amount already recorded on the gift is not counted again without the tick (fresh review, 25/11/2026)", async () => {
     sameAmount = { provider: 1, person: 0 };
     const r = await send("400");
-    expect(r).toMatchObject({ ok: false, message: expect.stringContaining("already told us about a refund of R400") });
+    expect(r).toMatchObject({ ok: false, message: expect.stringContaining("A refund of R400 is already recorded on this gift (the payment provider told us about it)") });
     expect(recorded).toEqual([]);
     // A genuinely separate second refund of the same amount: the admin ticks the box.
     expect(await send("400", DONATION, ENTRY, true)).toMatchObject({ ok: true });
     expect(recorded).toHaveLength(1);
-    // Each provider refund already matched by one recorded by hand: nothing to stop.
-    recorded.length = 0;
+  });
+
+  it("also when the first one was recorded by hand: the provider's held report must not be typed in again (code review, 26/11/2026)", async () => {
+    sameAmount = { provider: 0, person: 1 };
+    expect(await send("400")).toMatchObject({ ok: false, message: expect.stringContaining("it was recorded here by hand") });
     sameAmount = { provider: 1, person: 1 };
-    expect(await send("400")).toMatchObject({ ok: true });
-    expect(recorded).toHaveLength(1);
+    expect((await send("400")).ok).toBe(false);
+    expect(recorded).toEqual([]);
+    expect(await send("400", DONATION, ENTRY, true)).toMatchObject({ ok: true });
   });
 
   it("needs a platform admin, as the other payment actions do", async () => {

@@ -157,9 +157,20 @@ export default async function PaymentsPage() {
           const status = donationId ? statusById.get(donationId) : undefined;
           // Without a matching donation, the gateway's reference is what to look up in its dashboard.
           const reference = (a.details as { reference?: string | null } | null)?.reference ?? null;
+          // A provider refund that matched one already recorded by hand: say so, or a person records it a second time.
+          const heldDetails = a.details as { matchesRecordedByHand?: boolean; amountCents?: number | null } | null;
+          const matchesByHand = a.action === "donation.refund_review" && heldDetails?.matchesRecordedByHand === true;
+          const matchedCents = matchesByHand && typeof heldDetails?.amountCents === "number" ? heldDetails.amountCents : null;
           return (
             <div key={a.id as string} className="border-t border-border py-1.5 first:border-t-0">
               <Row left={heldLabel[a.action as string] ?? (a.action as string)} right={formatDate(a.created_at as string)} />
+              {matchesByHand ? (
+                <p className="pt-1 text-xs text-muted">
+                  The payment provider reported a part refund{matchedCents ? ` of ${formatRand(matchedCents)}` : ""}. A refund of the same amount was already recorded here by hand, so it
+                  was not taken off the gift again. Same refund: nothing to record, clear the hold under &quot;Kept off s18A receipts&quot; below. A second,
+                  separate refund: record it here and tick the box.
+                </p>
+              ) : null}
               {donationId && status === "paid" ? (
                 <div className="flex flex-wrap gap-3 pt-1 text-xs">
                   <span className="text-muted">Donation {donationId.slice(0, 8)}</span>
@@ -288,7 +299,7 @@ function PartRefundForm({ donationId, leftCents }: { donationId: string; leftCen
       />
       <label className="flex items-start gap-2 text-xs">
         <input type="checkbox" name="separate" className="mt-0.5" />
-        <span>This is a second, separate refund (only if the payment provider already told us about one of the same amount)</span>
+        <span>This is a second, separate refund (only if one of the same amount is already recorded on this gift)</span>
       </label>
     </ActionForm>
   );
