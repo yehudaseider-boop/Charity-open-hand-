@@ -54,13 +54,21 @@ vi.mock("@/lib/supabase/admin", () => ({
         eq: (c: string, v: unknown) => ((f[c] = v), q),
         is: (c: string, v: unknown) => ((f[`${c}:is`] = v), q),
         maybeSingle: async () => {
-          if (table === "donation_refunds") return { data: { created_at: refundRecordedAt }, error: null };
+          if (table === "donation_refunds") {
+            // The refund's own record (looked up by its source) exists only once record_partial_refund counted it.
+            if (f.source !== undefined) return { data: refundSources.has(String(f.source)) ? { id: "r", created_at: refundRecordedAt } : null, error: null };
+            return { data: { created_at: refundRecordedAt }, error: null };
+          }
           const d = donations.find((x) => (f.gateway_ref === undefined || x.gateway_ref === f.gateway_ref) && (f.id === undefined || x.id === f.id));
           return { data: d ?? null, error: null };
         },
         in: (c: string, v: unknown[]) => ((f[`${c}:in`] = v), q),
         not: (c: string) => ((f[`${c}:set`] = true), q),
         then: (ok: (v: unknown) => unknown) => {
+          if (table === "donation_refunds") {
+            const rows = [...refundSources].filter(([, cents]) => f.amount_cents === undefined || cents === f.amount_cents).map(([source]) => ({ source }));
+            return Promise.resolve({ data: rows, error: null }).then(ok);
+          }
           if (table === "s18a_receipt_donations") return Promise.resolve({ data: receiptLinks.filter((l) => l.donation_id === f.donation_id), error: null }).then(ok);
           if (table === "s18a_receipts") {
             if (patch?.status === "void" && f.status === "issued") voided.push(String(f.id));
@@ -258,6 +266,18 @@ describe("partial refunds (20/11/2026)", () => {
     // A second refund of the same amount is its own event, and counts.
     await handleRefund("ref-1", 40_000, "evt-b");
     expect(donations[0].refunded_cents).toBe(80_000);
+  });
+
+  it("a provider refund matching one an admin already recorded by hand is held for a person, not counted twice (fresh review, 25/11/2026)", async () => {
+    donations = [gift({ amount_cents: 100_000, total_charged_cents: 100_000, refunded_cents: 40_000 })];
+    refundSources.set("admin:entry-1", 40_000);
+    await handleRefund("ref-1", 40_000, "evt-a");
+    expect(donations[0]).toMatchObject({ status: "paid", refunded_cents: 40_000, receipt_hold: "refund being reviewed" });
+    expect(audits).toEqual([expect.objectContaining({ action: "donation.refund_review", details: expect.objectContaining({ matchesRecordedByHand: true }) })]);
+    // A different amount is a different refund, and counts.
+    audits.length = 0;
+    await handleRefund("ref-1", 10_000, "evt-b");
+    expect(donations[0].refunded_cents).toBe(50_000);
   });
 
   it("refunded in full in parts: the gift is marked refunded", async () => {

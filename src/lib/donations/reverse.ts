@@ -122,6 +122,19 @@ export async function recordPartialRefund(donationId: string, amountCents: numbe
   return outcome;
 }
 
+/**
+ * Refunds of exactly this amount already recorded on a gift, by who recorded them: the payment provider's own refund
+ * events ("gateway_event:…") and people in Admin ("admin:…"). The same part refund can arrive both ways (fresh review,
+ * 25/11/2026: a person following the page's advice recorded one the provider had already reported, and the s18A
+ * receipt lost it twice), so each way checks the other before recording.
+ */
+export async function sameAmountRefunds(donationId: string, amountCents: number): Promise<{ provider: number; person: number }> {
+  const { data, error } = await createAdminClient().from("donation_refunds").select("source").eq("donation_id", donationId).eq("amount_cents", amountCents);
+  if (error) throw error;
+  const sources = (data ?? []).map((r) => String(r.source));
+  return { provider: sources.filter((x) => x.startsWith("gateway_event:")).length, person: sources.filter((x) => x.startsWith("admin:")).length };
+}
+
 /** A gift's hold reasons, as stored in receipt_hold ("dispute open; refund being reviewed"). */
 export const holdReasons = (hold: string | null | undefined): string[] =>
   (hold ?? "").split(";").map((r) => r.trim()).filter(Boolean);
@@ -254,7 +267,18 @@ export async function handleRefund(reference: string | null, amountCents: number
   // The gateway event row is the refund's own: the adapter keys each refund event by the refund itself, so two
   // partial refunds are two rows and a repeat delivery of one finds the same row.
   if (currency === "ZAR" && amountCents !== null && amountCents > 0 && amountCents < d.total_charged_cents && d.total_charged_cents === d.amount_cents) {
-    const outcome = await recordPartialRefund(d.id, amountCents, `gateway_event:${eventRowId}`, null, "the payment provider refunded part of the payment");
+    const source = `gateway_event:${eventRowId}`;
+    // A person may already have recorded this same refund by hand (Admin, Payments): then it is not counted again,
+    // but held for a person to check (two equal refunds are possible). A repeat delivery of this event records nothing.
+    const { data: own, error: ownError } = await createAdminClient().from("donation_refunds").select("id").eq("source", source).maybeSingle();
+    if (ownError) throw ownError;
+    const same = own ? null : await sameAmountRefunds(d.id, amountCents);
+    if (same && same.person > same.provider) {
+      await holdReceipt(d.id, RECEIPT_HOLD.refundReview);
+      await logAudit({ actorUserId: null, action: "donation.refund_review", entityType: "donation", entityId: d.id, details: { amountCents, currency, paidCents: d.total_charged_cents, status: d.status, matchesRecordedByHand: true } });
+      return;
+    }
+    const outcome = await recordPartialRefund(d.id, amountCents, source, null, "the payment provider refunded part of the payment");
     if (outcome === "done" || outcome === "already") return;
   }
   await holdReceipt(d.id, RECEIPT_HOLD.refundReview);

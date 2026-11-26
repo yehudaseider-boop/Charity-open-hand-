@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePlatformAdmin } from "@/lib/auth";
-import { clearReceiptHold, closeRefundedBeforeConfirm, recordPartialRefund, releaseDisputeHold, reverseDonation, type ReverseKind } from "@/lib/donations/reverse";
+import { clearReceiptHold, closeRefundedBeforeConfirm, recordPartialRefund, releaseDisputeHold, reverseDonation, sameAmountRefunds, type ReverseKind } from "@/lib/donations/reverse";
 import type { FormState } from "@/lib/form";
 import { isUuid } from "@/lib/ids";
 import { COMMA_THOUSANDS_MESSAGE, formatRand, looksLikeAmount, parseRandToCents, usesCommaThousands } from "@/lib/money";
@@ -63,6 +63,15 @@ export async function recordPartRefund(donationId: string, entry: string, _prev:
   if (d.status !== "paid") return { ok: false, message: `This donation is now ${String(d.status).replace("_", " ")}, so nothing was recorded.` };
   const left = Number(d.amount_cents) - Number(d.refunded_cents);
   if (cents > left) return wrong(`That is more than what is left of the gift (${formatRand(left)})`);
+  // The payment provider may already have told us about this refund: never counted twice unless a person says it is a
+  // second, separate one (fresh review, 25/11/2026).
+  const same = await sameAmountRefunds(donationId, cents);
+  if (same.provider > same.person && formData.get("separate") !== "on") {
+    return {
+      ok: false,
+      message: `The payment provider already told us about a refund of ${formatRand(cents)} on this gift, and it is recorded. If it's the same refund, there's nothing more to do. If it's a second, separate refund, tick the box and save again.`,
+    };
+  }
 
   const outcome = await recordPartialRefund(donationId, cents, `admin:${entry}`, viewer.userId, "recorded by a platform admin");
   revalidatePath("/admin/payments");

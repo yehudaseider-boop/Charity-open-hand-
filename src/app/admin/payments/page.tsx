@@ -286,6 +286,10 @@ function PartRefundForm({ donationId, leftCents }: { donationId: string; leftCen
         inputMode="decimal"
         required
       />
+      <label className="flex items-start gap-2 text-xs">
+        <input type="checkbox" name="separate" className="mt-0.5" />
+        <span>This is a second, separate refund (only if the payment provider already told us about one of the same amount)</span>
+      </label>
     </ActionForm>
   );
 }

@@ -105,14 +105,17 @@ vi.mock("@/lib/donations/reverse", () => ({
   clearReceiptHold: async (...args: unknown[]) => (recorded.push(["clear", ...args]), true),
   releaseDisputeHold: async () => true,
   reverseDonation: async () => "done",
+  sameAmountRefunds: async () => sameAmount,
 }));
 
 const { clearHold, recordPartRefund } = await import("@/app/admin/payments/actions");
 const DONATION = "3f9a2c71-0b1d-4e5f-9a8b-123456789abc";
 const ENTRY = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
-const send = (amount: string, donation = DONATION, entry = ENTRY) => {
+let sameAmount = { provider: 0, person: 0 };
+const send = (amount: string, donation = DONATION, entry = ENTRY, separate = false) => {
   const f = new FormData();
   f.set("amount", amount);
+  if (separate) f.set("separate", "on");
   return recordPartRefund(donation, entry, { ok: false }, f);
 };
 
@@ -122,6 +125,7 @@ describe("an admin records part of a gift refunded", () => {
     donationRow = { status: "paid", amount_cents: 100_000, refunded_cents: 0 };
     outcome = "done";
     admin = true;
+    sameAmount = { provider: 0, person: 0 };
   });
 
   it("records the amount in cents, once per entry, and says what is left for the receipt", async () => {
@@ -159,6 +163,21 @@ describe("an admin records part of a gift refunded", () => {
   it("a second press of the same form says it was already recorded", async () => {
     outcome = "already";
     expect(await send("400")).toEqual({ ok: true, message: "This was already recorded. Nothing more was changed." });
+  });
+
+  it("a refund of the same amount the payment provider already told us about is not counted again (fresh review, 25/11/2026)", async () => {
+    sameAmount = { provider: 1, person: 0 };
+    const r = await send("400");
+    expect(r).toMatchObject({ ok: false, message: expect.stringContaining("already told us about a refund of R400") });
+    expect(recorded).toEqual([]);
+    // A genuinely separate second refund of the same amount: the admin ticks the box.
+    expect(await send("400", DONATION, ENTRY, true)).toMatchObject({ ok: true });
+    expect(recorded).toHaveLength(1);
+    // Each provider refund already matched by one recorded by hand: nothing to stop.
+    recorded.length = 0;
+    sameAmount = { provider: 1, person: 1 };
+    expect(await send("400")).toMatchObject({ ok: true });
+    expect(recorded).toHaveLength(1);
   });
 
   it("needs a platform admin, as the other payment actions do", async () => {
