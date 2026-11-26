@@ -4,7 +4,7 @@ import { checkoutOrigins } from "@/lib/gateway/checkout-origins";
 import { gatewaySettings } from "@/lib/gateway/settings";
 
 describe("the settings check for Stitch", () => {
-  const ok = { PAYMENT_GATEWAY: "stitch", STITCH_CLIENT_ID: "id", STITCH_CLIENT_SECRET: "secret", STITCH_WEBHOOK_SECRET: "whsec_abc", STITCH_SPLITS: "yes" };
+  const ok = { PAYMENT_GATEWAY: "stitch", STITCH_CLIENT_ID: "id", STITCH_CLIENT_SECRET: "secret", STITCH_WEBHOOK_SECRET: "whsec_abc", STITCH_SPLITS: "yes", STITCH_SAVED_CARDS: "yes" };
   const status = (env: Record<string, string | undefined>, name: string) => gatewaySettings(env, "test").find((c) => c.name === name)?.status;
 
   it("is all fine with everything set", () => {
@@ -17,6 +17,7 @@ describe("the settings check for Stitch", () => {
     expect(status({ PAYMENT_GATEWAY: "stitch" }, "STITCH_WEBHOOK_SECRET")).toBe("fix");
     expect(status({ ...ok, STITCH_WEBHOOK_SECRET: "not-a-signing-secret" }, "STITCH_WEBHOOK_SECRET")).toBe("fix");
     expect(status({ ...ok, STITCH_SPLITS: undefined }, "STITCH_SPLITS")).toBe("later");
+    expect(status({ ...ok, STITCH_SAVED_CARDS: undefined }, "STITCH_SAVED_CARDS")).toBe("later");
     expect(JSON.stringify(gatewaySettings({ ...ok, STITCH_CLIENT_SECRET: "super-secret-value" }, "test"))).not.toContain("super-secret-value");
   });
 

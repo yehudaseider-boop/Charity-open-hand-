@@ -29,6 +29,11 @@ export function gatewaySettings(env: Env, site: "live" | "test" | "unknown"): Se
     else if (!secret.startsWith("whsec_")) out.push({ name: "STITCH_WEBHOOK_SECRET", status: "fix", says: "Doesn't look like Stitch's signing secret. It starts with whsec_." });
     else out.push({ name: "STITCH_WEBHOOK_SECRET", status: "ok", says: "Set." });
     out.push({ name: "STITCH_SPLITS", status: env.STITCH_SPLITS === "yes" ? "ok" : "later", says: env.STITCH_SPLITS === "yes" ? "On: each gift is split to the charity's own Stitch account." : "Off: Stitch takes no gifts, because it only takes them as a split to a charity." });
+    out.push({
+      name: "STITCH_SAVED_CARDS",
+      status: env.STITCH_SAVED_CARDS === "yes" ? "ok" : "later",
+      says: env.STITCH_SAVED_CARDS === "yes" ? "On: monthly donations and saved cards go through Stitch." : "Off: Stitch takes once-off gifts only; monthly donations and saved cards say they aren't available yet.",
+    });
     for (const name of ["TEST_GATEWAY_SECRET", "ALLOW_TEST_GATEWAY"]) {
       if (env[name]) out.push({ name, status: "fix", says: "Only for the test gateway. Remove it now that payments go to Stitch." });
     }

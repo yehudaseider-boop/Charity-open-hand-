@@ -2,7 +2,7 @@
 
 What Stitch's own documentation says, set against our Stitch connection. Nothing in the code was changed by the review itself.
 
-**Since then (26/11/2026, same day):** items 1 to 3 under "What our connection gets wrong" are fixed, each with a test, and every payment request now has an expiry (item 4). The other items are still open. See `docs/decisions.md`.
+**Since then (26/11/2026, same day):** items 1 to 3 under "What our connection gets wrong" are fixed, each with a test, and every payment request now has an expiry (item 4). Later the same day the rest was built: the donor id (5), the "completed by hand" state (7), refund and dispute events looked up at Stitch (8, 9), the split check (10), saved cards and monthly charges behind `STITCH_SAVED_CARDS=yes` (11), and consent events (12). Item 6 is not needed while refunds are made in Stitch's dashboard. The webhook subscription (13) is a set-up step on the go-live list. None of it has run against Stitch yet. See `docs/decisions.md`.
 
 ## What was read, and how
 

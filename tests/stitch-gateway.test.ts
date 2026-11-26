@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-const { stitchGateway, centsToQuantity, quantityToCents, clientToken, forgetTokens, webhookSignature } = await import("@/lib/gateway/stitch");
+const { stitchGateway, centsToQuantity, quantityToCents, clientToken, forgetTokens, webhookSignature, payerIdFor } = await import("@/lib/gateway/stitch");
 const { GatewayError } = await import("@/lib/gateway/types");
 
 type Call = { url: string; body: string; headers: Record<string, string> };
@@ -46,15 +46,52 @@ function stitchRefuses(query: string, variables: Record<string, unknown>): { sta
     if ((variables.merchantId || variables.externalMerchantId) && variables.splitSettlements) return bad("merchant_id_with_split_settlements", "A merchantId cannot be combined with splitSettlements.");
     if (typeof variables.payerReference === "string" && variables.payerReference.length > 12) return bad("BAD_USER_INPUT", "payerReference is longer than 12 characters.");
     if (typeof variables.beneficiaryReference === "string" && variables.beneficiaryReference.length > 20) return bad("BAD_USER_INPUT", "beneficiaryReference is longer than 20 characters.");
+    const payer = unknownField(variables.payerInformation, PAYER_INFORMATION_INPUT, "PayerInformationInput");
+    if (payer) return payer;
+  }
+  // Inputs sent whole as `$input` (consents and saved-card charges): only the fields their input types have.
+  const whole = variables.input as Record<string, unknown> | undefined;
+  if (/paymentConsentRequestCreate\(/.test(query) && whole) {
+    const wrong = unknownField(whole, CONSENT_INPUT, "CreatePaymentConsentRequestInput") ?? unknownField(whole.payerInformation, PAYER_INFORMATION_INPUT, "PayerInformationInput");
+    if (wrong) return wrong;
+    const card = (whole.paymentMethods as { card?: { initialCharge?: { amount?: unknown; merchantId?: unknown } } } | undefined)?.card;
+    const bad = (code: string, message: string) => ({ status: 200, json: { errors: [{ message, extensions: { code } }] } });
+    if (whole.splitSettlements && !card?.initialCharge?.amount) return bad("BAD_USER_INPUT", "splitSettlements need an initialCharge amount.");
+    if (whole.splitSettlements && card?.initialCharge?.merchantId) return bad("merchant_id_with_split_settlements", "initialCharge.merchantId cannot be combined with splitSettlements.");
+  }
+  if (/initiateTransaction\(/.test(query) && whole) {
+    const wrong = unknownField(whole, TRANSACTION_INPUT, "TransactionInitiateInput") ?? unknownField(whole.payerInformation, PAYER_INFORMATION_INPUT, "PayerInformationInput");
+    if (wrong) return wrong;
+    const bad = (code: string, message: string) => ({ status: 200, json: { errors: [{ message, extensions: { code } }] } });
+    if ((whole.merchantId || whole.externalMerchantId) && whole.splitSettlements) return bad("merchant_id_with_split_settlements", "A merchantId cannot be combined with splitSettlements.");
+    // A nonce identifies one transaction: Stitch refuses a second one with it.
+    if (typeof whole.nonce === "string") {
+      if (usedNonces.has(whole.nonce)) return bad("BAD_USER_INPUT", "transactionExistsError: a transaction with this nonce already exists.");
+      usedNonces.add(whole.nonce);
+    }
   }
   return null;
 }
+const PAYER_INFORMATION_INPUT = new Set(["payerId", "identifyingDocument", "businessRegistration", "mobileNumber", "email", "fullName", "bankAccountNumber", "accountCreatedDate"]);
+const CONSENT_INPUT = new Set(["nonce", "externalReference", "payerInformation", "paymentMethods", "metadata", "expireAt", "splitSettlements"]);
+const TRANSACTION_INPUT = new Set([
+  "paymentRequestId", "amount", "nonce", "externalReference", "payerInformation", "deviceInformation", "merchantId", "externalMerchantId",
+  "beneficiaryAccountId", "metadata", "splitSettlements", "token", "paymentMethods",
+]);
+function unknownField(value: unknown, allowed: Set<string>, type: string): { status: number; json: unknown } | null {
+  if (!value || typeof value !== "object") return null;
+  const field = Object.keys(value).find((k) => !allowed.has(k));
+  return field ? { status: 200, json: { errors: [{ message: `Field "${field}" is not defined by type "${type}".`, extensions: { code: "BAD_USER_INPUT" } }] } } : null;
+}
+let usedNonces: Set<string>;
 
 beforeEach(() => {
   process.env.STITCH_CLIENT_ID = "client-id";
   process.env.STITCH_CLIENT_SECRET = "client-secret";
   process.env.STITCH_WEBHOOK_SECRET = SECRET;
   delete process.env.STITCH_SPLITS;
+  delete process.env.STITCH_SAVED_CARDS;
+  usedNonces = new Set();
   forgetTokens();
   calls = [];
   graphqlAnswers = [];
@@ -441,5 +478,280 @@ describe("webhooks", () => {
   it("the card's details are never kept from a transaction event", async () => {
     const e = await send({ type: "transaction", id: "t4", data: { type: "CARD", status: "SUCCESS", externalReference: base.reference, card: { id: "card-secret", last4: "4242" }, authorizationCode: "A1B2C3" } });
     expect(JSON.stringify(e!.raw)).not.toMatch(/card-secret|4242|A1B2C3/);
+  });
+});
+
+describe("the donor's id for Stitch's fraud checks (payerId)", () => {
+  it("is sent with every payment request, is the same for the same email, and names nobody", async () => {
+    process.env.STITCH_SPLITS = "yes";
+    graphqlAnswers.push(() => made());
+    await stitchGateway.createCheckout(base);
+    const { variables } = JSON.parse(calls.find((c) => c.url === "https://api.stitch.money/graphql")!.body);
+    expect(variables.payerInformation.payerId).toBe(payerIdFor("donor@example.co.za"));
+    expect(variables.payerInformation.email).toBe("donor@example.co.za");
+    expect(payerIdFor(" Donor@Example.co.za ")).toBe(payerIdFor("donor@example.co.za"));
+    expect(payerIdFor("someone@else.co.za")).not.toBe(payerIdFor("donor@example.co.za"));
+    expect(payerIdFor("donor@example.co.za")).not.toMatch(/donor@|example/);
+  });
+
+  it("is keyed: without the key nothing is sent", async () => {
+    process.env.STITCH_SPLITS = "yes";
+    const key = process.env.ENCRYPTION_KEY;
+    delete process.env.ENCRYPTION_KEY;
+    try {
+      await expect(stitchGateway.createCheckout(base)).rejects.toMatchObject({ beforeSend: true });
+      expect(calls).toHaveLength(0);
+    } finally {
+      process.env.ENCRYPTION_KEY = key;
+    }
+  });
+});
+
+describe("where a payment was split to (reportsSplit)", () => {
+  const completedWith = (splits: unknown) => ({
+    json: { data: { client: { paymentInitiationRequests: { edges: [{ node: { id: "req-1", externalReference: base.reference, splitSettlements: splits, state: { __typename: "PaymentInitiationRequestCompleted", amount: { quantity: "203.45", currency: "ZAR" } } } }] } } } },
+  });
+
+  it("names the charity merchant the payment request was split to, so the payment check can compare it", async () => {
+    expect(stitchGateway.reportsSplit).toBe(true);
+    graphqlAnswers.push((q) => {
+      expect(q).toMatch(/splitSettlements \{ merchantId \}/);
+      return completedWith([{ merchantId: base.charityAccountRef }]);
+    });
+    expect(await stitchGateway.verifyTransaction(base.reference)).toMatchObject({ status: "success", settledTo: [base.charityAccountRef] });
+    graphqlAnswers.push(() => completedWith(null));
+    expect(await stitchGateway.verifyTransaction(base.reference)).toMatchObject({ status: "success", settledTo: [] });
+  });
+
+  it("a request 'completed by hand' at Stitch (no payment exists) is never paid, and is left for the daily check to close", async () => {
+    graphqlAnswers.push(() => ({ json: { data: { client: { paymentInitiationRequests: { edges: [{ node: { id: "req-1", externalReference: base.reference, state: { __typename: "PaymentInitiationRequestManuallyCompleted" } } }] } } } } }));
+    expect(await stitchGateway.verifyTransaction(base.reference)).toMatchObject({ status: "pending", abandoned: true });
+  });
+});
+
+describe("saved cards and monthly gifts", () => {
+  const charge = {
+    reference: "33333333-3333-3333-3333-333333333333",
+    authorizationCode: "Y29uc2VudC8x",
+    email: base.email,
+    totalCents: 20_345,
+    lines: base.lines,
+    charityAccountRef: base.charityAccountRef,
+    feeBearer: "each" as const,
+    description: "Donation to Meals Fund",
+    monthly: true,
+  };
+  const chargeAnswer = (state: Record<string, unknown>) => () => ({ json: { data: { initiateTransaction: { __typename: "CardTransaction", id: "tx-1", state } } } });
+  const transactions = (nodes: Record<string, unknown>[]) => ({ json: { data: { client: { transactions: { edges: nodes.map((node) => ({ node })) } } } } });
+  const noPaymentRequest = () => ({ json: { data: { client: { paymentInitiationRequests: { edges: [] } } } } });
+
+  beforeEach(() => {
+    process.env.STITCH_SPLITS = "yes";
+  });
+
+  it("are off unless STITCH_SAVED_CARDS is exactly 'yes', and say so before anything is sent", async () => {
+    expect(stitchGateway.supportsSavedCards).toBe(false);
+    await expect(stitchGateway.chargeAuthorization(charge)).rejects.toMatchObject({ beforeSend: true });
+    await expect(stitchGateway.createCheckout({ ...base, saveCard: true })).rejects.toMatchObject({ beforeSend: true });
+    process.env.STITCH_SAVED_CARDS = "true";
+    expect(stitchGateway.supportsSavedCards).toBe(false);
+    process.env.STITCH_SAVED_CARDS = "yes";
+    expect(stitchGateway.supportsSavedCards).toBe(true);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("the first gift is a card consent on Stitch's page: card only, the split and our reference on its first charge", async () => {
+    process.env.STITCH_SAVED_CARDS = "yes";
+    vi.useFakeTimers({ now: new Date("2026-11-26T10:00:00.000Z"), toFake: ["Date"] });
+    graphqlAnswers.push((q) => {
+      expect(q).toContain("paymentConsentRequestCreate");
+      return { json: { data: { paymentConsentRequestCreate: { id: "Y29uc2VudC8x", url: "https://secure.stitch.money/connect/consent/abc" } } } };
+    });
+    const r = await stitchGateway.createCheckout({ ...base, saveCard: true });
+    const gql = calls.find((c) => c.url === "https://api.stitch.money/graphql")!;
+    const { input } = JSON.parse(gql.body).variables;
+    expect(input.nonce).toBe(base.reference);
+    expect(input.externalReference).toBe(base.reference);
+    expect(input.expireAt).toBe("2026-11-26T12:00:00.000Z");
+    expect(input.splitSettlements).toEqual([{ merchantId: base.charityAccountRef, amount: { quantity: "180.00", currency: "ZAR" } }]);
+    expect(input.paymentMethods).toEqual({ card: { enabled: true, initialCharge: { amount: { quantity: "203.45", currency: "ZAR" }, nonce: base.reference, externalReference: base.reference } } });
+    expect(input.payerInformation.payerId).toBe(payerIdFor(base.email));
+    expect(calls[0].body).toContain("scope=client_recurringpaymentconsentrequest");
+    expect(new URL(r.redirectUrl).searchParams.get("redirect_uri")).toBe(base.returnUrl);
+  });
+
+  it("each month: charged by our server on the consent, as a merchant-started charge in one series, with the split every time", async () => {
+    process.env.STITCH_SAVED_CARDS = "yes";
+    graphqlAnswers.push(chargeAnswer({ __typename: "TransactionSuccess", date: "2026-12-01T06:00:00Z" }));
+    expect(await stitchGateway.chargeAuthorization(charge)).toEqual({ status: "success" });
+    const gql = calls.find((c) => c.url === "https://api.stitch.money/graphql")!;
+    const { query, variables } = JSON.parse(gql.body);
+    expect(query).toContain("initiateTransaction");
+    expect(variables.input).toMatchObject({
+      amount: { quantity: "203.45", currency: "ZAR" },
+      nonce: charge.reference,
+      externalReference: charge.reference,
+      token: charge.authorizationCode,
+      splitSettlements: [{ merchantId: base.charityAccountRef, amount: { quantity: "180.00", currency: "ZAR" } }],
+      paymentMethods: { card: { recurringPayment: { source: "merchant", agreement: { reference: charge.authorizationCode, variability: "variable", scenario: "Subscription" } } } },
+    });
+    expect(variables.input.merchantId).toBeUndefined();
+    expect(gql.headers["Idempotency-Key"]).toBe(`charge-${charge.reference}`);
+    expect(calls[0].body).toContain("scope=transaction_initiate");
+  });
+
+  it("a once-off gift on a saved card is an unscheduled charge", async () => {
+    process.env.STITCH_SAVED_CARDS = "yes";
+    graphqlAnswers.push(chargeAnswer({ __typename: "TransactionSuccess" }));
+    await stitchGateway.chargeAuthorization({ ...charge, monthly: false });
+    const { variables } = JSON.parse(calls.find((c) => c.url === "https://api.stitch.money/graphql")!.body);
+    expect(variables.input.paymentMethods.card.recurringPayment.agreement.scenario).toBe("Unscheduled");
+  });
+
+  it("the card turned down is a decline; anything else Stitch turns down is not the donor's card; waiting is pending", async () => {
+    process.env.STITCH_SAVED_CARDS = "yes";
+    graphqlAnswers.push(chargeAnswer({ __typename: "TransactionFailure", reason: "insufficientFunds" }));
+    expect(await stitchGateway.chargeAuthorization({ ...charge, reference: "r-1" })).toEqual({ status: "failed" });
+    graphqlAnswers.push(chargeAnswer({ __typename: "TransactionFailure", reason: "invalidConsentRequest" }));
+    expect(await stitchGateway.chargeAuthorization({ ...charge, reference: "r-2" })).toEqual({ status: "failed" });
+    graphqlAnswers.push(chargeAnswer({ __typename: "TransactionFailure", reason: "invalidConfigurationError", reasonDescription: "client set-up" }));
+    await expect(stitchGateway.chargeAuthorization({ ...charge, reference: "r-3" })).rejects.toMatchObject({ refused: true, declined: false });
+    graphqlAnswers.push(chargeAnswer({ __typename: "TransactionPending", reason: "waitingFor3dSecure" }));
+    expect(await stitchGateway.chargeAuthorization({ ...charge, reference: "r-4" })).toEqual({ status: "pending" });
+  });
+
+  it("the same charge sent twice is refused by Stitch, never charged twice", async () => {
+    process.env.STITCH_SAVED_CARDS = "yes";
+    graphqlAnswers.push(chargeAnswer({ __typename: "TransactionSuccess" }));
+    await stitchGateway.chargeAuthorization(charge);
+    graphqlAnswers.push(chargeAnswer({ __typename: "TransactionSuccess" }));
+    await expect(stitchGateway.chargeAuthorization(charge)).rejects.toMatchObject({ refused: true });
+  });
+
+  it("refuses to charge, and sends nothing, without a split it can make or a saved card", async () => {
+    process.env.STITCH_SAVED_CARDS = "yes";
+    for (const change of [{ charityAccountRef: null }, { feeBearer: "charity" as const }, { authorizationCode: "" }, { totalCents: 1 }]) {
+      await expect(stitchGateway.chargeAuthorization({ ...charge, ...change })).rejects.toMatchObject({ beforeSend: true });
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  it("a charge on a saved card is looked up as a transaction by our reference, with the saved card it can charge again", async () => {
+    process.env.STITCH_SAVED_CARDS = "yes";
+    graphqlAnswers.push(noPaymentRequest);
+    graphqlAnswers.push((q, v) => {
+      expect(q).toContain("transactions(filter: { externalReference: { eq: $ref } })");
+      expect(q).not.toMatch(/\bamount\s*\{/);
+      expect(v).toEqual({ ref: base.reference });
+      return transactions([
+        // A refund under the same reference is never read as the payment.
+        { __typename: "CardRefundTransaction", id: "rf-1", externalReference: base.reference, amount: { quantity: "203.45", currency: "ZAR" }, state: { __typename: "TransactionSuccess" } },
+        {
+          __typename: "CardTransaction",
+          id: "tx-1",
+          externalReference: base.reference,
+          amount: { quantity: "203.45", currency: "ZAR" },
+          state: { __typename: "TransactionSuccess", date: "2026-11-26T10:05:00Z" },
+          paymentConsentRequest: { id: "Y29uc2VudC8x", status: { __typename: "PaymentConsentGranted" } },
+          card: { network: "Visa", last4: "1111", expiryMonth: 3, expiryYear: 29 },
+          splitSettlements: [{ merchantId: base.charityAccountRef }],
+        },
+      ]);
+    });
+    expect(await stitchGateway.verifyTransaction(base.reference)).toEqual({
+      reference: base.reference,
+      status: "success",
+      amountCents: 20_345,
+      currency: "ZAR",
+      gatewayTransactionId: "tx-1",
+      paidAt: "2026-11-26T10:05:00Z",
+      authorization: { code: "Y29uc2VudC8x", reusable: true, last4: "1111", brand: "visa", expires: "03/2029" },
+      channel: "card",
+      settledTo: [base.charityAccountRef],
+    });
+  });
+
+  it("a consent that isn't granted can't be charged again; a failed charge is failed; a waiting one is pending", async () => {
+    process.env.STITCH_SAVED_CARDS = "yes";
+    const node = (state: Record<string, unknown>, consent = "PaymentConsentGranted") => ({
+      __typename: "CardTransaction", id: "tx-1", externalReference: base.reference, amount: { quantity: "1.00", currency: "ZAR" }, state,
+      paymentConsentRequest: { id: "c1", status: { __typename: consent } }, card: { network: "Mastercard", last4: "4444", expiryMonth: 12, expiryYear: 2030 },
+    });
+    graphqlAnswers.push(noPaymentRequest, () => transactions([node({ __typename: "TransactionSuccess" }, "PaymentConsentRevoked")]));
+    expect((await stitchGateway.verifyTransaction(base.reference)).authorization).toMatchObject({ code: "c1", reusable: false, expires: "12/2030" });
+    graphqlAnswers.push(noPaymentRequest, () => transactions([node({ __typename: "TransactionFailure", reason: "insufficientFunds" })]));
+    expect(await stitchGateway.verifyTransaction(base.reference)).toMatchObject({ status: "failed" });
+    graphqlAnswers.push(noPaymentRequest, () => transactions([node({ __typename: "TransactionPending", reason: "waitingFor3dSecure" })]));
+    expect(await stitchGateway.verifyTransaction(base.reference)).toMatchObject({ status: "pending", abandoned: false });
+  });
+
+  it("with saved cards off, nothing under the reference means Stitch never received it (no second lookup)", async () => {
+    graphqlAnswers.push(noPaymentRequest);
+    await expect(stitchGateway.verifyTransaction(base.reference)).rejects.toMatchObject({ notFound: true });
+    expect(calls.filter((c) => c.url === "https://api.stitch.money/graphql")).toHaveLength(1);
+    process.env.STITCH_SAVED_CARDS = "yes";
+    graphqlAnswers.push(noPaymentRequest, () => transactions([]));
+    await expect(stitchGateway.verifyTransaction(base.reference)).rejects.toMatchObject({ notFound: true });
+  });
+});
+
+describe("refunds, disputes and saved-card events", () => {
+  const now = () => String(Math.floor(Date.now() / 1000));
+  const send = (body: unknown, id = "msg_r") => {
+    const raw = JSON.stringify(body);
+    const ts = now();
+    return stitchGateway.parseWebhook(raw, new Headers({ "svix-id": id, "svix-timestamp": ts, "svix-signature": `v1,${webhookSignature(SECRET, id, ts, raw)}` }));
+  };
+  const refundEvent = (status = "SUCCESS", kind = "CARD_REFUND") => ({ type: "transaction", id: "transaction:status:success:r", data: { id: "rf-1", type: kind, status, externalReference: "typed-in-dashboard" } });
+  const byId = (node: Record<string, unknown> | null) => () => ({ json: { data: { node } } });
+
+  it("a successful refund is looked up at Stitch: the gift it refunds and Stitch's amount, never the event's words", async () => {
+    graphqlAnswers.push((q, v) => {
+      expect(q).toContain("node(id: $id)");
+      expect(q).not.toMatch(/\bamount\s*\{/);
+      expect(v).toEqual({ id: "rf-1" });
+      return byId({ __typename: "CardRefundTransaction", id: "rf-1", amount: { quantity: "50.00", currency: "ZAR" }, externalReference: "typed-in-dashboard", state: { __typename: "TransactionSuccess" }, paymentInitiationRequest: { externalReference: base.reference } })();
+    });
+    const e = await send(refundEvent());
+    expect(e).toMatchObject({ type: "refund_processed", reference: base.reference, amountCents: 5_000, currency: "ZAR" });
+    expect(calls[0].body).toContain("scope=client_refund");
+  });
+
+  it("a wallet refund, or one found through the original charge, works the same way", async () => {
+    graphqlAnswers.push(byId({ __typename: "WalletRefundTransaction", id: "rf-1", amount: { quantity: "203.45", currency: "ZAR" }, state: { __typename: "TransactionSuccess" }, paymentInitiationRequest: null, originalTransaction: { externalReference: base.reference, paymentInitiationRequest: null } }));
+    expect(await send(refundEvent("SUCCESS", "APPLE_PAY_REFUND"))).toMatchObject({ type: "refund_processed", reference: base.reference, amountCents: 20_345 });
+  });
+
+  it("a refund Stitch can't place is still a refund, held for a person; a failed refund, or a transaction that isn't a refund, changes nothing", async () => {
+    graphqlAnswers.push(byId(null));
+    expect(await send(refundEvent())).toMatchObject({ type: "refund_processed", reference: null, amountCents: null });
+    expect(await send(refundEvent("FAILURE"))).toMatchObject({ type: "other" });
+    graphqlAnswers.push(byId({ __typename: "CardTransaction", id: "rf-1", amount: { quantity: "1", currency: "ZAR" }, state: { __typename: "TransactionSuccess" } }));
+    expect(await send(refundEvent("SUCCESS", "SOMETHING_NEW"))).toMatchObject({ type: "other" });
+  });
+
+  it("if Stitch can't be reached for the lookup, the event is not taken (it will be sent again)", async () => {
+    graphqlAnswers.push(() => ({ status: 503, json: {} }));
+    await expect(send(refundEvent())).rejects.toBeInstanceOf(GatewayError);
+  });
+
+  it("a dispute opening and closing reaches the gift through Stitch's record of the disputed payment", async () => {
+    const dispute = (type: string, status: string, transactions: unknown[]) => ({ type, createdAt: "2026-11-26T10:00:00Z", data: { disputeId: "dsp_1", caseReference: "STDB100", status, transactions } });
+    const paid = byId({ __typename: "CardTransaction", id: "tx-9", amount: { quantity: "203.45", currency: "ZAR" }, externalReference: null, state: { __typename: "TransactionSuccess" }, paymentInitiationRequest: { externalReference: base.reference } });
+    graphqlAnswers.push(paid);
+    expect(await send(dispute("dispute.created", "pending", [{ id: "tx-9" }]), "msg_d1")).toMatchObject({ type: "dispute_opened", reference: base.reference, eventId: "dispute.created:msg_d1", raw: { disputeId: "dsp_1", caseReference: "STDB100" } });
+    graphqlAnswers.push(paid);
+    expect(await send(dispute("dispute.won", "won", [{ id: "tx-9" }]))).toMatchObject({ type: "dispute_resolved", reference: base.reference, detail: "won" });
+    // A case over several payments, or with no transaction id, is held for a person.
+    expect(await send(dispute("dispute.lost", "lost", [{ id: "a" }, { id: "b" }]))).toMatchObject({ type: "dispute_resolved", reference: null, detail: "lost" });
+    expect(await send(dispute("dispute.created", "pending", [{ id: null }]))).toMatchObject({ type: "dispute_opened", reference: null });
+    // Evidence events change nothing here.
+    expect(await send(dispute("dispute.evidence_received", "pending", [{ id: "tx-9" }]))).toMatchObject({ type: "other" });
+  });
+
+  it("a saved card's consent event is kept with our reference, and changes nothing by itself", async () => {
+    const e = await send({ type: "payment-consent-request", id: "payment-consent-request:status:revoked:1", data: { id: "c1", status: "REVOKED", type: "CARD", externalReference: base.reference, card: { last4: "4242" } } });
+    expect(e).toMatchObject({ type: "other", reference: base.reference, raw: { status: "REVOKED" } });
+    expect(JSON.stringify(e!.raw)).not.toContain("4242");
   });
 });

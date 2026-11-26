@@ -1,14 +1,15 @@
 import "server-only";
 import { createHmac } from "node:crypto";
+import { emailHash } from "@/lib/email-fingerprint";
 import { sameSecret } from "@/lib/secret-compare";
 import { gatewayTimeoutOverride } from "./timeout";
-import { GatewayError, type CheckoutRequest, type PaymentGateway, type VerifiedTransaction, type WebhookEvent } from "./types";
+import { GatewayError, type CardAuthorization, type ChargeRequest, type CheckoutRequest, type PaymentGateway, type VerifiedTransaction, type WebhookEvent } from "./types";
 
 /**
  * Stitch adapter (decided 18/11/2026: Givezy moves from Paystack to Stitch).
  *
  * NOT YET RUN AGAINST STITCH'S TEST SYSTEM: Stitch issues test access with Givezy's own onboarding. Written to
- * Stitch's published docs (docs.stitch.money, read 17/11/2026); points to check in the test system are marked VERIFY.
+ * Stitch's published docs (docs.stitch.money, read 17/11/2026 and in full 26/11/2026, see docs/stitch-docs-review.md); points to check in the test system are marked VERIFY.
  *
  * How a once-off gift works here (https://docs.stitch.money/payment-products/payins/card/once-off/hosted-ui and
  * .../card/split-settlements/integration):
@@ -23,11 +24,19 @@ import { GatewayError, type CheckoutRequest, type PaymentGateway, type VerifiedT
  * Splitting is a switch, STITCH_SPLITS=yes, and a payment always names a charity's Stitch merchant: Stitch needs a
  * destination, and without a split the whole amount would settle to Givezy.
  *
- * NOT BUILT YET (waiting for test access, because the docs leave points open): saving a card and charging it later
- * (monthly gifts and saved cards: where the split goes on a consent request, which reference the first charge
- * carries, the card id, switching off the extra 3DS step), refunds and disputes arriving as events, a charity's
- * deposits (Stitch pays charities out the next day; there is no documented report), registering a charity from our
- * side (Stitch sets charities up; the merchant API is documented only for in-person payments).
+ * Saved cards and monthly gifts (built 26/11/2026 from the docs, own switch STITCH_SAVED_CARDS=yes, off by default):
+ * the first gift is a card "consent" on Stitch's page (`paymentConsentRequestCreate`) whose first charge carries our
+ * reference and the split; later gifts are charged by our server (`initiateTransaction` with the consent id as the
+ * token, `source: merchant`, the consent id as the agreement reference, the split on every charge). Payments made
+ * that way are looked up as transactions by our reference.
+ *
+ * Refunds and disputes arrive as events and are looked up at Stitch before they count (the refund or the disputed
+ * payment, by Stitch's own id, gives our reference and the amount). Refunds are made in Stitch's dashboard; there is
+ * no refund button here.
+ *
+ * NOT BUILT (nothing in the docs to build it on): a charity's deposits (no payout report per charity is documented),
+ * registering a charity from our side (Stitch sets charities up; the merchant API is documented only for in-person
+ * payments).
  */
 
 const TOKEN_URL = "https://secure.stitch.money/connect/token";
@@ -98,13 +107,17 @@ const NOT_ALLOWED = /unauthori[sz]ed|unauthenticated|forbidden|scope|token|permi
 const OUR_MISTAKE_CODES = new Set(["GRAPHQL_VALIDATION_FAILED", "GRAPHQL_PARSE_FAILED", "INTERNAL_SERVER_ERROR", "UNAUTHENTICATED", "FORBIDDEN"]);
 const OUR_MISTAKE_WORDS = /cannot query field|unknown (argument|type|field)|variable "?\$?\w+"? (of type|expected|got|is)|syntax error|must have a selection|is not defined by type/i;
 
-async function graphql<T>(what: string, scopes: string[], query: string, variables: Record<string, unknown>): Promise<T> {
+/**
+ * One GraphQL call. `idempotencyKey`: Stitch replays the first answer for a byte-identical retry within 24 hours
+ * (docs.stitch.money/idempotency); only for calls whose body never changes between tries.
+ */
+async function graphql<T>(what: string, scopes: string[], query: string, variables: Record<string, unknown>, idempotencyKey?: string): Promise<T> {
   const token = await clientToken(scopes);
   let res: Response;
   try {
     res = await fetch(API, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}) },
       body: JSON.stringify({ query, variables }),
       cache: "no-store",
       signal: AbortSignal.timeout(gatewayTimeoutOverride() ?? TIMEOUT_MS),
@@ -145,7 +158,50 @@ export function quantityToCents(v: unknown): number | null {
   return Number.isSafeInteger(cents) ? cents : null;
 }
 
+
 type Money = { quantity?: unknown; currency?: string } | null | undefined;
+
+/**
+ * Who the donor is, for Stitch's fraud checks: Stitch asks for a `payerId` on every request, "any internal identifier
+ * that always uniquely identifies users". The email is the only identity a gift has (guests included), so the id is the
+ * address's keyed fingerprint (the one way Givezy turns an address into a value, ../email-fingerprint): the same donor
+ * always has the same id, and nobody without our key can tell whose it is. Without the key nothing is sent.
+ */
+export function payerIdFor(email: string): string {
+  let hash: string;
+  try {
+    hash = emailHash(email);
+  } catch (e) {
+    throw new GatewayError(`The donor's id for the payment provider could not be made: ${e instanceof Error ? e.message : String(e)}`, { beforeSend: true });
+  }
+  return `donor-${hash.slice(0, 32)}`;
+}
+
+/** Saved cards and monthly gifts on Stitch: off until STITCH_SAVED_CARDS=yes (needs card consents switched on by Stitch). */
+function savedCardsOn(): boolean {
+  return process.env.STITCH_SAVED_CARDS === "yes";
+}
+
+/**
+ * The checks every payment shares before anything is sent: Stitch only takes a gift as a split to the charity, each
+ * side pays its own fee, and the two lines make up the whole payment. Each refusal is `beforeSend`: nothing was charged.
+ */
+function checkSplit(req: Pick<CheckoutRequest, "charityAccountRef" | "feeBearer" | "lines" | "totalCents">): void {
+  const stop = (message: string) => new GatewayError(message, { beforeSend: true });
+  if (!stitchGateway.splitsPayments) throw stop("Stitch takes payments only as a split to a charity's account, and splitting is not switched on, so nothing was started.");
+  if (!req.charityAccountRef) throw stop("This charity has no Stitch account, so the payment was not started (it would not reach the charity).");
+  // Stitch settles each side net of its own fee: each side pays it on its own share.
+  if (req.feeBearer !== "each") throw stop("Stitch takes each side's charge on its own share, so a split payment can only start when the gateway charge is paid by each (the platform setting).");
+  if (!Number.isSafeInteger(req.lines.charityCents) || req.lines.charityCents <= 0) throw stop("The charity's share must be a whole number of cents.");
+  if (!Number.isSafeInteger(req.lines.contributionCents) || req.lines.contributionCents < 0) throw stop("The contribution must be a whole number of cents.");
+  // The two lines must make up the whole payment: anything left over would sit with Givezy.
+  if (req.lines.charityCents + req.lines.contributionCents !== req.totalCents) throw stop("The charity's line and the contribution do not add up to the total, so the payment was not started.");
+}
+
+/** The split Stitch takes: the charity's line to its own merchant, the rest stays with Givezy. Never a top-level merchant. */
+function splitFor(req: Pick<CheckoutRequest, "charityAccountRef" | "lines">) {
+  return [{ merchantId: req.charityAccountRef, amount: { quantity: centsToQuantity(req.lines.charityCents), currency: "ZAR" } }];
+}
 
 const CREATE_PAYMENT = `
 mutation CreatePaymentRequest($amount: MoneyInput!, $externalReference: String!, $payerReference: String!, $beneficiaryReference: String!, $expireAt: Date, $splitSettlements: [SplitSettlementInput!], $paymentMethods: PaymentMethodsInput, $payerInformation: PayerInformationInput) {
@@ -157,11 +213,29 @@ mutation CreatePaymentRequest($amount: MoneyInput!, $externalReference: String!,
 }`;
 
 /**
+ * A card consent: Stitch's page saves the card and takes the first gift (`initialCharge`) in one go. The first charge
+ * carries our reference, so it can be looked up as a transaction; the split applies to that first charge only
+ * (Stitch's docs), and every later charge sends its own.
+ */
+const CREATE_CONSENT = `
+mutation CreateConsent($input: CreatePaymentConsentRequestInput!) {
+  paymentConsentRequestCreate(input: $input) { id url }
+}`;
+
+/** A charge we start on a saved card (a monthly gift, or a once-off gift on a saved card). */
+const CHARGE_SAVED_CARD = `
+mutation ChargeSavedCard($input: TransactionInitiateInput!) {
+  initiateTransaction(input: $input) {
+    __typename id
+    state { __typename ... on TransactionFailure { reason reasonDescription } ... on TransactionPending { reason } }
+  }
+}`;
+
+/**
  * Look up a payment request by our own reference. `amount` is Stitch's `Money` scalar: it is asked for as a whole and
  * comes back as `{ quantity, currency }` (selecting sub-fields on it is refused before the query runs; fixed 26/11/2026,
- * see docs/stitch-docs-review.md). VERIFY in the test system: the docs list the filter (an
- * `externalReference` string filter) but show no worked example for payment requests, so this is the documented
- * filter in the documented connection shape.
+ * see docs/stitch-docs-review.md). `splitSettlements` names the charity merchant the payment was split to.
+ * VERIFY in the test system: the docs list the `externalReference` filter but show no worked example for it.
  */
 const FIND_PAYMENT = `
 query FindPayment($ref: String!) {
@@ -169,9 +243,10 @@ query FindPayment($ref: String!) {
     paymentInitiationRequests(filter: { externalReference: { eq: $ref } }) {
       edges { node {
         id externalReference
+        splitSettlements { merchantId }
         state {
           __typename
-          ... on PaymentInitiationRequestCompleted { date amount payer { ... on PaymentInitiationCardPayer { network last4 } } }
+          ... on PaymentInitiationRequestCompleted { date amount payer { __typename ... on PaymentInitiationCardPayer { network last4 } ... on PaymentInitiationWalletPayer { network last4 } } }
           ... on PaymentInitiationRequestCancelled { date reason }
           ... on PaymentInitiationRequestExpired { date }
         }
@@ -180,11 +255,98 @@ query FindPayment($ref: String!) {
   }
 }`;
 
+/**
+ * Look up a charge on a saved card (and the first charge of a card consent) by our own reference.
+ * VERIFY in the test system: the scope this query needs (the docs don't say; `transaction_initiate` is assumed).
+ */
+const FIND_TRANSACTION = `
+query FindTransaction($ref: String!) {
+  client {
+    transactions(filter: { externalReference: { eq: $ref } }) {
+      edges { node {
+        __typename id externalReference amount
+        state { __typename ... on TransactionSuccess { date } ... on TransactionFailure { reason } ... on TransactionPending { reason } }
+        paymentConsentRequest { id status { __typename } }
+        ... on CardTransaction { card { network last4 expiryMonth expiryYear } splitSettlements { merchantId } }
+      } }
+    }
+  }
+}`;
+
+/**
+ * A transaction by Stitch's own id: a refund (to find the gift it refunds and how much) or a disputed payment (to
+ * find the gift). VERIFY in the test system: the scope a `node` lookup of a transaction needs.
+ */
+const FIND_BY_ID = `
+query FindTransactionById($id: ID!) {
+  node(id: $id) {
+    __typename
+    ... on PaymentTransaction {
+      id amount externalReference
+      state { __typename }
+      paymentInitiationRequest { externalReference }
+      originalTransaction { externalReference paymentInitiationRequest { externalReference } }
+    }
+  }
+}`;
+
+/** Scopes: payment requests; charges on saved cards and transaction lookups; consents; refunds. */
+const SCOPE_PAYMENT_REQUEST = ["client_paymentrequest"];
+const SCOPE_TRANSACTION = ["transaction_initiate"];
+const SCOPE_CONSENT = ["client_recurringpaymentconsentrequest"];
+const SCOPE_REFUND = ["client_refund"];
+
 type PaymentNode = {
   id?: string;
   externalReference?: string | null;
+  splitSettlements?: { merchantId?: string | null }[] | null;
   state?: { __typename?: string; date?: string; amount?: Money; payer?: { network?: string | null; last4?: string | null } | null } | null;
 };
+
+type TransactionNode = {
+  __typename?: string;
+  id?: string;
+  externalReference?: string | null;
+  amount?: Money;
+  state?: { __typename?: string; date?: string; reason?: string; reasonDescription?: string | null } | null;
+  paymentConsentRequest?: { id?: string; status?: { __typename?: string } | null } | null;
+  card?: { network?: string | null; last4?: string | null; expiryMonth?: number | null; expiryYear?: number | null } | null;
+  splitSettlements?: { merchantId?: string | null }[] | null;
+};
+
+type ByIdNode = {
+  __typename?: string;
+  id?: string;
+  amount?: Money;
+  externalReference?: string | null;
+  state?: { __typename?: string } | null;
+  paymentInitiationRequest?: { externalReference?: string | null } | null;
+  originalTransaction?: { externalReference?: string | null; paymentInitiationRequest?: { externalReference?: string | null } | null } | null;
+};
+
+/** Transaction kinds that are payments, as GraphQL types and as the `transaction` event's `data.type`. */
+const PAYMENT_TYPENAMES = new Set(["CardTransaction", "ApplePayTransaction", "GooglePayTransaction", "SamsungPayTransaction"]);
+const PAYMENT_TRANSACTION_KINDS = new Set(["CARD", "APPLE_PAY", "GOOGLE_PAY", "SAMSUNG_PAY"]);
+/** Refunds, as GraphQL types. */
+const REFUND_TYPENAMES = new Set(["CardRefundTransaction", "WalletRefundTransaction"]);
+
+/**
+ * Why a charge failed, when the reason is the card itself: declined by the bank, or a card (or saved card) that can no
+ * longer be charged. Any other failure reason (a set-up problem, an outage) is never told to the donor as a decline.
+ */
+const DECLINE_REASONS = new Set([
+  "insufficientFunds",
+  "exceedsCardWithdrawalLimit",
+  "authorizationFailed",
+  "invalidCardError",
+  "restrictedCard",
+  "restrictedCountryCode",
+  "issuerValidationFailed",
+  "issuerVerificationFailed",
+  "secure3dDeclined",
+  "secure3dNotCompleted",
+  "invalidConsentRequest",
+]);
 
 /** The payment page's address with our return address added (it must be on Stitch's allowed list). */
 function hostedUrl(url: string, returnUrl: string): string {
@@ -202,8 +364,99 @@ function hostedUrl(url: string, returnUrl: string): string {
   return u.toString();
 }
 
-/** The `transaction` event kinds that are payments (Stitch's docs, webhooks/types). Everything else, refunds included, is not. */
-const PAYMENT_TRANSACTION_KINDS = new Set(["CARD", "APPLE_PAY", "GOOGLE_PAY", "SAMSUNG_PAY"]);
+/** The merchant ids a payment says it was split to (the charity's account, if all went as asked). */
+function merchantsOf(splits: { merchantId?: string | null }[] | null | undefined): string[] {
+  return (splits ?? []).map((s) => s.merchantId).filter((m): m is string => typeof m === "string" && m.length > 0);
+}
+
+/** A saved card's details for our records: the consent id is what we charge later. */
+function authorizationOf(node: TransactionNode): CardAuthorization | null {
+  const consent = node.paymentConsentRequest;
+  if (!consent?.id) return null;
+  const card = node.card ?? null;
+  const month = card?.expiryMonth;
+  const year = card?.expiryYear;
+  const fullYear = typeof year === "number" ? (year < 100 ? 2000 + year : year) : null;
+  return {
+    code: consent.id,
+    // Only a granted consent can be charged again (Stitch refuses a charge on any other).
+    reusable: consent.status?.__typename === "PaymentConsentGranted",
+    last4: card?.last4 ?? null,
+    brand: card?.network ? card.network.toLowerCase() : null,
+    expires: typeof month === "number" && fullYear ? `${String(month).padStart(2, "0")}/${fullYear}` : null,
+  };
+}
+
+/** A hosted payment request, as a verified transaction. */
+function fromPaymentRequest(reference: string, node: PaymentNode): VerifiedTransaction {
+  const state = node.state?.__typename ?? "";
+  const settledTo = merchantsOf(node.splitSettlements);
+  if (state === "PaymentInitiationRequestCompleted") {
+    const cents = quantityToCents(node.state?.amount?.quantity);
+    if (cents === null) throw new GatewayError("Stitch gave a payment amount we can't read.");
+    return {
+      reference,
+      status: "success",
+      amountCents: cents,
+      currency: node.state?.amount?.currency === "ZAR" ? "ZAR" : String(node.state?.amount?.currency ?? ""),
+      gatewayTransactionId: String(node.id ?? ""),
+      paidAt: node.state?.date ?? null,
+      authorization: null,
+      channel: "card",
+      settledTo,
+    };
+  }
+  // Cancelled, expired, or "completed by hand" (Stitch's words: "No payment exists"): not paid, and never a declined
+  // card. Pending and "abandoned", so only the daily check closes it, and it is never counted against the donor. A donor
+  // who just closes the page leaves the request pending (Stitch's docs: it is cancelled only if we cancel it or Stitch
+  // switches on cancel-on-close), which is why every request has an expiry. A card turned down on Stitch's page also
+  // leaves it open for another try.
+  const left = state === "PaymentInitiationRequestCancelled" || state === "PaymentInitiationRequestExpired" || state === "PaymentInitiationRequestManuallyCompleted";
+  return { reference, status: "pending", amountCents: 0, currency: "ZAR", gatewayTransactionId: String(node.id ?? ""), paidAt: null, authorization: null, channel: null, abandoned: left, settledTo };
+}
+
+/** A charge on a saved card (or a consent's first charge), as a verified transaction. */
+function fromTransaction(reference: string, node: TransactionNode): VerifiedTransaction {
+  const state = node.state?.__typename ?? "";
+  const id = String(node.id ?? "");
+  const authorization = authorizationOf(node);
+  const settledTo = merchantsOf(node.splitSettlements);
+  if (state === "TransactionSuccess") {
+    const cents = quantityToCents(node.amount?.quantity);
+    if (cents === null) throw new GatewayError("Stitch gave a payment amount we can't read.");
+    return {
+      reference,
+      status: "success",
+      amountCents: cents,
+      currency: node.amount?.currency === "ZAR" ? "ZAR" : String(node.amount?.currency ?? ""),
+      gatewayTransactionId: id,
+      paidAt: node.state?.date ?? null,
+      authorization,
+      channel: "card",
+      settledTo,
+    };
+  }
+  if (state === "TransactionFailure") {
+    return { reference, status: "failed", amountCents: 0, currency: "ZAR", gatewayTransactionId: id, paidAt: null, authorization, channel: null, settledTo };
+  }
+  // Pending (for example waiting for a 3DS step), or cancelled (only a preauthorisation can be): not paid, not declined.
+  return { reference, status: "pending", amountCents: 0, currency: "ZAR", gatewayTransactionId: id, paidAt: null, authorization, channel: null, abandoned: state === "TransactionCancelled", settledTo };
+}
+
+/**
+ * Our reference for the payment a refund or a dispute is about, looked up at Stitch by Stitch's own id. For a refund the
+ * gift is the original payment; for a dispute the transaction is the payment itself. Null when Stitch has no such
+ * transaction or doesn't say. An outage is thrown, so the event is sent again.
+ */
+async function lookUpById(id: string, scopes: string[]): Promise<ByIdNode | null> {
+  try {
+    const data = await graphql<{ node?: ByIdNode | null }>("transaction lookup", scopes, FIND_BY_ID, { id });
+    return data.node ?? null;
+  } catch (e) {
+    if (e instanceof GatewayError && !e.unreachable && e.refused) return null;
+    throw e;
+  }
+}
 
 /** Stitch's webhook signature (Svix): HMAC-SHA256 of "id.timestamp.body" with the secret's bytes, base64, "v1,<sig>". */
 export function webhookSignature(secret: string, id: string, timestamp: string, rawBody: string): string {
@@ -211,45 +464,64 @@ export function webhookSignature(secret: string, id: string, timestamp: string, 
   return createHmac("sha256", key).update(`${id}.${timestamp}.${rawBody}`).digest("base64");
 }
 
+/** Dispute events (a Stitch "Technical Preview"): the opening event and the four closing ones. */
+const DISPUTE_CLOSED = new Set(["dispute.won", "dispute.lost", "dispute.auto_accepted", "dispute.partially_accepted"]);
+
 export const stitchGateway: PaymentGateway = {
   name: "stitch",
   /** Off until STITCH_SPLITS=yes, set once splitting is switched on by Stitch and confirmed in the test system. */
   get splitsPayments() {
     return process.env.STITCH_SPLITS === "yes";
   },
-  /** Not built yet (see the note at the top): the website and the app say so before anything is recorded. */
-  supportsSavedCards: false,
+  /** Off until STITCH_SAVED_CARDS=yes: the website and the app say so before anything is recorded. */
+  get supportsSavedCards() {
+    return savedCardsOn();
+  },
+  /** Stitch names the merchant a payment was split to, so a gift is only paid when that is the charity's own account. */
+  reportsSplit: true,
 
   async createCheckout(req: CheckoutRequest) {
-    if (req.saveCard) {
-      // Saving a card on Stitch is a different flow (a consent request), not built yet: see the note at the top.
-      throw new GatewayError("Saving a card is not set up on this payment provider yet, so nothing was started.");
+    if (req.saveCard && !savedCardsOn()) {
+      throw new GatewayError("Saving a card is not set up on this payment provider yet, so nothing was started.", { beforeSend: true });
     }
-    if (!stitchGateway.splitsPayments) throw new GatewayError("Stitch takes payments only as a split to a charity's account, and splitting is not switched on, so nothing was started.");
-    if (!req.charityAccountRef) throw new GatewayError("This charity has no Stitch account, so the payment was not started (it would not reach the charity).");
-    // Stitch settles each side net of its own fee: each side pays it on its own share.
-    if (req.feeBearer !== "each") throw new GatewayError("Stitch takes each side's charge on its own share, so a split payment can only start when the gateway charge is paid by each (the platform setting).");
-    if (!Number.isSafeInteger(req.lines.charityCents) || req.lines.charityCents <= 0) throw new GatewayError("The charity's share must be a whole number of cents.");
-    if (!Number.isSafeInteger(req.lines.contributionCents) || req.lines.contributionCents < 0) throw new GatewayError("The contribution must be a whole number of cents.");
-    // The two lines must make up the whole payment: anything left over would sit with Givezy.
-    if (req.lines.charityCents + req.lines.contributionCents !== req.totalCents) throw new GatewayError("The charity's line and the contribution do not add up to the total, so the payment was not started.");
+    checkSplit(req);
+    const expireAt = new Date(Date.now() + PAYMENT_PAGE_MINUTES * 60_000).toISOString();
+    const payerInformation = { payerId: payerIdFor(req.email), email: req.email };
+    const amount = { quantity: centsToQuantity(req.totalCents), currency: "ZAR" };
+
+    if (req.saveCard) {
+      // Card only: a consent is a saved card. The first gift is taken on Stitch's page while the donor is there.
+      const data = await graphql<{ paymentConsentRequestCreate?: { id?: string; url?: string } | null }>("card consent", SCOPE_CONSENT, CREATE_CONSENT, {
+        input: {
+          nonce: req.reference,
+          externalReference: req.reference,
+          payerInformation,
+          expireAt,
+          splitSettlements: splitFor(req),
+          paymentMethods: { card: { enabled: true, initialCharge: { amount, nonce: req.reference, externalReference: req.reference } } },
+        },
+      });
+      const made = data.paymentConsentRequestCreate;
+      if (!made?.url) throw new GatewayError("Stitch gave no payment page, so nothing was started.");
+      return { redirectUrl: hostedUrl(made.url, req.returnUrl) };
+    }
 
     const data = await graphql<{ clientPaymentInitiationRequestCreate: { paymentInitiationRequest: { id: string; url: string } } }>(
       "payment request",
-      ["client_paymentrequest"],
+      SCOPE_PAYMENT_REQUEST,
       CREATE_PAYMENT,
       {
-        amount: { quantity: centsToQuantity(req.totalCents), currency: "ZAR" },
+        amount,
         externalReference: req.reference,
         // Shown on the donor's statement and Stitch's records: at most 12 and 20 characters.
         payerReference: "Givezy",
         beneficiaryReference: `Gift ${req.reference.replace(/-/g, "").slice(0, 8)}`,
-        expireAt: new Date(Date.now() + PAYMENT_PAGE_MINUTES * 60_000).toISOString(),
+        expireAt,
         // Single destination, ZAR only. The destination goes inside the split, never as a top-level merchant.
-        splitSettlements: [{ merchantId: req.charityAccountRef, amount: { quantity: centsToQuantity(req.lines.charityCents), currency: "ZAR" } }],
+        splitSettlements: splitFor(req),
         // Cards and the phone wallets on Stitch's page. Pay by Bank is switched off (it needs a bank beneficiary).
         paymentMethods: { card: { enabled: true }, applePay: { enabled: true }, googlePay: { enabled: true }, eft: { enabled: false } },
-        payerInformation: { email: req.email },
+        payerInformation,
       },
     );
     const made = data.clientPaymentInitiationRequestCreate?.paymentInitiationRequest;
@@ -257,46 +529,81 @@ export const stitchGateway: PaymentGateway = {
     return { redirectUrl: hostedUrl(made.url, req.returnUrl) };
   },
 
-  async chargeAuthorization() {
-    // Charging a saved card later: not built yet (see the note at the top).
-    throw new GatewayError("Charging a saved card is not set up on this payment provider yet, so nothing was charged.", { beforeSend: true });
+  async chargeAuthorization(req: ChargeRequest) {
+    if (!savedCardsOn()) {
+      throw new GatewayError("Charging a saved card is not set up on this payment provider yet, so nothing was charged.", { beforeSend: true });
+    }
+    checkSplit(req);
+    if (!req.authorizationCode) throw new GatewayError("There is no saved card to charge, so nothing was charged.", { beforeSend: true });
+    const input = {
+      amount: { quantity: centsToQuantity(req.totalCents), currency: "ZAR" },
+      // Our reference is both the nonce (Stitch refuses a second charge with it) and the reference we look it up by.
+      nonce: req.reference,
+      externalReference: req.reference,
+      token: req.authorizationCode,
+      payerInformation: { payerId: payerIdFor(req.email), email: req.email },
+      splitSettlements: splitFor(req),
+      paymentMethods: {
+        card: {
+          recurringPayment: {
+            // We start this charge: the donor is not there. The consent id names the series (the same for every charge).
+            source: "merchant",
+            agreement: { reference: req.authorizationCode, variability: "variable", scenario: req.monthly === false ? "Unscheduled" : "Subscription" },
+          },
+        },
+      },
+    };
+    // The same body every try, so a retry of the same charge gets Stitch's first answer back, never a second charge.
+    const data = await graphql<{ initiateTransaction?: { state?: { __typename?: string; reason?: string; reasonDescription?: string | null } | null } | null }>(
+      "saved card charge",
+      SCOPE_TRANSACTION,
+      CHARGE_SAVED_CARD,
+      { input },
+      `charge-${req.reference}`,
+    );
+    const state = data.initiateTransaction?.state;
+    if (state?.__typename === "TransactionSuccess") return { status: "success" as const };
+    if (state?.__typename === "TransactionFailure") {
+      // The card itself: a decline. Anything else Stitch turned down is not the donor's card.
+      if (DECLINE_REASONS.has(String(state.reason ?? ""))) return { status: "failed" as const };
+      const said = [state.reason, state.reasonDescription].filter(Boolean).join(": ") || "a failure";
+      throw new GatewayError(`Stitch turned the charge down: ${said}`, { refused: true, said });
+    }
+    // Pending (a 3DS step the donor isn't there to do, or Stitch still waiting on the bank): the payment check settles it.
+    return { status: "pending" as const };
   },
 
   async verifyTransaction(reference): Promise<VerifiedTransaction> {
-    const data = await graphql<{ client?: { paymentInitiationRequests?: { edges?: { node?: PaymentNode }[] } } }>(
+    const found = await graphql<{ client?: { paymentInitiationRequests?: { edges?: { node?: PaymentNode }[] } } }>(
       "payment lookup",
-      ["client_paymentrequest"],
+      SCOPE_PAYMENT_REQUEST,
       FIND_PAYMENT,
       { ref: reference },
     );
-    const nodes = (data.client?.paymentInitiationRequests?.edges ?? []).map((e) => e.node).filter((n): n is PaymentNode => Boolean(n));
-    // Stitch has no payment request under this reference: it never received it.
-    if (nodes.length === 0) throw new GatewayError("Stitch has no record of this payment.", { notFound: true });
-    // The answer must be about the payment we asked about (the filter is an equality, but never assume).
-    const mine = nodes.filter((n) => n.externalReference === reference);
-    if (mine.length !== 1) throw new GatewayError(mine.length === 0 ? "Stitch answered about a different payment." : "Stitch holds more than one payment under this reference.");
-    const node = mine[0];
-    const state = node.state?.__typename ?? "";
-    if (state === "PaymentInitiationRequestCompleted") {
-      const cents = quantityToCents(node.state?.amount?.quantity);
-      if (cents === null) throw new GatewayError("Stitch gave a payment amount we can't read.");
-      return {
-        reference,
-        status: "success",
-        amountCents: cents,
-        currency: node.state?.amount?.currency === "ZAR" ? "ZAR" : String(node.state?.amount?.currency ?? ""),
-        gatewayTransactionId: String(node.id ?? ""),
-        paidAt: node.state?.date ?? null,
-        authorization: null,
-        channel: "card",
-      };
+    const requests = (found.client?.paymentInitiationRequests?.edges ?? []).map((e) => e.node).filter((n): n is PaymentNode => Boolean(n));
+    if (requests.length > 0) {
+      // The answer must be about the payment we asked about (the filter is an equality, but never assume).
+      const mine = requests.filter((n) => n.externalReference === reference);
+      if (mine.length !== 1) throw new GatewayError(mine.length === 0 ? "Stitch answered about a different payment." : "Stitch holds more than one payment under this reference.");
+      return fromPaymentRequest(reference, mine[0]);
     }
-    // A cancelled request, or one that ran out of time, is not a declined card: pending, and "abandoned", so only the
-    // daily check closes it (and it is never counted against the donor). A donor who just closes the page leaves the
-    // request pending (Stitch's docs: it is cancelled only if we cancel it or Stitch switches on cancel-on-close),
-    // which is why every request has an expiry. A card turned down on Stitch's page also leaves it open for another try.
-    const left = state === "PaymentInitiationRequestCancelled" || state === "PaymentInitiationRequestExpired";
-    return { reference, status: "pending", amountCents: 0, currency: "ZAR", gatewayTransactionId: String(node.id ?? ""), paidAt: null, authorization: null, channel: null, abandoned: left };
+    // Not a payment page: a charge on a saved card, or a consent's first charge, carries our reference as a transaction.
+    // Only looked for when saved cards are on (nothing else makes such a charge).
+    if (!savedCardsOn()) throw new GatewayError("Stitch has no record of this payment.", { notFound: true });
+    const tx = await graphql<{ client?: { transactions?: { edges?: { node?: TransactionNode | null }[] | null } } }>(
+      "charge lookup",
+      SCOPE_TRANSACTION,
+      FIND_TRANSACTION,
+      { ref: reference },
+    );
+    const charges = (tx.client?.transactions?.edges ?? [])
+      .map((e) => e.node)
+      .filter((n): n is TransactionNode => Boolean(n) && PAYMENT_TYPENAMES.has(String(n?.__typename ?? "")));
+    // Stitch has nothing under this reference: it never received it.
+    if (charges.length === 0) throw new GatewayError("Stitch has no record of this payment.", { notFound: true });
+    const mine = charges.filter((n) => n.externalReference === reference);
+    if (mine.length !== 1) throw new GatewayError(mine.length === 0 ? "Stitch answered about a different payment." : "Stitch holds more than one payment under this reference.");
+    return fromTransaction(reference, mine[0]);
   },
 
   async parseWebhook(rawBody, headers): Promise<WebhookEvent | null> {
@@ -333,34 +640,76 @@ export const stitchGateway: PaymentGateway = {
     const paymentNode = (body.data as { client?: { paymentInitiationRequests?: { node?: PaymentNode } } } | undefined)?.client?.paymentInitiationRequests?.node;
     const type = String(body.type ?? (paymentNode && typeof paymentNode === "object" ? "payment" : ""));
     // The message's own id (stable across Stitch's retries, different for every message): the body's id may be the
-    // payment's own, shared by a first "pending" event and the later "completed" one, which would then be dropped as a repeat.
+    // payment's own, shared by a first "pending" event and the later "completed" one, which would then be dropped as a
+    // repeat. Dispute events have no id of their own at all.
     const eventId = `${type}:${id}`;
     let reference: string | null = null;
     let kind: WebhookEvent["type"] = "other";
+    let amountCents: number | null = null;
+    let currency: string | null = null;
+    let detail: string | null = null;
+    const extra: Record<string, string | null> = {};
+
     if (type === "payment") {
-      // data.client.paymentInitiationRequests.node: a completed payment request is the only thing that counts. A
-      // cancelled or expired one is left to the daily check (the payment check would only say "pending" again).
+      // A completed payment request is the only thing that counts. A cancelled or expired one is left to the daily check.
       reference = typeof paymentNode?.externalReference === "string" ? paymentNode.externalReference : null;
       if (paymentNode?.state?.__typename === "PaymentInitiationRequestCompleted") kind = "payment_succeeded";
     } else if (type === "transaction") {
-      // A successful card or wallet payment that carries our reference. Refunds come on this same event with
-      // `status: "SUCCESS"` (`data.type` "CARD_REFUND" and the like), so only the payment kinds count, and a
-      // transaction that doesn't say its kind is not trusted. Refunds stay "other" (left for a person) until they
-      // are built and checked in Stitch's test system. A failed payment is left alone: on Stitch's page a donor may
-      // try another card, so a failure is not the end of the payment. VERIFY in the test system.
-      const d = body.data as { type?: string; status?: string; externalReference?: string | null } | undefined;
+      const d = body.data as { id?: string; type?: string; status?: string; externalReference?: string | null } | undefined;
+      const kindSaid = String(d?.type ?? "");
+      if (PAYMENT_TRANSACTION_KINDS.has(kindSaid)) {
+        // A successful card or wallet payment that carries our reference (a saved-card charge, or a consent's first
+        // charge). A failed one is left alone: on Stitch's page a donor may try another card, and a saved-card charge is
+        // settled by our own payment check. A transaction that doesn't say its kind is never trusted as a payment.
+        reference = typeof d?.externalReference === "string" ? d.externalReference : null;
+        if (d?.status === "SUCCESS" && reference) kind = "payment_succeeded";
+      } else if (d?.status === "SUCCESS" && typeof d.id === "string" && d.id) {
+        // Possibly a refund (card refunds come as "CARD_REFUND"; Stitch doesn't name the wallet one). Never taken on the
+        // event's word: the transaction is looked up at Stitch, and only a successful refund counts, with Stitch's amount
+        // and the reference of the gift it refunds (the refund's own reference is whatever was typed when it was made).
+        const found = await lookUpById(d.id, SCOPE_REFUND);
+        if (found && REFUND_TYPENAMES.has(String(found.__typename ?? "")) && found.state?.__typename === "TransactionSuccess") {
+          kind = "refund_processed";
+          reference = found.paymentInitiationRequest?.externalReference ?? found.originalTransaction?.paymentInitiationRequest?.externalReference ?? found.originalTransaction?.externalReference ?? null;
+          amountCents = quantityToCents(found.amount?.quantity);
+          currency = typeof found.amount?.currency === "string" ? found.amount.currency : null;
+        } else if (!found && /REFUND/.test(kindSaid)) {
+          // Stitch says it's a refund but the lookup found nothing: still a refund, held for a person (no reference).
+          kind = "refund_processed";
+        }
+      }
+    } else if (type === "payment-consent-request") {
+      // A saved card's consent changed (granted, revoked, paused…). The money comes on the `transaction` event; a
+      // revoked card is found at its next charge. Kept for the record with our reference.
+      const d = body.data as { externalReference?: string | null; status?: string } | undefined;
       reference = typeof d?.externalReference === "string" ? d.externalReference : null;
-      if (PAYMENT_TRANSACTION_KINDS.has(String(d?.type ?? "")) && d?.status === "SUCCESS" && reference) kind = "payment_succeeded";
+      extra.status = typeof d?.status === "string" ? d.status : null;
+    } else if (type === "dispute.created" || DISPUTE_CLOSED.has(type)) {
+      // A chargeback (Stitch "Technical Preview"). The disputed payment is looked up at Stitch by its own id to find our
+      // reference; a case covering several payments, or one Stitch can't place, is held for a person (no reference).
+      const d = body.data as { disputeId?: string; caseReference?: string; status?: string; transactions?: { id?: string | null }[] } | undefined;
+      kind = type === "dispute.created" ? "dispute_opened" : "dispute_resolved";
+      detail = type === "dispute.created" ? null : (d?.status ?? type.replace("dispute.", ""));
+      extra.disputeId = typeof d?.disputeId === "string" ? d.disputeId : null;
+      extra.caseReference = typeof d?.caseReference === "string" ? d.caseReference : null;
+      const txs = Array.isArray(d?.transactions) ? d.transactions : [];
+      const only = txs.length === 1 && typeof txs[0]?.id === "string" ? txs[0].id : null;
+      if (only) {
+        const found = await lookUpById(only, SCOPE_TRANSACTION);
+        if (found && PAYMENT_TYPENAMES.has(String(found.__typename ?? ""))) {
+          reference = found.paymentInitiationRequest?.externalReference ?? found.externalReference ?? null;
+        }
+      }
     }
     return {
       eventId,
       type: kind,
       reference,
-      amountCents: null,
-      currency: null,
-      detail: null,
+      amountCents,
+      currency,
+      detail,
       // What we keep of the event: never the whole body (a transaction carries the card's details).
-      raw: { type, id, reference },
+      raw: { type, id, reference, ...extra },
     };
   },
 
