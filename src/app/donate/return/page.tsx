@@ -166,7 +166,7 @@ export default async function DonateReturnPage({ searchParams }: PageProps<"/don
         ) : null}
         {/* The charity's own thank-you paragraph, under its own label: the same one the confirmation email and the app carry. */}
         {charityNote ? (
-          <div className="mb-5 rounded-control border-2 border-border border-l-4 border-l-honey p-4">
+          <div className="mb-5 rounded-control border-2 border-honey p-4">
             <p className="text-sm font-semibold text-muted" dir="auto">{noteHeading(charity.name_en)}</p>
             <p className="mt-1 whitespace-pre-line text-navy [overflow-wrap:anywhere]" dir="auto">{charityNote}</p>
           </div>

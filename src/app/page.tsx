@@ -53,20 +53,12 @@ function origin(): string {
 const appName = platformConfig.appName;
 const charity = DEMO_CHARITY.name_en;
 
-// Headings: regular-weight Bricolage with one phrase in its extra-bold and a second colour. The `!` beats the
+// Section headings: one weight and one colour (27/11/2026: no emphasised phrase; only the hero and the close have a second colour). The `!` beats the
 // site's global heading rule (colour, weight, spacing), which is not inside a layer.
 const sizeH1 = "text-[clamp(2.75rem,5.2vw,4.75rem)] leading-[1.04]";
 const sizeH2 = "text-[clamp(2.25rem,4.2vw,3.75rem)] leading-[1.08]";
 function H({ as: Tag = "h2", size, dark = false, className = "", children }: { as?: "h1" | "h2"; size: "h1" | "h2"; dark?: boolean; className?: string; children: React.ReactNode }) {
   return <Tag className={`font-display ${size === "h1" ? sizeH1 : sizeH2} font-bold! tracking-[-0.03em]! text-balance ${dark ? "text-white!" : "text-indigo!"} ${className}`}>{children}</Tag>;
-}
-/** The one emphasised phrase in a heading. */
-function Em({ dark = false, children }: { dark?: boolean; children: React.ReactNode }) {
-  return <em className={`font-extrabold not-italic ${dark ? "text-honey" : "text-brand"}`}>{children}</em>;
-}
-/** A small label with a hairline above it. Sentence case, as the brand does. */
-function Eyebrow({ dark = false, center = false, children }: { dark?: boolean; center?: boolean; children: React.ReactNode }) {
-  return <p className={`w-full max-w-[24rem] border-t pt-3 text-[14px] font-semibold ${center ? "mx-auto text-center" : ""} ${dark ? "border-white/30 text-white/80" : "border-navy/20 text-muted"}`}>{children}</p>;
 }
 
 const orangeBtn = "pressable inline-flex min-h-12 items-center rounded-[1.125rem] bg-coral px-6 text-[16px] font-bold text-navy";
@@ -174,8 +166,7 @@ export default function HomePage() {
       <section id="donors" className="scroll-mt-20 bg-white">
         <Reveal className="mx-auto grid max-w-[80rem] items-center gap-14 px-4 py-20 sm:px-6 md:grid-cols-2 md:gap-20 md:py-28">
           <div className="flex min-w-0 flex-col gap-8">
-            <Eyebrow>For donors</Eyebrow>
-            <H size="h2">Give in a few taps. <Em>Keep every receipt.</Em></H>
+            <H size="h2">Give in a few taps. Keep every receipt.</H>
             <ol className="flex flex-col gap-7">
               <Step n="1" title="Find a charity you can trust" body="Search by name, cause or area. A person checks every charity before it can take a single rand." />
               <Step n="2" title="Give once or every month, and watch it grow" body={`In the ${appName} app, see how much you've given this tax year, set a giving goal if you like, and watch your ring fill up.`} />
@@ -198,8 +189,7 @@ export default function HomePage() {
       <section id="charities" className="scroll-mt-20 bg-brand text-white">
         <div className="mx-auto max-w-[80rem] px-4 py-20 sm:px-6 md:py-28">
           <Reveal className="mx-auto flex max-w-[52rem] flex-col items-center gap-6 text-center">
-            <Eyebrow dark center>For charities</Eyebrow>
-            <H size="h2" dark>Your charity&apos;s giving, <Em dark>all in one place.</Em></H>
+            <H size="h2" dark>Your charity&apos;s giving, all in one place.</H>
             <p className="max-w-[36rem] text-[clamp(1.0625rem,1.5vw,1.1875rem)] leading-relaxed text-white/85">This is the real dashboard, with a made-up charity. Click around: it&apos;s what you&apos;ll use from launch day.</p>
           </Reveal>
           <Reveal className="mx-auto mt-12 max-w-[80rem] text-navy">
@@ -243,8 +233,7 @@ export default function HomePage() {
       <section className="bg-white">
         <Reveal className="mx-auto max-w-[80rem] px-4 py-20 sm:px-6 md:py-28">
           <div className="mx-auto flex max-w-[48rem] flex-col items-center gap-6 text-center">
-            <Eyebrow center>Built to be trusted with money</Eyebrow>
-            <H size="h2">Safe for donors. <Em>Simple for charities.</Em></H>
+            <H size="h2">Safe for donors. Simple for charities.</H>
           </div>
           <ul className="mt-14 grid gap-5 md:grid-cols-3">
             {([
@@ -266,8 +255,7 @@ export default function HomePage() {
       <section className="bg-brand text-white">
         <div className="mx-auto max-w-[80rem] px-4 py-20 sm:px-6 md:py-28">
           <Reveal className="mx-auto flex max-w-[52rem] flex-col items-center gap-6 text-center">
-            <Eyebrow dark center>Why charities switch</Eyebrow>
-            <H size="h2" dark>Bank references and spreadsheets <Em dark>had a good run.</Em></H>
+            <H size="h2" dark>Bank references and spreadsheets had a good run.</H>
           </Reveal>
           <div className="mt-14">
             <div aria-hidden className="hidden grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.5fr)] gap-x-6 pb-4 md:grid">
@@ -296,7 +284,7 @@ export default function HomePage() {
 
       {/* 7. Questions. */}
       <Questions
-        title={<>Good to <em className="font-extrabold not-italic text-brand">know</em>.</>}
+        title={<>Good to know.</>}
         faqs={withoutCostQuestions([...donorFaqs.slice(0, 2), ...donorFaqs.filter((f) => /s18A|monthly|every month/i.test(f.q)), ...charityFaqs])}
         more={<Link href="/faq" className={arrowLink}>All questions<ArrowRight /></Link>}
         width="max-w-[80rem]"

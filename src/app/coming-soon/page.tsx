@@ -54,9 +54,6 @@ function H2({ dark = false, children }: { dark?: boolean; children: React.ReactN
 function Em({ dark = false, children }: { dark?: boolean; children: React.ReactNode }) {
   return <em className={`font-extrabold not-italic ${dark ? "text-honey" : "text-brand"}`}>{children}</em>;
 }
-function Eyebrow({ dark = false, children }: { dark?: boolean; children: React.ReactNode }) {
-  return <p className={`w-full max-w-[24rem] border-t pt-3 text-[14px] font-semibold ${dark ? "border-white/30 text-white/80" : "border-navy/20 text-muted"}`}>{children}</p>;
-}
 
 /** WhatsApp's own mark, drawn simply, in the colour of the text around it. */
 function WhatsAppMark({ size = 18 }: { size?: number }) {
@@ -126,10 +123,7 @@ export default function ComingSoon() {
         <div className="mx-auto grid max-w-[80rem] items-center gap-12 px-4 pb-14 pt-12 sm:px-6 xl:min-h-[44rem] xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:gap-6 xl:py-20">
           <div className="flex min-w-0 flex-col items-start gap-7">
             <p className="inline-flex items-center gap-2.5 rounded-full bg-white/12 px-4 py-2 text-[14px] font-semibold text-white ring-1 ring-white/20">
-              <span aria-hidden className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-coral opacity-60 motion-reduce:hidden" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-coral" />
-              </span>
+              <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-coral" />
               {launch ? `Launching in South Africa, ${launch}` : "Coming soon to South Africa"}
             </p>
             <h1 className="font-display text-[clamp(3rem,6vw,5.25rem)] font-bold! leading-[1.02] tracking-[-0.035em]! text-balance text-white!">
@@ -175,8 +169,7 @@ export default function ComingSoon() {
       <section id="join" className="scroll-mt-20 bg-white">
         <div className="mx-auto max-w-[80rem] px-4 py-20 sm:px-6 md:py-28">
           <Reveal className="mx-auto flex max-w-[48rem] flex-col items-center gap-6 text-center">
-            <Eyebrow>Be there from day one</Eyebrow>
-            <H2>Two ways in. <Em>Pick yours.</Em></H2>
+            <H2>Two ways in. Pick yours.</H2>
           </Reveal>
           <div className="mt-14 grid gap-5 lg:grid-cols-2">
             <Reveal className="relative isolate flex flex-col gap-7 overflow-hidden rounded-[2rem] bg-honey-soft p-7 sm:p-10">
@@ -259,8 +252,7 @@ export default function ComingSoon() {
       <section className="bg-brand text-white">
         <div className="mx-auto max-w-[80rem] px-4 py-20 sm:px-6 md:py-28">
           <Reveal className="mx-auto flex max-w-[52rem] flex-col items-center gap-6 text-center">
-            <Eyebrow dark>For charities</Eyebrow>
-            <H2 dark>Receipts without <Em dark>the February rush.</Em></H2>
+            <H2 dark>Receipts without the February rush.</H2>
             <p className="max-w-[36rem] text-[clamp(1.0625rem,1.5vw,1.1875rem)] leading-relaxed text-white/85">Every gift, every donor and every s18A receipt in one place. This is the real dashboard with a made-up charity: click the tabs.</p>
           </Reveal>
           <Reveal className="mx-auto mt-12 max-w-[80rem] text-navy">
@@ -284,8 +276,7 @@ export default function ComingSoon() {
       <section className="bg-white">
         <Reveal className="mx-auto max-w-[80rem] px-4 py-20 sm:px-6 md:py-28">
           <div className="mx-auto flex max-w-[48rem] flex-col items-center gap-6 text-center">
-            <Eyebrow>Built to be trusted with money</Eyebrow>
-            <H2>Safe for donors. <Em>Simple for charities.</Em></H2>
+            <H2>Safe for donors. Simple for charities.</H2>
           </div>
           <ul className="mx-auto mt-14 grid max-w-[72rem] gap-10 lg:grid-cols-3 lg:gap-10">
             {([
@@ -305,7 +296,7 @@ export default function ComingSoon() {
 
       {/* 5. Questions, and a person to ask. */}
       <Questions
-        title={<>Good to <em className="font-extrabold not-italic text-brand">know</em>.</>}
+        title={<>Good to know.</>}
         faqs={questions(listOpen, Boolean(whatsApp))}
         more={whatsApp ? (
           <a href={whatsApp} target="_blank" rel="noopener noreferrer" className={lineBtn}><WhatsAppMark size={20} />Ask us on WhatsApp</a>

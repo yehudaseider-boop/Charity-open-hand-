@@ -38,8 +38,7 @@ export default function ForDonorsPage() {
 
       <StepCards
         id="how"
-        kicker="How it works"
-        title={<>From a cause you care about to <Key>a receipt in your account</Key>.</>}
+        title={<>From a cause you care about to a receipt in your account.</>}
         lead="Four steps, a minute or two. You can give as a guest or with an account."
         steps={[
           { icon: "search", title: "Find a charity", body: "Search by name, cause or area. Every charity is checked by a person before it can take a gift." },
@@ -50,9 +49,7 @@ export default function ForDonorsPage() {
       />
 
       <Chapter
-        n={1}
-        kicker="Once or every month"
-        title={<>Give the way that <Key>suits you</Key>.</>}
+        title={<>Give the way that suits you.</>}
         body="A once-off gift when something moves you, or the same amount every month for a cause you stand behind. A monthly donation is always yours to change."
         points={[
           { icon: "repeat", title: "Pause, resume or stop", body: "From your account, whenever you like. Nobody to phone, no form to fill in." },
@@ -62,18 +59,14 @@ export default function ForDonorsPage() {
       />
 
       <Chapter
-        n={2}
         flip
-        kicker="In someone's name"
-        title={<>A gift that <Key>means something</Key>.</>}
+        title={<>A gift that means something.</>}
         body="Give in memory of someone, or in their honour. Or give quietly: choose to give anonymously and your name stays off public pages and live totals."
         picture={<TributePicture />}
       />
 
       <Chapter
-        n={3}
-        kicker="s18A receipts"
-        title={<>Tax time, <Key>without the hunt</Key>.</>}
+        title={<>Tax time, without the hunt.</>}
         body="If a charity is approved to issue s18A receipts, tick “I'd like an s18A receipt” when you give. You get one receipt for all your gifts to that charity each tax year (1 March to the end of February), kept in your account for your tax return."
         points={[
           { icon: "receipt", title: "One receipt a year from each charity", body: "Not a pile of slips. One clear receipt per charity, per tax year." },
@@ -84,7 +77,6 @@ export default function ForDonorsPage() {
 
       <BlueBlock
         id="safe"
-        kicker="Your card and your details"
         title={<>Private by design.</>}
         body={`You pay on the payment provider's secure page. ${appName} never sees your card and never holds your money.`}
         points={[
@@ -98,9 +90,7 @@ export default function ForDonorsPage() {
       </BlueBlock>
 
       <Chapter
-        n={4}
-        kicker="Checked charities"
-        title={<>Every charity is <Key>checked by a person</Key>.</>}
+        title={<>Every charity is checked by a person.</>}
         body="Before a charity can take a gift on Givezy, a person looks at its registration documents and bank details. On every charity's page you can see that it's verified, and whether it issues s18A receipts."
         points={[
           { icon: "building", title: "Registered South African organisations", body: "NPOs and PBOs, with their registration documents checked." },
@@ -112,17 +102,14 @@ export default function ForDonorsPage() {
       </Chapter>
 
       <Chapter
-        n={5}
         flip
-        kicker="Hear back"
-        title={<>See what your <Key>giving does</Key>.</>}
+        title={<>See what your giving does.</>}
         body="Charities thank you in their own words, post updates (some with a video), and run campaigns with a goal you can watch fill up."
         picture={<UpdatePicture />}
       />
 
       <Chapter
-        kicker="The app"
-        title={<>Your giving, <Key>in your pocket</Key>.</>}
+        title={<>Your giving, in your pocket.</>}
         body={appLinks.launchMonth ? `The ${appName} app is coming to the App Store and Google Play in ${appLinks.launchMonth}. Until then, you can give on the website.` : `The ${appName} app is coming to the App Store and Google Play. Until then, you can give on the website.`}
         points={[
           { icon: "heart", title: "Causes you care about first", body: "Tell it what matters to you, and those charities show first." },
@@ -133,13 +120,13 @@ export default function ForDonorsPage() {
       />
 
       <Questions
-        title={<>Good to <Key>know</Key>.</>}
+        title={<>Good to know.</>}
         faqs={withoutCostQuestions(donorFaqs)}
         more={<Link href="/faq" className={arrowLink}>All questions<ArrowRight /></Link>}
       />
 
       <Closing
-        title={<>Ready when <Key>you are</Key>.</>}
+        title={<>Ready when you are.</>}
         body="Find a charity you believe in, and give in a few taps. Your gift and your s18A receipt stay together in one place."
         action={
           <>

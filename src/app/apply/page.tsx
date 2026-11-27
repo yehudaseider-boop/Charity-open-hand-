@@ -122,7 +122,7 @@ export default async function ApplyPage({ searchParams }: PageProps<"/apply">) {
 
       <section className="mx-auto max-w-[75rem] space-y-6 px-4 pb-16 sm:px-6">
         <div className="max-w-[40rem] space-y-2">
-          <h2 className="text-[clamp(1.75rem,3vw,2.25rem)] font-bold! leading-tight">What you&apos;ll <Key>need</Key></h2>
+          <h2 className="text-[clamp(1.75rem,3vw,2.25rem)] font-bold! leading-tight">What you&apos;ll need</h2>
           <p className="text-muted">Have these ready as PDFs or clear photos (up to 4 MB each). You can upload from your phone.</p>
         </div>
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -142,7 +142,7 @@ export default async function ApplyPage({ searchParams }: PageProps<"/apply">) {
 
       <section className="mx-auto max-w-[75rem] px-4 pb-24 sm:px-6">
         <div className="mb-6 max-w-[40rem]">
-          <h2 className="text-[clamp(1.75rem,3vw,2.25rem)] font-bold! leading-tight">What happens <Key>next</Key></h2>
+          <h2 className="text-[clamp(1.75rem,3vw,2.25rem)] font-bold! leading-tight">What happens next</h2>
         </div>
         <Steps
           steps={[

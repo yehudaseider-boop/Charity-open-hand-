@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SupportContact } from "@/components/legal";
-import { Floating, Icon, Key } from "@/components/marketing";
+import { Floating, Icon } from "@/components/marketing";
 import { platformConfig } from "@/config/platform";
 import { LiveWindow } from "@/components/live-window";
 import { Reveal } from "@/components/reveal";
@@ -211,9 +211,7 @@ export default function ForCharitiesPage() {
 
       <StepCards
         id="join"
-        kicker="How to join"
-        title={<>Three steps to your <Key>first donation</Key>.</>}
-        lead="Apply in one sitting, or save and come back any time."
+        title={<>Three steps to your first donation.</>}
         steps={[
           { icon: "building", title: "Apply online", body: "Your registration details, bank account and a bank confirmation letter. You can upload documents straight from your phone." },
           { icon: "shield", title: "We check it", body: `A person reviews every application within ${reviewWithin()}, then emails you when it's approved or if something needs fixing.` },
@@ -222,9 +220,7 @@ export default function ForCharitiesPage() {
       />
 
       <Chapter
-        n={1}
-        kicker="Getting started"
-        title={<>Your dashboard shows you <Key>what&apos;s next</Key>.</>}
+        title={<>Your dashboard shows you what&apos;s next.</>}
         body="Once you're approved, a short list on your dashboard walks you through what helps donors find you and give. Each step ticks itself off as you go."
         points={[
           { icon: "eye", title: "A page donors trust", body: "Your logo, a cover photo, what you do and where gifts go." },
@@ -235,10 +231,8 @@ export default function ForCharitiesPage() {
       />
 
       <Chapter
-        n={2}
         flip
-        kicker="Every week"
-        title={<>Built for <Key>busy volunteers</Key>.</>}
+        title={<>Built for busy volunteers.</>}
         body="Every donation and donor in one place, with what needs you this week at the top: new donors to thank, details to add for s18A receipts, a monthly card that was declined."
         points={[
           { icon: "chart", title: "Donations, donors and campaigns", body: "Monthly totals, who gives every month, and how each campaign is doing." },
@@ -249,9 +243,7 @@ export default function ForCharitiesPage() {
       />
 
       <Chapter
-        n={3}
-        kicker="s18A receipts"
-        title={<>Receipts, <Key>done for you</Key>.</>}
+        title={<>Receipts, done for you.</>}
         body="With s18A approval and our signed receipting mandate, we make your donors' s18A receipts in your name once a year. You check them first."
         points={[
           { icon: "receipt", title: "Preview, then approve", body: "Approve, correct or decline each donor's receipt before it goes out." },
@@ -263,7 +255,6 @@ export default function ForCharitiesPage() {
 
       <BlueBlock
         id="keep"
-        kicker="Keep your donors"
         title={<>Year after year.</>}
         body="Your dashboard does the follow-up for you, and sends at most one message a week to each donor, so nobody feels chased."
         points={[
@@ -275,18 +266,14 @@ export default function ForCharitiesPage() {
       />
 
       <Chapter
-        n={4}
         flip
-        kicker="Updates and campaigns"
-        title={<>Show donors <Key>what their gifts do</Key>.</>}
+        title={<>Show donors what their gifts do.</>}
         body="Post updates to your page, with a YouTube or Vimeo video if you have one, and email them to your donors. Raising for something big? Start a campaign with a goal, and donors watch it fill up."
         picture={<UpdatePicture />}
       />
 
       <Chapter
-        n={5}
-        kicker="Your team"
-        title={<>Everyone with <Key>the right access</Key>.</>}
+        title={<>Everyone with the right access.</>}
         body="Owner, Admin, Finance, Fundraiser and Viewer. Each person sees and does only what their role allows, so your treasurer, your fundraiser and your volunteers can all work in the same place."
         picture={<Illustration name="workingTogether" sparkle="stars" className="mx-auto w-full max-w-[22rem]" />}
       />

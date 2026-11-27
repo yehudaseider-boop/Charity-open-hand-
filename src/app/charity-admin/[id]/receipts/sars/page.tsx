@@ -291,7 +291,7 @@ function ProblemRow({ p, charityId }: { p: It3dProblem; charityId: string }) {
     : p.fix === "support" ? <span>Contact Givezy: <SupportContact /></span>
     : null;
   return (
-    <li className={`rounded-control border-l-4 p-3 ${tone}`}>
+    <li className={`rounded-control border-2 p-3 ${tone}`}>
       <p className="font-semibold text-navy">{p.severity === "blocking" ? "Fix first: " : "Check: "}<span className="font-normal">{p.message}</span></p>
       {who ? <p className="mt-1 text-xs text-muted [overflow-wrap:anywhere]" dir="auto">{who}</p> : null}
       {link ? <p className="mt-1">{link}</p> : null}
