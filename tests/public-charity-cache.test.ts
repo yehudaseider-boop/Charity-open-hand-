@@ -218,7 +218,7 @@ describe("the cache is only for the pages, never for money", () => {
   });
 
   it("the give page keeps the signed-in donor and their saved ID out of the cache", () => {
-    const page = read("src/app/c/[slug]/donate/page.tsx");
+    const page = read("src/app/c/[slug]/donate/give-page.tsx"); // the page's content, shared with its preview (27/11/2026)
     expect(page).toContain("getViewer()");
     expect(page).toContain("savedIdLast4(viewer.userId)");
     const lib = read("src/lib/charity/public-cache.ts");

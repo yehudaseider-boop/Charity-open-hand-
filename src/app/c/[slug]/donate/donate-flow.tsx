@@ -55,6 +55,11 @@ type Props = {
   singleAgreementTick?: boolean;
   /** Cloudflare's bot check site key, when the check is on (23/11/2026). */
   botCheckKey?: string | null;
+  /**
+   * "flat" (preview, 27/11/2026): no outer card and no lilac box round each choice; each part sits under a thin line,
+   * and the amount is bigger. Only the look changes: every field, check and message is the same.
+   */
+  look?: "boxes" | "flat";
 };
 
 const noSubscribe = () => () => {};
@@ -118,8 +123,11 @@ function offlineOrDown(e: unknown): { ok: false; message: string } {
 
 export function DonateFlow({
   slug, charityName, receiptsAvailable, s18aDetailsBy, minimumLabel, suggestedCents = [], contributionMinimumLabel, initialLabel, initialAmountCents, initialMonthly = false,
-  fromApp, campaign, account, source, impactUnit, cardChargeAvailable = false, singleAgreementTick = false, botCheckKey = null,
+  fromApp, campaign, account, source, impactUnit, cardChargeAvailable = false, singleAgreementTick = false, botCheckKey = null, look = "boxes",
 }: Props) {
+  const flat = look === "flat";
+  /** One part of the form: a lilac box, or (flat) a thin line above it. */
+  const part = (extra = "") => (flat ? `border-t border-border pt-5 ${extra}` : `rounded-control bg-honey-soft p-4 ${extra}`);
   // The amount, the contribution and the card charge box decide the live total, worked out as the donor types.
   const [amountText, setAmountText] = useState(initialAmountCents ? centsToInput(initialAmountCents) : "");
   const [picked, setPicked] = useState<number | null>(initialAmountCents && suggestedCents.includes(initialAmountCents) ? initialAmountCents : null);
@@ -289,7 +297,7 @@ export function DonateFlow({
         ref={formRef}
         noValidate
         method="post"
-        className="space-y-5 rounded-[1.75rem] border-2 border-border bg-surface p-5 sm:p-6"
+        className={flat ? "space-y-6" : "space-y-5 rounded-[1.75rem] border-2 border-border bg-surface p-5 sm:p-6"}
         onSubmit={(e) => {
           e.preventDefault();
           if (!quote) {
@@ -352,7 +360,7 @@ export function DonateFlow({
         <div>
           {suggestedCents.length ? <p className="mb-1 text-sm font-semibold text-navy">Or type your own amount</p> : null}
           <div className="flex min-w-0 items-center rounded-control border-2 border-outline bg-surface px-4 focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-soft has-[[aria-invalid=true]]:border-danger">
-            <span className="font-display text-2xl font-bold text-indigo">R</span>
+            <span className={`font-display font-bold text-indigo ${flat ? "text-4xl" : "text-2xl"}`}>R</span>
             <input
               id="amount"
               ref={amountRef}
@@ -376,7 +384,7 @@ export function DonateFlow({
               onBlur={(e) => {
                 if (e.currentTarget.value.trim()) setAmountTouched(true);
               }}
-              className="min-w-0 flex-1 bg-transparent px-2 py-3 font-display text-2xl font-bold text-navy outline-none"
+              className={`min-w-0 flex-1 bg-transparent px-2 font-display font-bold text-navy outline-none ${flat ? "py-4 text-4xl" : "py-3 text-2xl"}`}
             />
           </div>
         </div>
@@ -396,7 +404,7 @@ export function DonateFlow({
 
         {/* Gift amount, then the card charge, then the contribution, then the total (decided 09/11/2026). */}
         {cardChargeAvailable ? (
-          <div className="rounded-control bg-honey-soft p-4">
+          <div className={part()}>
             <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
               <input
                 type="checkbox"
@@ -415,7 +423,7 @@ export function DonateFlow({
 
         {/* The contribution to Givezy: amount buttons, Other, and No thanks, one radio group (decided 09/11/2026).
             The preselected amount always shows as its own line in the total below, so it is never hidden. */}
-        <fieldset className="space-y-3 rounded-control bg-honey-soft p-4" aria-describedby="contribution-about">
+        <fieldset className={part("space-y-3")} aria-describedby="contribution-about">
           <legend className="float-left w-full font-semibold text-navy">Contribution to Givezy</legend>
           <p id="contribution-about" className="clear-both text-sm text-muted">{CONTRIBUTION_EXPLAINER}</p>
           <div className="grid grid-cols-4 gap-2">
@@ -528,7 +536,7 @@ export function DonateFlow({
         <TextField name="email" label="Email" type="email" required autoComplete="email" defaultValue={account?.email} hint="Your confirmation goes here." maxLength={254} />
 
         {receiptsAvailable ? (
-          <div className="space-y-3 rounded-control bg-honey-soft p-4">
+          <div className={part("space-y-3")}>
             <label className="flex min-h-11 cursor-pointer items-center gap-3 font-semibold">
               <input type="checkbox" name="wants_18a" checked={want18a} onChange={(e) => setWant18a(e.target.checked)} />
               <span>I&apos;d like an s18A receipt</span>
@@ -614,7 +622,7 @@ export function DonateFlow({
         <details
           open={extrasOpen || extrasNeedFixing}
           onToggle={(e) => setExtrasOpen(e.currentTarget.open)}
-          className="group rounded-control border-2 border-border open:pb-4"
+          className={flat ? "group border-t border-border pt-1 open:pb-4" : "group rounded-control border-2 border-border open:pb-4"}
         >
           <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
             <span className="flex flex-col">
@@ -642,7 +650,7 @@ export function DonateFlow({
         </details>
 
         {/* Campaign gifts are once-off: a monthly gift would carry on after the campaign ends. */}
-        {campaign ? null : <div className="space-y-2 rounded-control bg-honey-soft p-4">
+        {campaign ? null : <div className={part("space-y-2")}>
           <label className="flex min-h-11 cursor-pointer items-center gap-3 font-semibold">
             <input type="checkbox" name="monthly" checked={monthly} onChange={(e) => setMonthly(e.target.checked)} />
             <span>{total ? `Give ${total} every month` : "Give every month"}</span>
