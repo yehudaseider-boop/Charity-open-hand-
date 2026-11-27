@@ -61,7 +61,7 @@ type Row = {
  * built per visit (app/charities/page.tsx). The look follows the landing page (11/11/2026): a big headline over
  * soft lilac and peach splashes, the cause of the week as a blue colour block, and photo-led charity cards.
  */
-export async function CharitiesView({ q, categorySlug }: { q: string; categorySlug: string }) {
+export async function CharitiesView({ q, categorySlug, look = "white" }: { q: string; categorySlug: string; look?: "white" | "blue" }) {
   const supabase = createPublicClient();
   const categories = await loadCategories();
   const category = categories.find((c) => c.slug === categorySlug);
@@ -95,38 +95,71 @@ export async function CharitiesView({ q, categorySlug }: { q: string; categorySl
     `inline-flex min-h-11 shrink-0 items-center rounded-full border-2 px-4 text-[15px] font-semibold transition-[transform,color,background-color,border-color] duration-150 active:scale-[0.97] motion-reduce:transition-none ${
       active ? "border-brand bg-brand text-white" : "border-border bg-surface text-navy hover:border-brand hover:text-brand"
     }`;
+  // On blue: the chosen cause is white with blue words, the others outlined in white.
+  const chipOnBlue = (active: boolean) =>
+    `inline-flex min-h-11 shrink-0 items-center rounded-full border-2 px-4 text-[15px] font-semibold transition-[transform,color,background-color,border-color] duration-150 active:scale-[0.97] motion-reduce:transition-none ${
+      active ? "border-white bg-white text-brand" : "border-white/35 text-white hover:border-white"
+    }`;
   const requestsOpen = charityRequestsOpen();
   const empty = charities.length === 0 ? emptyState(q, category ? { slug: category.slug, name: category.name_en } : null, { requestsOpen }) : null;
 
   return (
     // full-bleed: this page runs edge to edge, with its own 1 200 px column (see globals.css).
     <div className="full-bleed overflow-x-clip">
-      <section className="relative isolate">
-        <span aria-hidden className="pointer-events-none absolute -left-40 -top-28 -z-10 h-[28rem] w-[28rem] rounded-full bg-honey-soft" />
-        <span aria-hidden className="pointer-events-none absolute -right-24 top-24 -z-10 h-72 w-72 rounded-full bg-peach max-md:hidden" />
-        <div className="mx-auto grid max-w-[75rem] items-end gap-6 px-4 pb-8 pt-8 sm:px-6 sm:pb-12 sm:pt-12 lg:grid-cols-[minmax(0,1fr)_14rem]">
-          <div className="flex min-w-0 flex-col gap-5">
-            <h1 className="font-display text-[clamp(2.75rem,8vw,5.25rem)] leading-[0.95] tracking-[-0.035em] text-balance">
-              Find a <Key>charity</Key>
+      {look === "blue" ? (
+        // The blue opening (preview 27/11/2026), as the home and For charities pages: white headline with the second
+        // colour on one word, the search's orange button, and the causes on one row that scrolls sideways at every width.
+        <section className="relative isolate overflow-hidden bg-brand text-white">
+          <span aria-hidden className="pointer-events-none absolute -right-24 -top-24 -z-10 h-80 w-80 rounded-full border-[48px] border-honey/20" />
+          <span aria-hidden className="pointer-events-none absolute -bottom-10 right-[18%] -z-10 h-20 w-20 rounded-full bg-coral max-md:hidden" />
+          <div className="mx-auto flex max-w-[75rem] flex-col gap-6 px-4 pb-10 pt-10 sm:px-6 sm:pb-14 sm:pt-14">
+            <h1 className="font-display text-[clamp(2.75rem,8vw,5.25rem)] font-extrabold! leading-[0.95] tracking-[-0.04em]! text-balance text-white!">
+              Find a <span className="text-honey">charity</span>
             </h1>
-            <p className="max-w-[36rem] text-[clamp(1.0625rem,1.8vw,1.25rem)] leading-relaxed text-muted">
+            <p className="max-w-[36rem] text-[clamp(1.0625rem,1.8vw,1.25rem)] leading-relaxed text-white/85">
               Registered South African charities, checked by us before they can take a gift.
             </p>
-            <CharitySearch initial={q} category={category?.slug ?? ""} />
+            <CharitySearch initial={q} category={category?.slug ?? ""} onBlue />
             {categories.length > 0 ? (
-              <nav aria-label="Causes" className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto pl-4 pr-16 pb-1 [mask-image:linear-gradient(to_right,black_82%,transparent)] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:[mask-image:none]">
-                <Link href={causeHref(null, q)} className={chip(!category)} aria-current={!category ? "page" : undefined}>All</Link>
+              <nav aria-label="Causes" className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [mask-image:linear-gradient(to_right,black_88%,transparent)] sm:-mx-6 sm:px-6">
+                <Link href={causeHref(null, q)} className={chipOnBlue(!category)} aria-current={!category ? "page" : undefined}>All</Link>
                 {categories.map((c) => (
-                  <Link key={c.id} href={causeHref(c.slug, q)} className={chip(c.id === category?.id)} aria-current={c.id === category?.id ? "page" : undefined}>
+                  <Link key={c.id} href={causeHref(c.slug, q)} className={chipOnBlue(c.id === category?.id)} aria-current={c.id === category?.id ? "page" : undefined}>
                     {c.name_en}
                   </Link>
                 ))}
               </nav>
             ) : null}
           </div>
-          <Illustration name="findingTheWay" sparkle="stars" className="hidden w-56 lg:block" />
-        </div>
-      </section>
+        </section>
+      ) : (
+        <section className="relative isolate">
+          <span aria-hidden className="pointer-events-none absolute -left-40 -top-28 -z-10 h-[28rem] w-[28rem] rounded-full bg-honey-soft" />
+          <span aria-hidden className="pointer-events-none absolute -right-24 top-24 -z-10 h-72 w-72 rounded-full bg-peach max-md:hidden" />
+          <div className="mx-auto grid max-w-[75rem] items-end gap-6 px-4 pb-8 pt-8 sm:px-6 sm:pb-12 sm:pt-12 lg:grid-cols-[minmax(0,1fr)_14rem]">
+            <div className="flex min-w-0 flex-col gap-5">
+              <h1 className="font-display text-[clamp(2.75rem,8vw,5.25rem)] leading-[0.95] tracking-[-0.035em] text-balance">
+                Find a <Key>charity</Key>
+              </h1>
+              <p className="max-w-[36rem] text-[clamp(1.0625rem,1.8vw,1.25rem)] leading-relaxed text-muted">
+                Registered South African charities, checked by us before they can take a gift.
+              </p>
+              <CharitySearch initial={q} category={category?.slug ?? ""} />
+              {categories.length > 0 ? (
+                <nav aria-label="Causes" className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto pl-4 pr-16 pb-1 [mask-image:linear-gradient(to_right,black_82%,transparent)] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:[mask-image:none]">
+                  <Link href={causeHref(null, q)} className={chip(!category)} aria-current={!category ? "page" : undefined}>All</Link>
+                  {categories.map((c) => (
+                    <Link key={c.id} href={causeHref(c.slug, q)} className={chip(c.id === category?.id)} aria-current={c.id === category?.id ? "page" : undefined}>
+                      {c.name_en}
+                    </Link>
+                  ))}
+                </nav>
+              ) : null}
+            </div>
+            <Illustration name="findingTheWay" sparkle="stars" className="hidden w-56 lg:block" />
+          </div>
+        </section>
+      )}
 
       {featured ? <CauseOfTheWeek charity={featured} causes={causesOf(featured)} /> : null}
 
