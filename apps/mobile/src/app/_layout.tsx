@@ -12,6 +12,7 @@ import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { PreviewChrome } from "@/components/preview-chrome";
 import { AccountProvider } from "@/lib/account";
+import { ReminderProvider } from "@/lib/reminder";
 import { SavedProvider } from "@/lib/saved";
 import { secureStorage } from "@/lib/secure-storage";
 import { colors } from "@/theme/tokens";
@@ -47,6 +48,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AccountProvider>
       <SavedProvider>
+      <ReminderProvider>
         <PreviewChrome>
           <StatusBar style="dark" />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.cream }, animation: "slide_from_right" }}>
@@ -55,6 +57,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ animation: "fade" }} />
           </Stack>
         </PreviewChrome>
+      </ReminderProvider>
       </SavedProvider>
       </AccountProvider>
     </SafeAreaProvider>

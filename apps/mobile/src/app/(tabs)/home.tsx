@@ -36,10 +36,11 @@ import { inCause, savedCharities } from "@/lib/live-charities";
 import { GIVING_LOAD_ERROR, givingLoadState, monthlyAmountLine, nextChargeText } from "@/lib/live-giving";
 import { loadCausePrefs } from "@/lib/cause-prefs";
 import { dismissGoalCard, goalCardDismissed } from "@/lib/first-run";
+import { useReminder } from "@/lib/reminder";
 import type { IncomeEntry } from "@/lib/ledger";
 import { useSaved } from "@/lib/saved";
 import { useStoredRecord } from "@/lib/use-stored-record";
-import { colors, fonts, radius, space, tabular } from "@/theme/tokens";
+import { colors, fonts, radius, space, tabular, touch } from "@/theme/tokens";
 
 const noGoals: Goal[] = [];
 const noIncome: IncomeEntry[] = [];
@@ -97,6 +98,7 @@ export default function Home() {
   ].filter((x): x is NonNullable<typeof x> => x !== null);
   // No goal yet: a gentle card the donor can dismiss. Once dismissed it stays gone (and nothing pops up).
   // While the choice is being read it stays hidden, so it never flashes up and away.
+  const reminder = useReminder();
   const [cardGone, setCardGone] = useState<boolean | null>(null);
   useEffect(() => {
     goalCardDismissed().then(setCardGone);
@@ -260,6 +262,22 @@ export default function Home() {
           </View>
         </View>}
 
+        {/* The payday reminder, offered once after a first gift (27/11/2026). Never beside the goal invitation: one
+            ask at a time. It opens the reminder screen, where the donor picks a day and sees the reminder before the
+            phone is asked. */}
+        {reminder.offerable && (goal !== null || cardGone === true) ? (
+          <View style={styles.gutter}>
+            <View style={styles.reminderCard}>
+              <Text style={styles.reminderTitle}>Want a nudge on payday?</Text>
+              <Text variant="bodyMuted">Once a month, on the day you choose. Never more, and not in a month you&apos;ve already given.</Text>
+              <Button label="Choose a day" onPress={() => router.push("/reminder")} />
+              <Pressable accessibilityRole="button" accessibilityLabel="Not now: hide the reminder offer" hitSlop={8} onPress={() => void reminder.notNow()} style={styles.notNowDark}>
+                <Text style={styles.notNowDarkText}>Not now</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
         {givingState === "error" && !givingErrorInCard ? (
           <View style={styles.gutter}>
             <View style={[styles.glance, styles.glanceProblem]} accessibilityRole="alert">
@@ -364,6 +382,10 @@ const styles = StyleSheet.create({
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.lilacSoft, borderWidth: 1.5, borderColor: colors.lightPurple, alignItems: "center", justifyContent: "center" },
   avatarText: { fontFamily: fonts.display, fontSize: 18, color: colors.blue },
   goalCard: { backgroundColor: colors.blue, borderRadius: radius.card, padding: 20, overflow: "hidden" },
+  reminderCard: { backgroundColor: colors.lilacSoft, borderRadius: radius.card, padding: 20, gap: 12 },
+  reminderTitle: { fontFamily: fonts.displayBold, fontSize: 22, lineHeight: 27, color: colors.navy },
+  notNowDark: { alignSelf: "center", minHeight: touch, justifyContent: "center", paddingHorizontal: 12 },
+  notNowDarkText: { fontFamily: fonts.bodySemibold, fontSize: 16, color: colors.blue, textDecorationLine: "underline" },
   goalRow: { flexDirection: "row", alignItems: "center", gap: 18 },
   goalKicker: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.lilacSoft },
   goalWindow: { fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.lilacSoft, marginBottom: 2 },

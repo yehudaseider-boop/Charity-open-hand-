@@ -12,6 +12,8 @@ import { Button } from "@/components/button";
 import { ChevronIcon, GivingIcon, ReceiptsIcon } from "@/components/icons";
 import { Bubbles, People } from "@/components/people";
 import { SettingsGroup } from "@/components/settings-group";
+import { useReminder } from "@/lib/reminder";
+import { dayName } from "@/lib/reminders";
 import { Agree, SignIn } from "@/components/sign-in";
 import { SkeletonBlock } from "@/components/states";
 import { Text } from "@/components/text";
@@ -80,6 +82,7 @@ export default function Account() {
     if (mail) Linking.openURL(mail).catch(() => notify("Get help", helpLine()));
     else notify("Get help", helpLine());
   };
+  const reminder = useReminder();
   const support = [
     { label: "Get help", onPress: getHelp },
     { label: "How Givezy works", onPress: () => router.push("/how-it-works") },
@@ -161,6 +164,13 @@ export default function Account() {
             ) : null}
 
             <SavedCardRow />
+            {/* The payday reminder (27/11/2026): only where this phone and app build can set one. */}
+            {reminder.available ? (
+              <SettingsGroup
+                title="Reminders"
+                cells={[{ label: "Payday reminder", value: reminder.settings?.on && reminder.settings.day ? (reminder.settings.day === "last" ? "Last day" : dayName(reminder.settings.day)) : "Off", onPress: () => router.push("/reminder") }]}
+              />
+            ) : null}
             <SettingsGroup title="App" cells={support} />
             <SettingsGroup
               title="Your information"

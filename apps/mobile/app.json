@@ -47,7 +47,13 @@
           "faceIDPermission": false
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "color": "#1749B5"
+        }
+      ]
     ],
     "scheme": "nedivlev",
     "extra": {
