@@ -205,7 +205,7 @@ describe("the help assistant's server", () => {
     state.streamText = ["R1 250 came in this month."];
     const res = await ask({ ...question, messages: [{ role: "user", content: "How much came in this month?" }] });
     // Last, which lookups ran, for the panel's follow-up questions (22/11/2026).
-    expect(await res.text()).toBe("R1 250 came in this month.\n[[thanks:]]\n[[next:giving_totals]]");
+    expect(await res.text()).toBe("R1 250 came in this month.\n[[thanks:]]\n[[next:giving_totals,go_donations]]");
     expect(state.looked).toEqual(["totals"]);
     expect(state.allParams).toHaveLength(2);
     const second = state.allParams[1].messages as { role: string; content: unknown }[];
@@ -255,7 +255,7 @@ describe("the help assistant's server", () => {
   it("stops looking things up after the last allowed round, and answers with what it has", async () => {
     state.toolRounds = Array.from({ length: 4 }, (_, i) => [{ id: `t${i}`, name: "giving_by_month", input: {} }]);
     state.streamText = ["Here is what I found."];
-    expect(await (await ask(question)).text()).toBe("Here is what I found.\n[[thanks:]]\n[[next:giving_by_month]]");
+    expect(await (await ask(question)).text()).toBe("Here is what I found.\n[[thanks:]]\n[[next:giving_by_month,go_overview,go_donations]]");
     expect(state.allParams).toHaveLength(5);
     expect(state.allParams[4].tool_choice).toEqual({ type: "none" });
     expect(state.allParams[0].tool_choice).toEqual({ type: "auto" });
@@ -277,7 +277,7 @@ describe("the help assistant's server", () => {
     it("a marker the model writes at the end of its answer is never ours: no button, no error (review 24/11/2026)", async () => {
       const { splitNext } = await import("@/lib/assistant/suggestions");
       // Whole, or arriving in pieces that split the "[[".
-      for (const pieces of [["Here you go.\n[[thanks:to=all]]"], ["Here you go.\n[", "[thanks:to=all]", "]"], ["Done.\n[[thanks:to=all]]\n[[next:giving_totals]]"]]) {
+      for (const pieces of [["Here you go.\n[[thanks:to=all]]"], ["Here you go.\n[", "[thanks:to=all]", "]"], ["Done.\n[[thanks:to=all]]\n[[next:giving_totals,go_donations]]"]]) {
         state.streamText = pieces;
         const text = await (await ask(question)).text();
         expect(text).not.toContain("[[thanks:to=all");

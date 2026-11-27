@@ -221,6 +221,9 @@ Questions only the charities or their advisers can answer. Bring these up whenev
 - [ ] **Privacy Policy line, for Yosef (draft, not yet on the site):** "Payday reminder (optional). If you turn it on in the app, Givezy sets a monthly reminder on your phone, on the day you choose. The reminder and the day you chose stay on your phone: they are not sent to Givezy. You can turn it off in the app (Account, Reminders) or in your phone's settings at any time."
 - [ ] **App Store and Google Play:** the reminder is a local notification for the user's own chosen reminder, which both stores allow; mention it in the review notes ("an optional monthly reminder the user sets, asked for only after they choose a day").
 
+### Givy's accuracy test set (built 27/11/2026, see decisions.md)
+- [ ] **Add the repository secret `ANTHROPIC_API_KEY` on GitHub (Yehuda, Settings, Secrets and variables, Actions), then run Actions, "Givy accuracy".** Each run asks Givy 24 questions (Anthropic charges per call; check the first run's cost on the Anthropic console before running it often). Fix anything below 24 of 24 before Givy goes live, and run it again after any change to Givy.
+
 ### Outside attack test before launch (26/11/2026, Yehuda: "Not now")
 - [ ] **Run an outside tool that tries to break in and proves each hole (for example Strix).** Offered on 26/11/2026; Yehuda chose to wait (the fresh review of 25/11/2026 found no blocker in money or security). Before launch in January, decide whether to run one: either in a session container against a local copy of the site and the local test database, with its own AI key added through the secure form and a spending cap he approves in Rand first, or on the tool's paid cloud, which sends our code to that company (price and privacy terms to him first). Never against the live site.
 

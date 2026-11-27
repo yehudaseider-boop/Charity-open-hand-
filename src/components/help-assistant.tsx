@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { parseAnswer, type Block, type Inline } from "@/lib/assistant/answer";
+import { GO, goHref, type GoKey } from "@/lib/assistant/go-links";
 import { followUps, splitNext, startingSuggestions } from "@/lib/assistant/suggestions";
 import { thanksButtonHref } from "@/lib/assistant/thank-you-draft";
 import { blueAction } from "@/components/dash";
@@ -23,7 +24,7 @@ import { blueAction } from "@/components/dash";
  * `next`: the lookups an answer used, for its follow-up questions (22/11/2026). `thanks`: a thank-you Givy prepared
  * (24/11/2026), from the server's own marker, for the "Check and send" button.
  */
-type Turn = { role: "user" | "assistant"; content: string; failed?: boolean; next?: string[]; thanks?: string };
+type Turn = { role: "user" | "assistant"; content: string; failed?: boolean; next?: string[]; thanks?: string; go?: GoKey[] };
 
 const ERROR_MARK = "[[error]]";
 const noSubscribe = () => () => {};
@@ -206,8 +207,8 @@ export function HelpAssistant({
         setTurns([...asked, { role: "assistant", content: partial || "We couldn't finish that answer. Nothing was changed.", failed: true }]);
         setAnnounce("The answer didn't finish");
       } else {
-        const { text: answer, tools, thanks } = splitNext(text);
-        setTurns([...asked, { role: "assistant", content: answer, ...(tools ? { next: tools } : {}), ...(thanks ? { thanks } : {}) }]);
+        const { text: answer, tools, thanks, go } = splitNext(text);
+        setTurns([...asked, { role: "assistant", content: answer, ...(tools ? { next: tools } : {}), ...(thanks ? { thanks } : {}), ...(go.length ? { go } : {}) }]);
         setAnnounce("Answer ready");
       }
     } catch (e) {
@@ -341,6 +342,17 @@ export function HelpAssistant({
                         <Link href={thanksButtonHref(drafts, t.thanks, base)!} onClick={onLink} className={`${blueAction} w-full justify-center text-[15px]`}>
                           Check and send
                         </Link>
+                      </div>
+                    ) : null}
+                    {/* "Take me there" (27/11/2026): the page and filter that show what was just looked up, chosen by the
+                        server from the lookups that ran, never by the model. */}
+                    {!t.failed && t.go?.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {t.go.map((k) => (
+                          <Link key={k} href={goHref(base, k)} onClick={onLink} className={`${blueAction} justify-center text-[14px]`}>
+                            {GO[k].label}
+                          </Link>
+                        ))}
                       </div>
                     ) : null}
                     {/* What to ask next, fitting what was just looked up: under the newest answer only. */}

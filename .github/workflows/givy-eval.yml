@@ -1,0 +1,29 @@
+# Givy's accuracy test set (evals/givy.eval.ts): real charity questions asked of the real Givy (the live AI model)
+# against the public demo's sample charity, each answer checked for the right lookup, the right figures, no figure it
+# can't back up, and Givezy's house style. Run by hand (Actions, "Givy accuracy", Run workflow) after changing Givy:
+# each run makes about 24 AI calls on Givezy's Anthropic account. Needs the repository secret ANTHROPIC_API_KEY;
+# without it every question is skipped. Never part of the Checks that gate a deploy.
+name: Givy accuracy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  givy-accuracy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install website packages
+        run: npm ci
+      - name: Ask Givy the test questions
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: npm run eval:givy

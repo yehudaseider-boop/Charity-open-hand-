@@ -138,7 +138,7 @@ describe("the panel's button", () => {
   it("is our own marker, at the very end, before the follow-ups", () => {
     const id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
     const text = `I prepared it.${thanksMark({ draftId: id, audience: "monthly" })}\n[[next:prepare_thank_you]]`;
-    expect(splitNext(text)).toEqual({ text: "I prepared it.", tools: ["prepare_thank_you"], thanks: `d=${id}` });
+    expect(splitNext(text)).toEqual({ text: "I prepared it.", tools: ["prepare_thank_you"], thanks: `d=${id}`, go: [] });
     expect(thanksMark({ draftId: null, audience: "s18a:asked" })).toBe("\n[[thanks:to=s18a:asked]]");
   });
   it("is hidden while it streams in, piece by piece", () => {

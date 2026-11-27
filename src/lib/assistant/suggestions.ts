@@ -8,6 +8,8 @@
  *   written by the model, and none is offered twice in one chat.
  */
 
+import { goFromNames, goMarkNames, type GoKey } from "./go-links";
+
 const Q = {
   thisMonth: "How much came in this month?",
   lastMonths: "How does that compare to the last few months?",
@@ -108,16 +110,19 @@ const PARTIAL_MARK = /\n*\[(?:\[(?:t(?:h(?:a(?:n(?:k(?:s(?::[a-z0-9:=_-]*(?:\](?
  * Splits the markers off a (possibly still arriving) answer. A half-arrived marker is hidden too. `thanks` is the
  * prepared thank-you's marker value ("d=<draft id>" or "to=<audience>"), for thanksHref; null when there is none.
  */
-export function splitNext(text: string): { text: string; tools: string[] | null; thanks: string | null } {
+export function splitNext(text: string): { text: string; tools: string[] | null; thanks: string | null; go: GoKey[] } {
   const m = NEXT_MARK.exec(text);
-  if (m) return { text: text.slice(0, m.index), tools: m[2].split(",").filter((t) => t in AFTER), thanks: m[1] || null };
+  if (m) {
+    const names = m[2].split(",");
+    return { text: text.slice(0, m.index), tools: names.filter((t) => t in AFTER), thanks: m[1] || null, go: goFromNames(names) };
+  }
   // While streaming, the markers can arrive in pieces: never show "[[ne..." or "[[thanks:..." to the reader.
   const partial = PARTIAL_MARK.exec(text);
-  return { text: partial ? text.slice(0, partial.index) : text, tools: null, thanks: null };
+  return { text: partial ? text.slice(0, partial.index) : text, tools: null, thanks: null, go: [] };
 }
 
-/** The marker for these lookups (names only, from our own tool list). */
-export function nextMark(tools: string[]): string {
-  const names = [...new Set(tools.filter((t) => /^[a-z_]+$/.test(t)))];
+/** The marker for these lookups (names only, from our own tool list), and the answer's "take me there" buttons. */
+export function nextMark(tools: string[], go: readonly GoKey[] = []): string {
+  const names = [...new Set([...tools, ...goMarkNames(go)].filter((t) => /^[a-z_]+$/.test(t)))];
   return `\n[[next:${names.join(",")}]]`;
 }

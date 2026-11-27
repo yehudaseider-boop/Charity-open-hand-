@@ -5,6 +5,9 @@ import { demoSource } from "@/lib/assistant/demo-source";
 import { liveSource } from "@/lib/assistant/live-source";
 import { askerContext, stableInstructions } from "@/lib/assistant/prompt";
 import { checkQuestion, pagePath, type AssistantRequest } from "@/lib/assistant/request";
+import { goKeys } from "@/lib/assistant/go-links";
+import { formatRand } from "@/lib/money";
+import { unmatchedAmounts, unmatchedNote } from "@/lib/assistant/grounding";
 import { markerGuard, nextMark } from "@/lib/assistant/suggestions";
 import { ONE_CONTACT_PER_ANSWER, ToolRefusal, checkToolCall, runPrepare, runTool, toolDefinitions, type HelperSource, type ThankYouPreparer } from "@/lib/assistant/tools";
 import { livePreparer } from "@/lib/assistant/drafts";
@@ -13,6 +16,7 @@ import { can } from "@/lib/charity/permissions";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getViewer } from "@/lib/auth";
 import { viewerRole } from "@/lib/charity/team";
+import { hiddenPages } from "@/lib/charity/permissions";
 import { clientIp } from "@/lib/client-ip";
 import { hasSecondStep } from "@/lib/mfa";
 import { forgetAttempts, hitRateLimit, ipKeys } from "@/lib/rate-limit";
@@ -183,6 +187,14 @@ export async function POST(req: Request) {
       let lookups = 0;
       // Which lookups ran, so the panel can offer fitting follow-up questions (22/11/2026).
       const used: string[] = [];
+      const ran: { name: string; input: unknown }[] = [];
+      // The accuracy check (27/11/2026): the model's own words, and what it found plus the chat so far (what the person
+      // typed, and earlier answers, which were checked when they were given).
+      let words = "";
+      // Givy's own instructions and how-to guide count too (the R30 minimum, a step's amount).
+      const foundIn: string[] = [...messages.map((m) => m.content), ...system.map((b) => b.text)];
+      // Pages this role can't open never get a button (the demo shows every page).
+      const hidden = role === "demo" ? [] : hiddenPages(role);
       // A thank-you prepared in this answer (at most one): what the panel's button needs.
       let prepared: { draftId: string | null; audience: DraftAudience } | null = null;
       let contactLookups = 0;
@@ -208,6 +220,7 @@ export async function POST(req: Request) {
             if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
               sent = true;
               anySent = true;
+              words += event.delta.text;
               sendWords(event.delta.text);
             }
           }
@@ -268,6 +281,8 @@ export async function POST(req: Request) {
               try {
                 results.push({ type: "tool_result", tool_use_id: block.id, content: await runTool(call, source, donorData) });
                 used.push(block.name);
+                // For the answer's "take me there" buttons: the lookup that ran, with its checked inputs.
+                ran.push({ name: block.name, input: block.input });
               } catch (e) {
                 if (e instanceof ToolRefusal) {
                   results.push({ type: "tool_result", tool_use_id: block.id, content: e.message, is_error: true });
@@ -278,6 +293,8 @@ export async function POST(req: Request) {
               }
             }
             convo.push({ role: "user", content: results });
+            // What the answer's figures may come from (the accuracy check below): every lookup's result.
+            for (const r of results) if (typeof r.content === "string" && !r.is_error) foundIn.push(r.content);
             // A blank line, so words from before and after a lookup don't run together.
             if (sent) sendWords("\n\n");
             sent = false;
@@ -296,7 +313,14 @@ export async function POST(req: Request) {
         // Last of all, after the answer: which lookups ran (names only, from our own list). The panel hides it.
         // Just before it, the thank-you slot, always there and always ours: a prepared thank-you's draft id or one of our
         // fixed audiences, or empty when nothing was prepared (review 24/11/2026).
-        if (!stopped) send(thanksMark(prepared) + nextMark(used));
+        // Every Rand amount must come from what was looked up (or typed): one that matches nothing is named, with a plain
+        // note to check it on the dashboard. Counted in the log without the figures or the question.
+        const unmatched = !stopped && anySent ? unmatchedAmounts(words, foundIn) : [];
+        if (unmatched.length) {
+          console.warn(`[assistant] unmatched figures: ${unmatched.length}`);
+          send(unmatchedNote(unmatched, formatRand));
+        }
+        if (!stopped) send(thanksMark(prepared) + nextMark(used, goKeys(ran, hidden)));
         console.info(`[assistant] lookups: ${lookups}`);
       } catch (e) {
         if (!stopped) {

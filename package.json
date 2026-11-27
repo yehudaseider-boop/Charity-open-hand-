@@ -16,7 +16,8 @@
     "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
     "receipts": "tsx --env-file=.env.local scripts/issue-receipts.ts",
     "picture-copies": "tsx --conditions=react-server --env-file=.env.local scripts/make-picture-copies.ts",
-    "test:e2e": "vitest run --config vitest.e2e.config.ts"
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "eval:givy": "vitest run --config vitest.eval.config.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",
