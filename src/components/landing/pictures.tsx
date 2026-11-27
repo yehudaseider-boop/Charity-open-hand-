@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Icon, type IconName } from "@/components/marketing";
 import { platformConfig } from "@/config/platform";
 
@@ -31,41 +32,33 @@ function Panel({ children, caption, className = "" }: { children: React.ReactNod
   );
 }
 
-const gifts = [
-  { date: "02/10/2026", name: "A food parcel charity", tag: "s18A receipt", amount: "R500" },
-  { date: "28/09/2026", name: "A school charity", tag: "once-off", amount: "R250" },
-  { date: "19/09/2026", name: "An old-age home", tag: "monthly", amount: "R180" },
-  { date: "05/09/2026", name: "A medical support charity", tag: "s18A receipt", amount: "R360" },
-];
-
-/** The giver's picture: a phone with a sample giving history. */
+/**
+ * The giver's picture: the Givezy app's own Home screen, a real picture of the app with its sample data (27/11/2026,
+ * Yehuda: the drawn phone still looked like the old app). Taken at three times phone size (1170 × 2532) from the app's
+ * browser preview, so it is sharp on a phone. Retake it when the app's Home changes: build the preview
+ * (scripts/build-app-preview.sh), open Home, screenshot at 390 × 844 with deviceScaleFactor 3, save as WebP with a new
+ * version number in the name.
+ */
 export function PhonePicture() {
   return (
     <div className="relative">
       <span aria-hidden className="absolute -left-4 top-10 -z-10 h-40 w-40 rounded-full bg-peach sm:-left-8" />
       <span aria-hidden className="absolute -right-2 bottom-6 -z-10 h-24 w-24 rounded-full bg-honey sm:-right-6" />
-      <Phone caption="A sample of the giving history in the Givezy app.">
-        <div className="flex items-center justify-between">
-          <p className="font-display text-[1.25rem] font-bold">Your giving</p>
-          <SampleTag />
+      <figure className="relative mx-auto w-full max-w-[20rem]">
+        {/* A thin white edge inside the frame, so the rounded corners never cut into the app's bottom bar. */}
+        <div className="overflow-hidden rounded-[2.75rem] border-[10px] border-navy bg-white p-2 shadow-[0_40px_80px_rgba(14,27,61,0.18)]">
+          <Image
+            src="/home/app-home-v1.webp"
+            alt="The Givezy app's Home screen, with sample data: give again to a charity you gave to, a giving goal ring for the tax year, and a payday reminder."
+            width={1170}
+            height={2532}
+            sizes="(min-width: 768px) 20rem, 90vw"
+            quality={90}
+            className="block h-auto w-full rounded-[1.75rem]"
+          />
         </div>
-        <div className="mt-4 rounded-[1.25rem] bg-brand p-4 text-white">
-          <p className="text-[13px] opacity-80">This tax year</p>
-          <p className="font-display text-[2rem] font-extrabold leading-tight">R1 290</p>
-          <p className="text-[13px] opacity-80">Towards 2 s18A receipts</p>
-        </div>
-        <ul className="mt-3 flex flex-col">
-          {gifts.map((g) => (
-            <li key={g.date} className="flex items-center gap-3 border-b border-border py-2.5 last:border-0">
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-[14px] font-semibold">{g.name}</span>
-                <span className="text-[12px] text-muted">{g.date}, {g.tag}</span>
-              </span>
-              <span className="shrink-0 text-[14px] font-bold">{g.amount}</span>
-            </li>
-          ))}
-        </ul>
-      </Phone>
+        <figcaption className="mt-3 flex justify-center"><SampleTag /></figcaption>
+      </figure>
     </div>
   );
 }
