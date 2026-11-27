@@ -44,8 +44,8 @@ export const NONCE_AREAS = [
   "/test-gateway",
 ] as const;
 
-/** A charity's give page: /c/<slug>/donate. */
-const GIVE_PAGE = /^\/c\/[^/]+\/donate(?:\/|$)/;
+/** A charity's give page: /c/<slug>/donate, and its redesign preview /preview/give/<slug> (review 27/11/2026). */
+const GIVE_PAGE = /^\/(?:c\/[^/]+\/donate|preview\/give\/[^/]+)(?:\/|$)/;
 
 /** Which policy a page address gets. Matched without regard to capital letters, so a strange spelling is never looser. */
 export function cspPolicyFor(pathname: string): CspPolicy {

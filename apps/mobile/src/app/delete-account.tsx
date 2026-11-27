@@ -17,6 +17,7 @@ import { useAccount } from "@/lib/account";
 import { checkDeletion, deleteReady, phoneKeysFor, requestDeletion, stageAfterRefusal } from "@/lib/delete-account";
 import { startAgainAsNewDonor } from "@/lib/first-run";
 import { haptic } from "@/lib/haptics";
+import { useReminder } from "@/lib/reminder";
 import { helpLine, helpMailto } from "@/lib/help";
 import { cleanCode } from "@/lib/live-giving";
 import { secureStorage } from "@/lib/secure-storage";
@@ -44,6 +45,7 @@ export default function DeleteAccount() {
   const insets = useSafeAreaInsets();
   const status = useStatusCover({ onBlue: true });
   const account = useAccount();
+  const reminder = useReminder();
   const p = useLocalSearchParams<{ state?: string }>();
   const preview = account.status === "preview";
   const shot = preview || isIphonePreview() ? p.state : undefined;
@@ -119,6 +121,8 @@ export default function DeleteAccount() {
       // The account is already gone on our side: the phone still lets go of its copy of the sign-in.
     }
     if (id) await Promise.all(phoneKeysFor(id).map((k) => secureStorage.removeItem(k).catch(() => undefined)));
+    // The payday reminder goes too: no more nudges for an account that's gone (review 27/11/2026).
+    await reminder.forget().catch(() => undefined);
     await startAgainAsNewDonor().catch(() => undefined);
     haptic.success();
     setStage("done");
@@ -129,6 +133,7 @@ export default function DeleteAccount() {
     const id = account.userId;
     await account.signOut().catch(() => undefined);
     if (id) await Promise.all(phoneKeysFor(id).map((k) => secureStorage.removeItem(k).catch(() => undefined)));
+    await reminder.forget().catch(() => undefined);
     router.navigate("/account");
   };
 

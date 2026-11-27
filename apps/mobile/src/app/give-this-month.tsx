@@ -42,10 +42,17 @@ export default function GiveThisMonth() {
     return [...seen.values()].slice(0, MOST);
   }, [gifts]);
 
+  const [skipProblem, setSkipProblem] = useState(false);
   const notThisMonth = async () => {
-    const next = await reminder.skipThisMonth();
+    const r = await reminder.skipThisMonth();
+    if (r === "not-saved") {
+      haptic.soft();
+      setSkipProblem(true);
+      return;
+    }
     haptic.press();
-    setSkipped({ next });
+    setSkipProblem(false);
+    setSkipped({ next: r.next });
   };
 
   return (
@@ -87,7 +94,12 @@ export default function GiveThisMonth() {
               <Text style={styles.cardText}>{skipped.next ? `No problem. Your next reminder is on ${ddmmyyyy(skipped.next)}.` : "No problem. No reminder this month."}</Text>
             </View>
           ) : !gaveThisMonth ? (
-            <Button variant="secondary" label="Not this month" onPress={notThisMonth} />
+            <View style={{ gap: 10 }}>
+              {skipProblem ? (
+                <Text style={styles.problemText} accessibilityRole="alert">That wasn&apos;t saved just now, so this month&apos;s reminder is still on. Please try again.</Text>
+              ) : null}
+              <Button variant="secondary" label="Not this month" onPress={notThisMonth} />
+            </View>
           ) : null
         ) : null}
       </ScrollView>
@@ -101,6 +113,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: radius.card, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
   name: { fontFamily: fonts.bodyBold, fontSize: 16, lineHeight: 21, color: colors.navy },
   card: { padding: 18, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
+  problemText: { fontFamily: fonts.bodySemibold, fontSize: 16, lineHeight: 22, color: colors.danger },
   cardText: { fontFamily: fonts.bodySemibold, fontSize: 16, lineHeight: 23, color: colors.navy },
   doneCard: { flexDirection: "row", gap: 14, alignItems: "flex-start", padding: 18, borderRadius: radius.card, backgroundColor: colors.lilacSoft },
   tick: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.sage, alignItems: "center", justifyContent: "center" },

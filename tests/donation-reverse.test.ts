@@ -26,12 +26,17 @@ const refundRecordedAt = "2027-03-10T08:00:00Z";
 let refundSources: Map<string, number>;
 const audits: { action: string; entityId?: string | null; details?: Record<string, unknown> }[] = [];
 
-/** record_partial_refund (migration 20261120000001), as the database answers it. */
-function recordPartialRefundInDb(a: { p_donation_id: string; p_amount_cents: number; p_source: string }): string {
+/** record_partial_refund (migration 20261127000001), as the database answers it. */
+function recordPartialRefundInDb(a: { p_donation_id: string; p_amount_cents: number; p_source: string; p_same_amount?: string }): string {
   const d = donations.find((x) => x.id === a.p_donation_id);
   if (!d) return "not_found";
   if (refundSources.has(a.p_source)) return "already";
   if (d.status !== "paid") return "not_paid";
+  // (One gift in these tests, so every recorded refund is on it.)
+  const sameAmount = [...refundSources].filter(([, cents]) => cents === a.p_amount_cents).map(([source]) => source);
+  const rule = a.p_same_amount ?? "refuse";
+  if (rule === "refuse" && sameAmount.length) return "same_amount";
+  if (rule === "hold_if_by_hand" && sameAmount.some((x) => x.startsWith("admin:"))) return "same_amount";
   if (d.refunded_cents + a.p_amount_cents > d.amount_cents) return "too_much";
   refundSources.set(a.p_source, a.p_amount_cents);
   d.refunded_cents += a.p_amount_cents;
@@ -41,7 +46,7 @@ function recordPartialRefundInDb(a: { p_donation_id: string; p_amount_cents: num
 vi.mock("@/lib/audit", () => ({ logAudit: async (a: { action: string; entityId?: string | null; details?: Record<string, unknown> }) => void audits.push(a) }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
-    rpc: async (name: string, args: { p_donation_id: string; p_amount_cents: number; p_source: string }) => {
+    rpc: async (name: string, args: { p_donation_id: string; p_amount_cents: number; p_source: string; p_same_amount?: string }) => {
       if (name !== "record_partial_refund") throw new Error(`unexpected rpc ${name}`);
       return { data: recordPartialRefundInDb(args), error: null };
     },

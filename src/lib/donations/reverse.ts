@@ -14,8 +14,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export type ReverseKind = "refunded" | "charged_back";
 export type ReverseOutcome = "done" | "already" | "not_paid" | "not_found";
-/** What recording a partial refund did: see record_partial_refund (migration 20261120000001). */
-export type PartialRefundOutcome = "done" | "already" | "not_paid" | "not_found" | "too_much";
+/** What recording a partial refund did: see record_partial_refund (migration 20261127000001). */
+export type PartialRefundOutcome = "done" | "already" | "not_paid" | "not_found" | "too_much" | "same_amount";
+
+/**
+ * What to do when a refund of the same amount is already on the gift, decided by the database while the gift is held
+ * (code review 27/11/2026): "refuse" (an admin entry: say so), "allow" (an admin ticked "a second, separate refund"),
+ * "hold_if_by_hand" (the provider's report: held for a person when someone recorded that amount by hand).
+ */
+export type SameAmountRule = "refuse" | "allow" | "hold_if_by_hand";
 
 /**
  * Why a gift is kept off s18A receipts until a person has looked (donations.receipt_hold, 20/11/2026). The
@@ -99,10 +106,10 @@ async function withdrawReceiptsFor(donationId: string, actorUserId: string | nul
  * with the gift on it is withdrawn for re-issue. A gift refunded in full this way (and with nothing else charged)
  * is marked refunded. Safe to repeat.
  */
-export async function recordPartialRefund(donationId: string, amountCents: number, source: string, actorUserId: string | null, how: string): Promise<PartialRefundOutcome> {
+export async function recordPartialRefund(donationId: string, amountCents: number, source: string, actorUserId: string | null, how: string, sameAmount: SameAmountRule = "refuse"): Promise<PartialRefundOutcome> {
   if (!Number.isSafeInteger(amountCents) || amountCents <= 0) throw new Error("A refund must be a whole number of cents above 0");
   const db = createAdminClient();
-  const { data, error } = await db.rpc("record_partial_refund", { p_donation_id: donationId, p_amount_cents: amountCents, p_source: source, p_actor: actorUserId });
+  const { data, error } = await db.rpc("record_partial_refund", { p_donation_id: donationId, p_amount_cents: amountCents, p_source: source, p_actor: actorUserId, p_same_amount: sameAmount });
   if (error) throw error;
   const outcome = data as PartialRefundOutcome;
   if (outcome !== "done" && outcome !== "already") return outcome;
@@ -268,18 +275,16 @@ export async function handleRefund(reference: string | null, amountCents: number
   // partial refunds are two rows and a repeat delivery of one finds the same row.
   if (currency === "ZAR" && amountCents !== null && amountCents > 0 && amountCents < d.total_charged_cents && d.total_charged_cents === d.amount_cents) {
     const source = `gateway_event:${eventRowId}`;
-    // A person may already have recorded this same refund by hand (Admin, Payments): then it is not counted again,
-    // but held for a person to check (two equal refunds are possible). A repeat delivery of this event records nothing.
-    const { data: own, error: ownError } = await createAdminClient().from("donation_refunds").select("id").eq("source", source).maybeSingle();
-    if (ownError) throw ownError;
-    const same = own ? null : await sameAmountRefunds(d.id, amountCents);
-    if (same && same.person > same.provider) {
+    // A person may already have recorded a refund of this amount by hand (Admin, Payments): then it is not counted
+    // again, but held for a person to check (two equal refunds are possible). The database decides while the gift is
+    // held, so a hand entry saved at the same moment is seen (code review 27/11/2026). A repeat delivery records nothing.
+    const outcome = await recordPartialRefund(d.id, amountCents, source, null, "the payment provider refunded part of the payment", "hold_if_by_hand");
+    if (outcome === "done" || outcome === "already") return;
+    if (outcome === "same_amount") {
       await holdReceipt(d.id, RECEIPT_HOLD.refundReview);
       await logAudit({ actorUserId: null, action: "donation.refund_review", entityType: "donation", entityId: d.id, details: { amountCents, currency, paidCents: d.total_charged_cents, status: d.status, matchesRecordedByHand: true } });
       return;
     }
-    const outcome = await recordPartialRefund(d.id, amountCents, source, null, "the payment provider refunded part of the payment");
-    if (outcome === "done" || outcome === "already") return;
   }
   await holdReceipt(d.id, RECEIPT_HOLD.refundReview);
   await logAudit({ actorUserId: null, action: "donation.refund_review", entityType: "donation", entityId: d.id, details: { amountCents, currency, paidCents: d.total_charged_cents, status: d.status } });

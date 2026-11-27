@@ -1,5 +1,5 @@
-import { cleanSettings, gaveInMonth, nextReminderAt, NO_REMINDER, type ReminderSettings } from "./reminders";
-import { clearReminder, reminderPermission, setReminder } from "./phone-reminders";
+import { cleanSettings, gaveInMonth, NO_REMINDER, upcomingReminders, type ReminderSettings } from "./reminders";
+import { clearReminder, reminderPermission, setReminders } from "./phone-reminders";
 import { secureStorage } from "./secure-storage";
 
 /**
@@ -33,6 +33,11 @@ export type ReminderState =
   | { kind: "set"; next: Date }
   /** On, but the phone said no to notifications (or took it back in Settings): nothing goes off. */
   | { kind: "blocked" }
+  /**
+   * On, but the phone hasn't been asked yet: the app was deleted and put back (the setting outlives it, the phone's
+   * permission doesn't). Asking again is the way back, not Settings (review 27/11/2026).
+   */
+  | { kind: "ask" }
   /** On, but the phone wouldn't take the reminder just now. */
   | { kind: "failed" }
   /** This build or the web can't set reminders. */
@@ -41,10 +46,11 @@ export type ReminderState =
 /**
  * Puts the phone's reminder in line with the setting and the donor's gifts: the next date (skipping a month they
  * already gave in, or said "Not this month" to), or none. Run when the app opens or comes back, after the donor's gifts
- * load or change, and after any change to the setting. Safe to repeat: it always replaces the one reminder.
+ * load or change, and after any change to the setting. Safe to repeat: it always replaces the reminders it set.
  */
 export async function syncReminder(settings: ReminderSettings, giftDates: readonly Date[], now = new Date()): Promise<ReminderState> {
-  const next = nextReminderAt(settings, now, gaveInMonth(giftDates));
+  const dates = upcomingReminders(settings, now, gaveInMonth(giftDates));
+  const next = dates[0];
   if (!settings.on || !settings.day || !next) {
     await clearReminder();
     return { kind: "off" };
@@ -53,7 +59,7 @@ export async function syncReminder(settings: ReminderSettings, giftDates: readon
   if (permission === "unavailable") return { kind: "unavailable" };
   if (permission !== "granted") {
     await clearReminder();
-    return { kind: "blocked" };
+    return { kind: permission === "undetermined" ? "ask" : "blocked" };
   }
-  return (await setReminder(next, settings.day)) ? { kind: "set", next } : { kind: "failed" };
+  return (await setReminders(dates, settings.day)) ? { kind: "set", next } : { kind: "failed" };
 }

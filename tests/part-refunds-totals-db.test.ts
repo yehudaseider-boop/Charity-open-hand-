@@ -141,3 +141,63 @@ describe("part refunds in the charity's totals", () => {
     });
   });
 });
+
+// Code review 27/11/2026: the same refund never counted twice, decided in the database while the gift is held (so a
+// hand entry and the provider's report arriving at the same moment are decided one after the other).
+describe("a refund of the same amount (migration 20261127000001)", () => {
+  const rule = async (id: string, cents: number, source: string, same: string) =>
+    (await one("select public.record_partial_refund($1, $2::bigint, $3, null, $4) as outcome", [id, cents, source, same])).outcome as string;
+  const refunded = async (id: string) => Number((await one("select refunded_cents from public.donations where id = $1", [id])).refunded_cents);
+
+  it("an admin entry is refused while the provider's report of that amount is there, unless the box is ticked", async () => {
+    await tx(async () => {
+      const c = await charity(), d = await donor(), g = await gift(c, d, 100_000);
+      expect(await rule(g, 40_000, `gateway_event:${stamp()}`, "hold_if_by_hand")).toBe("done");
+      expect(await rule(g, 40_000, `admin:${stamp()}`, "refuse")).toBe("same_amount");
+      expect(await refunded(g)).toBe(40_000);
+      expect(await rule(g, 40_000, `admin:${stamp()}`, "allow")).toBe("done");
+      expect(await refunded(g)).toBe(80_000);
+    });
+  });
+
+  it("the provider's report of an amount someone recorded by hand is held, never counted again", async () => {
+    await tx(async () => {
+      const c = await charity(), d = await donor(), g = await gift(c, d, 100_000);
+      expect(await rule(g, 40_000, `admin:${stamp()}`, "refuse")).toBe("done");
+      expect(await rule(g, 40_000, `gateway_event:${stamp()}`, "hold_if_by_hand")).toBe("same_amount");
+      expect(await refunded(g)).toBe(40_000);
+    });
+  });
+
+  it("after an admin ticked 'separate', the provider's delayed report of that second refund is held, not a third", async () => {
+    await tx(async () => {
+      const c = await charity(), d = await donor(), g = await gift(c, d, 100_000);
+      expect(await rule(g, 5_000, `gateway_event:${stamp()}`, "hold_if_by_hand")).toBe("done");
+      expect(await rule(g, 5_000, `admin:${stamp()}`, "allow")).toBe("done");
+      expect(await rule(g, 5_000, `gateway_event:${stamp()}`, "hold_if_by_hand")).toBe("same_amount");
+      expect(await refunded(g)).toBe(10_000);
+    });
+  });
+
+  it("two provider reports of the same amount are two refunds; a repeat delivery is still counted once", async () => {
+    await tx(async () => {
+      const c = await charity(), d = await donor(), g = await gift(c, d, 100_000);
+      const e1 = `gateway_event:${stamp()}`;
+      expect(await rule(g, 5_000, e1, "hold_if_by_hand")).toBe("done");
+      expect(await rule(g, 5_000, e1, "hold_if_by_hand")).toBe("already");
+      expect(await rule(g, 5_000, `gateway_event:${stamp()}`, "hold_if_by_hand")).toBe("done");
+      expect(await refunded(g)).toBe(10_000);
+    });
+  });
+
+  it("refuses a rule it doesn't know, and nobody but the server can call it", async () => {
+    await tx(async () => {
+      const c = await charity(), d = await donor(), g = await gift(c, d, 100_000);
+      await expect(rule(g, 5_000, `admin:${stamp()}`, "sometimes")).rejects.toThrow(/Unknown rule/);
+    });
+    await tx(async () => {
+      await run("set local role authenticated");
+      await expect(run("select public.record_partial_refund(gen_random_uuid(), 100::bigint, 'admin:x', null, 'allow')")).rejects.toThrow(/permission denied/);
+    });
+  });
+});

@@ -7,7 +7,7 @@ import { askerContext, stableInstructions } from "@/lib/assistant/prompt";
 import { checkQuestion, pagePath, type AssistantRequest } from "@/lib/assistant/request";
 import { goKeys } from "@/lib/assistant/go-links";
 import { formatRand } from "@/lib/money";
-import { unmatchedAmounts, unmatchedNote } from "@/lib/assistant/grounding";
+import { trustedChat, unmatchedAmounts, unmatchedNote } from "@/lib/assistant/grounding";
 import { markerGuard, nextMark } from "@/lib/assistant/suggestions";
 import { ONE_CONTACT_PER_ANSWER, ToolRefusal, checkToolCall, runPrepare, runTool, toolDefinitions, type HelperSource, type ThankYouPreparer } from "@/lib/assistant/tools";
 import { livePreparer } from "@/lib/assistant/drafts";
@@ -189,10 +189,10 @@ export async function POST(req: Request) {
       const used: string[] = [];
       const ran: { name: string; input: unknown }[] = [];
       // The accuracy check (27/11/2026): the model's own words, and what it found plus the chat so far (what the person
-      // typed, and earlier answers, which were checked when they were given).
+      // typed, and earlier answers less any figure their own note flagged: trustedChat).
       let words = "";
       // Givy's own instructions and how-to guide count too (the R30 minimum, a step's amount).
-      const foundIn: string[] = [...messages.map((m) => m.content), ...system.map((b) => b.text)];
+      const foundIn: string[] = [...trustedChat(messages), ...system.map((b) => b.text)];
       // Pages this role can't open never get a button (the demo shows every page).
       const hidden = role === "demo" ? [] : hiddenPages(role);
       // A thank-you prepared in this answer (at most one): what the panel's button needs.

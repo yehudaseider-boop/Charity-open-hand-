@@ -65,18 +65,20 @@ export async function recordPartRefund(donationId: string, entry: string, _prev:
   if (cents > left) return wrong(`That is more than what is left of the gift (${formatRand(left)})`);
   // A refund of this same amount may already be recorded on the gift, by the payment provider or by hand (also when
   // the provider's report was held because it matched a hand entry): never counted twice unless a person says it is
-  // a second, separate one (fresh review, 25/11/2026; code review, 26/11/2026).
-  const same = await sameAmountRefunds(donationId, cents);
-  if (same.provider + same.person > 0 && formData.get("separate") !== "on") {
+  // a second, separate one. The database decides while the gift is held (code review 27/11/2026: checking first let a
+  // provider report saved at the same moment through).
+  const separate = formData.get("separate") === "on";
+  const outcome = await recordPartialRefund(donationId, cents, `admin:${entry}`, viewer.userId, "recorded by a platform admin", separate ? "allow" : "refuse");
+  revalidatePath("/admin/payments");
+  if (outcome === "same_amount") {
+    // Only for the words: who recorded the one already there.
+    const same = await sameAmountRefunds(donationId, cents);
     const by = same.provider > 0 ? "the payment provider told us about it" : "it was recorded here by hand";
     return {
       ok: false,
       message: `A refund of ${formatRand(cents)} is already recorded on this gift (${by}). If it's the same refund, there's nothing more to record. If it's a second, separate refund, tick the box and save again.`,
     };
   }
-
-  const outcome = await recordPartialRefund(donationId, cents, `admin:${entry}`, viewer.userId, "recorded by a platform admin");
-  revalidatePath("/admin/payments");
   if (outcome === "done") return { ok: true, message: `Recorded. ${formatRand(left - cents)} of the gift is left for the s18A receipt.` };
   if (outcome === "already") return { ok: true, message: "This was already recorded. Nothing more was changed." };
   if (outcome === "too_much") return wrong("That is more than what is left of the gift. Refresh the page to see the latest amount");

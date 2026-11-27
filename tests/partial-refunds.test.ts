@@ -101,7 +101,8 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 vi.mock("@/lib/donations/reverse", () => ({
-  recordPartialRefund: async (...args: unknown[]) => (recorded.push(args), outcome),
+  // As the database answers (migration 20261127000001): "refuse" with a refund of that amount already there.
+  recordPartialRefund: async (...args: unknown[]) => (recorded.push(args), args[5] === "refuse" && sameAmount.provider + sameAmount.person > 0 ? "same_amount" : outcome),
   clearReceiptHold: async (...args: unknown[]) => (recorded.push(["clear", ...args]), true),
   releaseDisputeHold: async () => true,
   reverseDonation: async () => "done",
@@ -130,7 +131,7 @@ describe("an admin records part of a gift refunded", () => {
 
   it("records the amount in cents, once per entry, and says what is left for the receipt", async () => {
     const r = await send("R400");
-    expect(recorded).toEqual([[DONATION, 40_000, `admin:${ENTRY}`, "admin-1", "recorded by a platform admin"]]);
+    expect(recorded).toEqual([[DONATION, 40_000, `admin:${ENTRY}`, "admin-1", "recorded by a platform admin", "refuse"]]);
     expect(r).toEqual({ ok: true, message: "Recorded. R600 of the gift is left for the s18A receipt." });
     expect(await send("400.50")).toMatchObject({ ok: true });
     expect(recorded[1][1]).toBe(40_050);
@@ -169,10 +170,11 @@ describe("an admin records part of a gift refunded", () => {
     sameAmount = { provider: 1, person: 0 };
     const r = await send("400");
     expect(r).toMatchObject({ ok: false, message: expect.stringContaining("A refund of R400 is already recorded on this gift (the payment provider told us about it)") });
-    expect(recorded).toEqual([]);
+    // The database was asked to refuse a same-amount refund (it decides while the gift is held: code review 27/11/2026).
+    expect(recorded.map((a) => a[5])).toEqual(["refuse"]);
     // A genuinely separate second refund of the same amount: the admin ticks the box.
     expect(await send("400", DONATION, ENTRY, true)).toMatchObject({ ok: true });
-    expect(recorded).toHaveLength(1);
+    expect(recorded.map((a) => a[5])).toEqual(["refuse", "allow"]);
   });
 
   it("also when the first one was recorded by hand: the provider's held report must not be typed in again (code review, 26/11/2026)", async () => {
@@ -180,8 +182,8 @@ describe("an admin records part of a gift refunded", () => {
     expect(await send("400")).toMatchObject({ ok: false, message: expect.stringContaining("it was recorded here by hand") });
     sameAmount = { provider: 1, person: 1 };
     expect((await send("400")).ok).toBe(false);
-    expect(recorded).toEqual([]);
     expect(await send("400", DONATION, ENTRY, true)).toMatchObject({ ok: true });
+    expect(recorded.map((a) => a[5])).toEqual(["refuse", "refuse", "allow"]);
   });
 
   it("needs a platform admin, as the other payment actions do", async () => {

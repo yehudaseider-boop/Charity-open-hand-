@@ -8,13 +8,13 @@ const input = { dev: false, supabaseOrigin: "https://x.supabase.co", formActionO
 
 describe("which pages get the nonce policy (23/11/2026)", () => {
   it("every sign-in, account, dashboard, give and receipt page does", () => {
-    for (const p of ["/account", "/account/data/export", "/admin", "/admin/charities/abc", "/charity-admin/x/donations", "/login", "/login/app", "/mfa", "/auth/callback", "/agree", "/donate/return", "/c/northcliff/donate", "/c/northcliff/donate/", "/receipts/abc", "/documents/abc", "/monthly/new-card", "/apply", "/charities/request", "/thanks/stop", "/test-gateway"]) {
+    for (const p of ["/account", "/account/data/export", "/admin", "/admin/charities/abc", "/charity-admin/x/donations", "/login", "/login/app", "/mfa", "/auth/callback", "/agree", "/donate/return", "/c/northcliff/donate", "/c/northcliff/donate/", "/receipts/abc", "/documents/abc", "/monthly/new-card", "/apply", "/charities/request", "/thanks/stop", "/test-gateway", "/preview/give/northcliff", "/Preview/Give/northcliff/"]) {
       expect(cspPolicyFor(p), p).toBe("nonce");
     }
   });
 
   it("public pages keep the static policy", () => {
-    for (const p of ["/", "/charities", "/browse-charities", "/c/northcliff", "/faq", "/for-donors", "/for-charities", "/privacy", "/terms", "/coming-soon", "/sitemap.xml", "/accounting", "/administration", "/c/donate", "/c/a/b/donate", "/charities/opengraph-image"]) {
+    for (const p of ["/", "/charities", "/browse-charities", "/c/northcliff", "/faq", "/for-donors", "/for-charities", "/privacy", "/terms", "/coming-soon", "/sitemap.xml", "/accounting", "/administration", "/c/donate", "/c/a/b/donate", "/charities/opengraph-image", "/preview/charities", "/preview/give"]) {
       expect(cspPolicyFor(p), p).toBe("static");
     }
   });

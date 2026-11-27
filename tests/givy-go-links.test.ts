@@ -45,6 +45,13 @@ describe("carried in the server's own marker", () => {
     expect(r.tools).toEqual(["monthly_donations"]);
     expect(r.go).toEqual(["monthly", "monthly_declined"]);
   });
+  it("every button survives the trip, including names with digits (review 27/11/2026: the s18A ones were dropped)", () => {
+    for (const key of Object.keys(GO) as (keyof typeof GO)[]) {
+      const r = splitNext("Answer." + "\n[[thanks:]]" + nextMark(["donor_list"], [key]));
+      expect(r.go, key).toEqual([key]);
+      expect(r.text, key).toBe("Answer.");
+    }
+  });
   it("unknown names are ignored, never turned into a button", () => {
     expect(goFromNames(["go_monthly", "go_admin", "go_", "monthly", "go_https"])).toEqual(["monthly"]);
     expect(goMarkNames(["donors"])).toEqual(["go_donors"]);

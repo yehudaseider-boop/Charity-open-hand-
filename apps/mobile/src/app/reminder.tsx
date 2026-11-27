@@ -48,7 +48,8 @@ export default function ReminderScreen() {
 
   const on = Boolean(s?.on);
   const next = reminder.state.kind === "set" ? reminder.state.next : null;
-  const changing = on && s?.day !== day;
+  // The phone needs asking again (after the app was put back): the same button asks.
+  const changing = on && (s?.day !== day || reminder.state.kind === "ask");
 
   const remind = async () => {
     if (busyRef.current) return;
@@ -79,9 +80,16 @@ export default function ReminderScreen() {
     }
   };
 
+  const notSaved = (what: string) => {
+    haptic.soft();
+    setNote({ kind: "problem", text: `${what} Nothing changed. Please try again.` });
+    scroll.current?.scrollTo({ y: 0, animated: true });
+  };
+
   const turnOff = async () => {
-    const previous = await reminder.turnOff();
-    if (!previous) return;
+    const r = await reminder.turnOff();
+    if (!r) return;
+    if (r === "not-saved") return notSaved("Your reminder wasn't turned off just now.");
     haptic.press();
     setNote(null);
     showUndo({
@@ -89,12 +97,15 @@ export default function ReminderScreen() {
       label: "Undo",
       run: () => {
         setUndo(null);
-        void reminder.restore(previous);
+        void reminder.restore(r.previous).then((ok) => {
+          if (!ok) notSaved("Your reminder couldn't be turned back on just now. It's still off.");
+        });
       },
     });
   };
 
   const notNow = async () => {
+    // Kept or not, the donor said no for now: leave the screen either way (the offer may simply come back).
     await reminder.notNow();
     if (router.canGoBack()) router.back();
     else router.replace("/(tabs)/account");
@@ -143,6 +154,13 @@ export default function ReminderScreen() {
               <>
                 <Text style={styles.cardText}>Your reminder is on, but your phone has notifications from Givezy switched off, so nothing goes off.</Text>
                 <Button variant="secondary" label="Open your phone's Settings" onPress={() => void openPhoneSettings()} />
+              </>
+            ) : reminder.state.kind === "ask" ? (
+              <Text style={styles.cardText}>Your reminder is on, but your phone needs your yes again before it can go off. Press the button below.</Text>
+            ) : reminder.state.kind === "failed" ? (
+              <>
+                <Text style={styles.cardText}>Your reminder is on, but your phone wouldn&apos;t set it just now, so nothing goes off yet.</Text>
+                <Button variant="secondary" label="Try again" onPress={() => void reminder.retry()} />
               </>
             ) : (
               <Text style={styles.cardText}>{reminderSummary(s, next)}</Text>

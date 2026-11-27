@@ -116,7 +116,7 @@ describe("browsers", () => {
         [role],
       );
       expect(t.any).toBe(false);
-      expect((await one("select has_function_privilege($1, 'public.record_partial_refund(uuid, bigint, text, uuid)', 'execute') as x", [role])).x).toBe(false);
+      expect((await one("select has_function_privilege($1, 'public.record_partial_refund(uuid, bigint, text, uuid, text)', 'execute') as x", [role])).x).toBe(false);
     }
     expect((await one("select relrowsecurity from pg_class where oid = 'public.donation_refunds'::regclass")).relrowsecurity).toBe(true);
   });

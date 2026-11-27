@@ -1,7 +1,7 @@
 import { Linking, Platform } from "react-native";
 import { requireOptionalNativeModule } from "expo";
 import type * as NotificationsModule from "expo-notifications";
-import { reminderMessage, type ReminderDay } from "./reminders";
+import { monthKeyOf, reminderMessage, type ReminderDay } from "./reminders";
 
 /**
  * The phone's side of the payday reminder (27/11/2026): asking permission, setting the one reminder, and hearing when
@@ -38,8 +38,12 @@ export const remindersAvailable = (): boolean => notifications() !== null;
 export type ReminderPermission = "granted" | "denied" | "undetermined" | "unavailable";
 
 const ANDROID_CHANNEL = "monthly-reminder";
-/** The one reminder's own id, so setting it again replaces it: never two. */
+/**
+ * Every reminder's id starts with this; each month's is "givezy-payday-reminder-2026-12", so a month is never set twice
+ * and they can all be found and cleared (the first build set one, under this exact id: cleared the same way).
+ */
 const REMINDER_ID = "givezy-payday-reminder";
+const isOurs = (id: string) => id === REMINDER_ID || id.startsWith(`${REMINDER_ID}-`);
 /** Where tapping it goes. */
 export const REMINDER_OPENS = "/give-this-month";
 
@@ -74,29 +78,46 @@ export async function askForReminders(): Promise<ReminderPermission> {
   }
 }
 
-/** Sets the one reminder for this moment (replacing any earlier one). False when the phone wouldn't set it. */
-export async function setReminder(at: Date, day: ReminderDay): Promise<boolean> {
+/** Takes every reminder of ours off the phone. */
+async function clearAll(n: Notifications): Promise<void> {
+  const ids = new Set<string>([REMINDER_ID]);
+  try {
+    for (const r of await n.getAllScheduledNotificationsAsync()) if (isOurs(r.identifier)) ids.add(r.identifier);
+  } catch {
+    // The list couldn't be read: the first build's id is still cleared below.
+  }
+  await Promise.all([...ids].map((id) => n.cancelScheduledNotificationAsync(id).catch(() => undefined)));
+}
+
+/**
+ * Sets the reminders for these moments (one per month), replacing all earlier ones. False when the phone wouldn't
+ * set them; then none is left half-set.
+ */
+export async function setReminders(dates: readonly Date[], day: ReminderDay): Promise<boolean> {
   const n = notifications();
   if (!n) return false;
   try {
-    await n.cancelScheduledNotificationAsync(REMINDER_ID).catch(() => undefined);
+    await clearAll(n);
     const { title, body } = reminderMessage(day);
-    await n.scheduleNotificationAsync({
-      identifier: REMINDER_ID,
-      content: { title, body, data: { opens: REMINDER_OPENS } },
-      trigger: { type: n.SchedulableTriggerInputTypes.DATE, date: at, ...(Platform.OS === "android" ? { channelId: ANDROID_CHANNEL } : {}) },
-    });
+    for (const at of dates) {
+      await n.scheduleNotificationAsync({
+        identifier: `${REMINDER_ID}-${monthKeyOf(at)}`,
+        content: { title, body, data: { opens: REMINDER_OPENS } },
+        trigger: { type: n.SchedulableTriggerInputTypes.DATE, date: at, ...(Platform.OS === "android" ? { channelId: ANDROID_CHANNEL } : {}) },
+      });
+    }
     return true;
   } catch {
+    await clearAll(n).catch(() => undefined);
     return false;
   }
 }
 
-/** Takes the reminder off the phone. Safe to call when none is set. */
+/** Takes the reminders off the phone. Safe to call when none is set. */
 export async function clearReminder(): Promise<void> {
   const n = notifications();
   if (!n) return;
-  await n.cancelScheduledNotificationAsync(REMINDER_ID).catch(() => undefined);
+  await clearAll(n);
 }
 
 /**
@@ -107,7 +128,7 @@ export function onReminderTapped(open: (path: string) => void): () => void {
   const n = notifications();
   if (!n) return () => undefined;
   const handle = (r: { notification: { request: { identifier: string; content: { data?: Record<string, unknown> | null } } } } | null) => {
-    if (!r || r.notification.request.identifier !== REMINDER_ID) return;
+    if (!r || !isOurs(r.notification.request.identifier)) return;
     const to = r.notification.request.content.data?.opens;
     open(typeof to === "string" && to.startsWith("/") ? to : REMINDER_OPENS);
   };
@@ -119,7 +140,15 @@ export function onReminderTapped(open: (path: string) => void): () => void {
       handle(last);
       n.clearLastNotificationResponse();
     }
-    const sub = n.addNotificationResponseReceivedListener(handle);
+    // Handled while running: forgotten too, so it can never be opened a second time (review 27/11/2026).
+    const sub = n.addNotificationResponseReceivedListener((r) => {
+      handle(r);
+      try {
+        n.clearLastNotificationResponse();
+      } catch {
+        // Only a tidy-up.
+      }
+    });
     return () => sub.remove();
   } catch {
     return () => undefined;

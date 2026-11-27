@@ -3,9 +3,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState, Platform } from "react-native";
 import { gifts as sampleGifts } from "@/data/giving";
 import { useAccount } from "./account";
-import { askForReminders, onReminderTapped, remindersAvailable } from "./phone-reminders";
-import { loadReminder, saveReminder, syncReminder, type ReminderState } from "./reminder-store";
-import { gaveInMonth, monthKeyOf, nextReminderAt, type ReminderDay, type ReminderSettings } from "./reminders";
+import { askForReminders, clearReminder, onReminderTapped, remindersAvailable } from "./phone-reminders";
+import { loadReminder, REMINDER_KEY, saveReminder, syncReminder, type ReminderState } from "./reminder-store";
+import { secureStorage } from "./secure-storage";
+import { gaveInMonth, monthKeyOf, nextReminderAt, NO_REMINDER, withDay, type ReminderDay, type ReminderSettings } from "./reminders";
 
 /**
  * The payday reminder for every screen (27/11/2026). One place keeps the phone's reminder in step with the setting and
@@ -28,12 +29,18 @@ type ReminderValue = {
   /** Offered once, after a first gift, until the donor chose: set one, or "Not now". */
   offerable: boolean;
   start(day: ReminderDay): Promise<StartResult>;
-  notNow(): Promise<void>;
-  /** Turns it off; the result is what Undo puts back. */
-  turnOff(): Promise<ReminderSettings | null>;
-  restore(previous: ReminderSettings): Promise<void>;
-  /** "Not this month": the next one is next month's. */
-  skipThisMonth(): Promise<Date | null>;
+  /** False when the phone wouldn't keep the answer (the offer may come back). */
+  notNow(): Promise<boolean>;
+  /** Turns it off; `previous` is what Undo puts back. "not-saved": nothing changed (review 27/11/2026). */
+  turnOff(): Promise<{ previous: ReminderSettings } | "not-saved" | null>;
+  /** Undo of turning it off. False when the phone wouldn't keep it. */
+  restore(previous: ReminderSettings): Promise<boolean>;
+  /** "Not this month": the next one is next month's. "not-saved": nothing changed, the reminders stay as they were. */
+  skipThisMonth(): Promise<{ next: Date | null } | "not-saved">;
+  /** Tries again to set the reminders, after the phone wouldn't ("failed"). */
+  retry(): Promise<void>;
+  /** The account was deleted: the reminder goes too, setting and all. */
+  forget(): Promise<void>;
 };
 
 const ReminderContext = createContext<ReminderValue | null>(null);
@@ -63,12 +70,15 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
   // The sample donor's gifts in the preview (sample mode), the signed-in donor's otherwise.
   const gifts = account.status === "preview" ? sampleGifts : account.live?.gifts;
   const giftDates = useMemo(() => (gifts ?? []).map((g) => g.date), [gifts]);
+  // Until the account has loaded, the gifts aren't known: syncing then would bring back a month the donor already gave
+  // in (review 27/11/2026). Signed out, the reminder keeps the months it last knew about until the next sign-in.
+  const ready = account.status !== "loading";
 
   // The latest of each, for the app-comes-back check, which runs outside React's own updates.
-  const latest = useRef({ settings, giftDates });
+  const latest = useRef({ settings, giftDates, ready });
   useEffect(() => {
-    latest.current = { settings, giftDates };
-  }, [settings, giftDates]);
+    latest.current = { settings, giftDates, ready };
+  }, [settings, giftDates, ready]);
 
   useEffect(() => {
     let alive = true;
@@ -82,7 +92,7 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
 
   // In step with the setting and the gifts: after loading, after every change, and when the gifts change.
   useEffect(() => {
-    if (!available || !settings) return;
+    if (!available || !settings || !ready) return;
     let alive = true;
     void syncAny(sample, settings, giftDates).then((s) => {
       if (alive) setState(s);
@@ -90,14 +100,14 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
     return () => {
       alive = false;
     };
-  }, [available, settings, giftDates, sample]);
+  }, [available, settings, giftDates, sample, ready]);
 
   // Back to the front (a new month may have started, or the donor changed the phone's Settings): check again.
   useEffect(() => {
     if (!available) return;
     const sub = AppState.addEventListener("change", (now) => {
-      const { settings: s, giftDates: d } = latest.current;
-      if (now === "active" && s) void syncAny(sample, s, d).then(setState);
+      const { settings: s, giftDates: d, ready: r } = latest.current;
+      if (now === "active" && s && r) void syncAny(sample, s, d).then(setState);
     });
     return () => sub.remove();
   }, [available, sample]);
@@ -127,31 +137,47 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
           await save({ on: false, day, askedAt, skipMonth: null });
           return { ok: false, reason: answer === "unavailable" ? "unavailable" : "denied" };
         }
-        const next: ReminderSettings = { on: true, day, askedAt, skipMonth: null };
+        // A change of day keeps "Not this month", and never reminds twice in one month (withDay).
+        const next = withDay(settings, day, new Date(), askedAt);
+        const before = settings;
         if (!(await save(next))) return { ok: false, reason: "not-saved" };
         const s = await syncAny(sample, next, giftDates);
         setState(s);
-        return s.kind === "set" ? { ok: true, next: s.next } : s.kind === "off" ? { ok: true, next: null } : { ok: false, reason: "failed" };
+        if (s.kind === "set") return { ok: true, next: s.next };
+        if (s.kind === "off") return { ok: true, next: null };
+        // The phone wouldn't take it: the setting goes back to what it was, so the screen never says "on" for nothing.
+        if (before) await save(before);
+        return { ok: false, reason: "failed" };
       },
       async notNow() {
-        await save({ ...(settings ?? { on: false, day: null, skipMonth: null }), on: false, askedAt: new Date().toISOString() });
+        return save({ ...(settings ?? NO_REMINDER), on: false, askedAt: new Date().toISOString() });
       },
       async turnOff() {
         if (!settings?.on) return null;
         const previous = settings;
-        await save({ ...settings, on: false });
-        return previous;
+        return (await save({ ...settings, on: false })) ? { previous } : "not-saved";
       },
       async restore(previous) {
-        await save(previous);
+        return save(previous);
       },
       async skipThisMonth() {
-        if (!settings?.on) return null;
+        if (!settings?.on) return { next: null };
         const next: ReminderSettings = { ...settings, skipMonth: monthKeyOf(new Date()) };
-        await save(next);
+        // Only once it is kept: otherwise the next check would set this month's reminder again.
+        if (!(await save(next))) return "not-saved";
         const s = await syncAny(sample, next, giftDates);
         setState(s);
-        return s.kind === "set" ? s.next : null;
+        return { next: s.kind === "set" ? s.next : null };
+      },
+      async retry() {
+        if (!settings) return;
+        setState(await syncAny(sample, settings, giftDates));
+      },
+      async forget() {
+        if (!sample) await clearReminder();
+        await secureStorage.removeItem(REMINDER_KEY).catch(() => undefined);
+        setSettings(NO_REMINDER);
+        setState({ kind: "off" });
       },
     };
   }, [available, settings, state, giftDates, save, sample]);

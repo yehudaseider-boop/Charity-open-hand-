@@ -83,7 +83,7 @@ export function followUps(tools: string[], asked: string[], live: boolean, max =
  * `[[thanks:]]`, when nothing was prepared), then which lookups ran. Only read at the very end, and the model's own
  * words can never hold "[[" (markerGuard), so a marker the model writes itself is never taken for ours.
  */
-export const NEXT_MARK = /\n*\[\[thanks:([a-z0-9:=_-]{0,80})\]\]\n\[\[next:([a-z_,]*)\]\]\s*$/;
+export const NEXT_MARK = /\n*\[\[thanks:([a-z0-9:=_-]{0,80})\]\]\n\[\[next:([a-z0-9_,]*)\]\]\s*$/;
 
 /**
  * For the model's words as they stream (review 24/11/2026): every "[[" loses its second "[", even when the two
@@ -104,7 +104,7 @@ export function markerGuard(): (piece: string) => string {
 }
 
 /** A half-arrived marker (or two), at the very end of an answer still streaming in. */
-const PARTIAL_MARK = /\n*\[(?:\[(?:t(?:h(?:a(?:n(?:k(?:s(?::[a-z0-9:=_-]*(?:\](?:\](?:\n(?:\[(?:\[(?:n(?:e(?:x(?:t(?::[a-z_,]*\]?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?|n(?:e(?:x(?:t(?::[a-z_,]*\]?)?)?)?)?)?)?$/;
+const PARTIAL_MARK = /\n*\[(?:\[(?:t(?:h(?:a(?:n(?:k(?:s(?::[a-z0-9:=_-]*(?:\](?:\](?:\n(?:\[(?:\[(?:n(?:e(?:x(?:t(?::[a-z0-9_,]*\]?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?|n(?:e(?:x(?:t(?::[a-z0-9_,]*\]?)?)?)?)?)?)?$/;
 
 /**
  * Splits the markers off a (possibly still arriving) answer. A half-arrived marker is hidden too. `thanks` is the
@@ -122,7 +122,9 @@ export function splitNext(text: string): { text: string; tools: string[] | null;
 }
 
 /** The marker for these lookups (names only, from our own tool list), and the answer's "take me there" buttons. */
+// Names may hold digits (go_donors_s18a_missing): review 27/11/2026 found the two s18A buttons dropped by a
+// letters-only filter.
 export function nextMark(tools: string[], go: readonly GoKey[] = []): string {
-  const names = [...new Set([...tools, ...goMarkNames(go)].filter((t) => /^[a-z_]+$/.test(t)))];
+  const names = [...new Set([...tools, ...goMarkNames(go)].filter((t) => /^[a-z][a-z0-9_]*$/.test(t)))];
   return `\n[[next:${names.join(",")}]]`;
 }

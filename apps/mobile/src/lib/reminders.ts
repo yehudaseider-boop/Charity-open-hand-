@@ -50,20 +50,45 @@ function dayIn(year: number, month: number, day: ReminderDay): Date {
 }
 
 /**
- * When the next reminder goes off: this month's day if it is still ahead and this month is still open, otherwise
- * next month's (and so on). A month is closed when the donor already gave in it, or said "Not this month" for it.
- * Null when no reminder is set.
+ * How many months ahead the phone holds a reminder (review 27/11/2026). One at a time meant the reminder stopped after
+ * it went off, until the app was next opened; six ahead keep it going for half a year without the app, and every open
+ * of the app tops them up (and takes away a month the donor has since given in).
  */
-export function nextReminderAt(settings: ReminderSettings, now: Date, gaveIn: (monthKey: string) => boolean): Date | null {
-  if (!settings.on || settings.day === null) return null;
-  for (let i = 0; i < 13; i += 1) {
+export const REMINDER_MONTHS_AHEAD = 6;
+
+/**
+ * The next reminders, soonest first: this month's day if it is still ahead and this month is still open, then the
+ * following months'. A month is closed when the donor already gave in it, or said "Not this month" for it. Empty when
+ * no reminder is set.
+ */
+export function upcomingReminders(settings: ReminderSettings, now: Date, gaveIn: (monthKey: string) => boolean, count = REMINDER_MONTHS_AHEAD): Date[] {
+  if (!settings.on || settings.day === null) return [];
+  const out: Date[] = [];
+  for (let i = 0; i < count + 13 && out.length < count; i += 1) {
     const at = dayIn(now.getFullYear(), now.getMonth() + i, settings.day);
     const key = monthKeyOf(at);
     if (at.getTime() <= now.getTime()) continue;
     if (key === settings.skipMonth || gaveIn(key)) continue;
-    return at;
+    out.push(at);
   }
-  return null;
+  return out;
+}
+
+/** When the next reminder goes off, or null when none is set. */
+export function nextReminderAt(settings: ReminderSettings, now: Date, gaveIn: (monthKey: string) => boolean): Date | null {
+  return upcomingReminders(settings, now, gaveIn, 1)[0] ?? null;
+}
+
+/**
+ * The setting after the donor picks a day (review 27/11/2026). A first reminder starts fresh. A change of day keeps
+ * "Not this month", and when this month's reminder already went off on the old day, this month stays closed: changing
+ * from the 20th to the 25th on the 21st must not remind them twice in one month.
+ */
+export function withDay(previous: ReminderSettings | null, day: ReminderDay, now: Date, askedAt: string): ReminderSettings {
+  if (!previous?.on || previous.day === null) return { on: true, day, askedAt, skipMonth: null };
+  const thisMonth = monthKeyOf(now);
+  const wentOff = dayIn(now.getFullYear(), now.getMonth(), previous.day).getTime() <= now.getTime();
+  return { on: true, day, askedAt, skipMonth: wentOff ? thisMonth : previous.skipMonth };
 }
 
 /** Whether the donor gave in a month, from their gift dates. */

@@ -12,6 +12,9 @@ import {
   reminderMessage,
   remindButton,
   reminderSummary,
+  REMINDER_MONTHS_AHEAD,
+  upcomingReminders,
+  withDay,
   type ReminderSettings,
 } from "../apps/mobile/src/lib/reminders";
 
@@ -80,5 +83,44 @@ describe("settings read back from the phone", () => {
   it("keeps good settings, and drops a malformed date", () => {
     expect(cleanSettings({ on: true, day: "last", askedAt: "2026-11-27T08:00:00Z", skipMonth: "2026-12" })).toEqual({ on: true, day: "last", askedAt: "2026-11-27T08:00:00Z", skipMonth: "2026-12" });
     expect(cleanSettings({ on: true, day: 25, askedAt: "yesterday", skipMonth: "Dec" })).toEqual({ on: true, day: 25, askedAt: null, skipMonth: null });
+  });
+});
+
+// Review 27/11/2026: one reminder at a time stopped after it went off; a change of day could remind twice in a month.
+describe("months ahead on the phone", () => {
+  it("holds the next six open months, so it keeps going without the app being opened", () => {
+    const dates = upcomingReminders(on(25), at(2026, 11, 27), never);
+    expect(dates).toHaveLength(REMINDER_MONTHS_AHEAD);
+    expect(dates.map(ddmmyyyy)).toEqual(["25/12/2026", "25/01/2027", "25/02/2027", "25/03/2027", "25/04/2027", "25/05/2027"]);
+  });
+  it("leaves out a month already given in, or said no to, and still holds six", () => {
+    const dates = upcomingReminders(on(25, { skipMonth: "2026-12" }), at(2026, 11, 27), gaveInMonth([at(2027, 1, 3)]));
+    expect(dates.map(ddmmyyyy)).toEqual(["25/02/2027", "25/03/2027", "25/04/2027", "25/05/2027", "25/06/2027", "25/07/2027"]);
+  });
+  it("the last day of each month, short ones included", () => {
+    expect(upcomingReminders(on("last"), at(2027, 1, 31, 10), never, 3).map(ddmmyyyy)).toEqual(["28/02/2027", "31/03/2027", "30/04/2027"]);
+  });
+  it("none when off", () => {
+    expect(upcomingReminders(NO_REMINDER, at(2026, 11, 27), never)).toEqual([]);
+  });
+});
+
+describe("picking a day", () => {
+  const asked = "2026-11-21T08:00:00.000Z";
+  it("a first reminder starts fresh", () => {
+    expect(withDay(null, 25, at(2026, 11, 21), asked)).toEqual({ on: true, day: 25, askedAt: asked, skipMonth: null });
+  });
+  it("changing from the 20th to the 25th on the 21st: November's already went off, so no second one", () => {
+    const next = withDay(on(20), 25, at(2026, 11, 21), asked);
+    expect(next.skipMonth).toBe("2026-11");
+    expect(nextReminderAt(next, at(2026, 11, 21), never)).toEqual(new Date(2026, 11, 25, 9));
+  });
+  it("changing before this month's went off: this month's comes on the new day", () => {
+    const next = withDay(on(25), 20, at(2026, 11, 10), asked);
+    expect(next.skipMonth).toBeNull();
+    expect(nextReminderAt(next, at(2026, 11, 10), never)).toEqual(new Date(2026, 10, 20, 9));
+  });
+  it("keeps Not this month", () => {
+    expect(withDay(on(25, { skipMonth: "2026-11" }), 20, at(2026, 11, 10), asked).skipMonth).toBe("2026-11");
   });
 });
