@@ -1,15 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SupportContact } from "@/components/legal";
-import { Confetti, Floating, Icon, Key } from "@/components/marketing";
+import { Floating, Icon, Key } from "@/components/marketing";
 import { platformConfig } from "@/config/platform";
 import { LiveWindow } from "@/components/live-window";
 import { Reveal } from "@/components/reveal";
 import { AudienceSwitch } from "@/components/audience-switch";
-import { Splash } from "@/components/splash";
 import { Illustration } from "@/components/illustration";
 import { ChecklistPicture, DashboardPicture, UpdatePicture } from "@/components/landing/pictures";
-import { ArrowRight, BlueBlock, Chapter, Closing, StepCards, arrowLink, bigTitle, chapterTitle, orangeButton } from "@/components/landing/sections";
+import { ArrowRight, BlueBlock, Chapter, StepCards, chapterTitle, orangeButton } from "@/components/landing/sections";
 import { reviewWithin } from "@/lib/charity/review-time";
 
 export const metadata: Metadata = {
@@ -139,31 +138,34 @@ function ReceiptsScreen() {
 export default function ForCharitiesPage() {
   return (
     <div className="full-bleed overflow-x-clip">
-      {/* Opening: the landing page's big headline over soft splashes, then the dashboard's sample screens. */}
-      <section className="relative">
-        <span aria-hidden className="pointer-events-none absolute -left-40 -top-24 -z-10 h-[30rem] w-[30rem] rounded-full bg-honey-soft" />
-        <span aria-hidden className="pointer-events-none absolute -right-24 top-40 -z-10 h-72 w-72 rounded-full bg-peach max-md:hidden" />
-        <div className="mx-auto flex max-w-[75rem] flex-col gap-6 px-4 pt-8 sm:px-6 md:pt-14">
-          <AudienceSwitch current="charity" />
-          <div className="grid items-end gap-8 md:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)]">
-            <div className="flex min-w-0 flex-col items-start gap-6">
-              <h1 className={bigTitle}>Get found, get given to, <Key>keep your donors.</Key></h1>
-              <p className="max-w-[36rem] text-[clamp(1.125rem,2vw,1.375rem)] leading-relaxed text-muted">
-                {platformConfig.appName} helps South African donors find your charity, give from their phone, and keep coming back. Donations go to your own bank account, and your donors&apos; s18A receipts are made for you.
-              </p>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-                <Link href="/apply" className={orangeButton}>List your charity</Link>
-                <Link href="/demo/dashboard" className={arrowLink}>Try the dashboard with sample data<ArrowRight /></Link>
-              </div>
+      {/* Opening, in the home page's look (preview 27/11/2026): a blue block with the big two-line headline, and the
+          sample dashboard to click around in, right there. */}
+      <section className="relative overflow-hidden bg-brand text-white">
+        <span aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full border-[48px] border-honey/20" />
+        <span aria-hidden className="pointer-events-none absolute -left-10 top-[22rem] h-24 w-24 rounded-full bg-coral max-md:hidden" />
+        <div className="relative mx-auto flex max-w-[75rem] flex-col gap-8 px-4 pb-10 pt-8 sm:px-6 md:pt-14">
+          <div className="self-start"><AudienceSwitch current="charity" /></div>
+          <div className="flex min-w-0 flex-col items-start gap-6">
+            <h1 className="font-display text-[clamp(3rem,6.6vw,6rem)] font-extrabold! leading-[0.92] tracking-[-0.045em]! text-white!">
+              Get found, get given to,
+              <br />
+              <span className="text-honey">keep your donors.</span>
+            </h1>
+            <p className="max-w-[38rem] text-pretty text-[clamp(1.0625rem,1.6vw,1.3125rem)] leading-relaxed text-white/85">
+              {platformConfig.appName} helps South African donors find your charity, give from their phone, and keep coming back. Donations go to your own bank account, and your donors&apos; s18A receipts are made for you.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link href="/apply" className={orangeButton}>List your charity</Link>
+              <Link href="/demo/dashboard" className="inline-flex min-h-14 items-center gap-1.5 rounded-[1.125rem] border-[1.5px] border-white/40 px-7 text-[17px] font-bold text-white transition-colors hover:border-white">
+                Try the full dashboard<ArrowRight />
+              </Link>
             </div>
-            <Splash className="splash-breathe mx-auto w-[9rem] max-md:hidden md:w-full md:max-w-[16rem]" />
           </div>
         </div>
-
-        <div className="relative mx-auto mt-14 w-full max-w-[60rem] px-4 pb-16 sm:px-6 md:pb-24">
-          <Confetti />
-          <div className="relative mx-auto max-w-[48rem]">
+        <div className="relative mx-auto w-full max-w-[60rem] px-4 pb-16 sm:px-6 md:pb-24">
+          <div className="relative mx-auto max-w-[48rem] text-navy">
             <LiveWindow
+              onBlue
               label="Sample screens of the charity dashboard"
               tabs={[
                 { label: "Overview", screen: <DashboardScreen /> },
@@ -185,10 +187,27 @@ export default function ForCharitiesPage() {
               <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-border" aria-hidden><div className="h-2.5 w-[68%] rounded-full bg-sage" /></div>
               <p className="mt-2 flex justify-between text-[12px]"><span className="font-bold">R34 000</span><span className="text-muted">of R50 000</span></p>
             </Floating>
-            <p className="mt-3 text-right text-xs text-muted">Sample screens. Tap through them to look around.</p>
+            <p className="mt-3 text-right text-xs text-white/80">Sample screens with made-up donors. Tap through them to look around.</p>
           </div>
         </div>
       </section>
+
+      {/* Three facts, as the home page's colour blocks (no invented numbers). */}
+      <Reveal as="section" className="mx-auto max-w-[75rem] px-4 pt-16 sm:px-6 md:pt-24">
+        <ul className="grid gap-5 md:grid-cols-3">
+          {([
+            ["0", "rand of a gift passes through Givezy's bank account. Donations go straight to your charity's own account.", "bg-brand text-white", "text-white", "text-white/85", "bg-coral"],
+            ["1", "s18A receipt a year for each donor who asks, made for you in your name. You check it before it goes out.", "bg-honey-soft text-navy", "text-brand", "text-navy/80", "bg-peach"],
+            [reviewWithin().split(" ")[0], "working days to review your application. A real person checks every one by hand, then emails you the outcome.", "bg-peach text-navy", "text-brand", "text-navy/80", "bg-honey"],
+          ] as [string, string, string, string, string, string][]).map(([big, text, ground, bigTone, textTone, dotTone]) => (
+            <li key={text} className={`relative flex flex-col justify-between gap-8 overflow-hidden rounded-[2rem] p-8 md:min-h-[18rem] md:p-9 ${ground}`}>
+              <span aria-hidden className={`absolute -right-5 -top-5 h-14 w-14 rounded-full ${dotTone}`} />
+              <span className={`relative font-display text-[clamp(5rem,9vw,7.5rem)] font-extrabold leading-[0.85] tracking-[-0.05em] ${bigTone}`}>{big}</span>
+              <span className={`relative max-w-[22rem] text-[17px] leading-relaxed ${textTone}`}>{text}</span>
+            </li>
+          ))}
+        </ul>
+      </Reveal>
 
       <StepCards
         id="join"
@@ -298,17 +317,27 @@ export default function ForCharitiesPage() {
         </div>
       </Reveal>
 
-      <Closing
-        title={<>Ready to <Key>list your charity</Key>?</>}
-        body={<>Apply in one sitting or save and come back. We check every application by hand and email you the outcome. Rather talk to a person first? <SupportContact />.</>}
-        action={
-          <>
+      {/* The close, as the home page's: blue, the big two-line headline, one orange button. */}
+      <section className="relative overflow-hidden bg-brand text-white">
+        <span aria-hidden className="absolute -right-24 -top-24 h-80 w-80 rounded-full border-[48px] border-honey/20" />
+        <span aria-hidden className="absolute -bottom-14 left-[12%] h-32 w-32 rounded-full bg-coral" />
+        <Reveal className="relative mx-auto flex max-w-[75rem] flex-col items-start gap-8 px-4 pb-32 pt-24 sm:px-6 md:pb-40 md:pt-32">
+          <h2 className="font-display text-[clamp(3rem,6.6vw,6rem)] font-extrabold! leading-[0.92] tracking-[-0.045em]! text-white!">
+            Ready to list
+            <br />
+            <span className="text-honey">your charity?</span>
+          </h2>
+          <p className="max-w-[36rem] text-[clamp(1.0625rem,1.5vw,1.25rem)] leading-relaxed text-white/85">
+            Apply in one sitting or save and come back. We check every application by hand and email you the outcome. Rather talk to a person first? <span className="[&_a]:font-semibold [&_a]:text-white [&_a]:underline [&_a]:underline-offset-4"><SupportContact /></span>.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
             <Link href="/apply" className={orangeButton}>List your charity</Link>
-            <Link href="/faq" className={arrowLink}>Questions<ArrowRight /></Link>
-          </>
-        }
-        side={<Illustration name="boxes" sparkle="hearts" className="mx-auto w-full max-w-[16rem]" />}
-      />
+            <Link href="/faq" className="inline-flex min-h-14 items-center gap-1.5 rounded-[1.125rem] border-[1.5px] border-white/40 px-7 text-[17px] font-bold text-white transition-colors hover:border-white">
+              Questions<ArrowRight />
+            </Link>
+          </div>
+        </Reveal>
+      </section>
     </div>
   );
 }
