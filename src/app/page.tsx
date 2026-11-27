@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { EmailPicture } from "@/components/landing/email-picture";
 import Link from "next/link";
 import { ChromeMark } from "@/components/chrome-mark";
 import { HeaderNav } from "@/components/header-nav";
@@ -8,10 +7,11 @@ import { Illustration } from "@/components/illustration";
 import { ArrowRight, Questions, arrowLink } from "@/components/landing/sections";
 import { PhonePicture } from "@/components/landing/pictures";
 import { LiveWindow } from "@/components/live-window";
+import { TryAGift } from "@/components/landing/try-a-gift";
 import { Icon, type IconName } from "@/components/marketing";
 import { Reveal } from "@/components/reveal";
 import { Splash } from "@/components/splash";
-import { GivePhone, NewGift, Receipt, Screen, Where, storyCard as card } from "@/components/landing/gift-story";
+import { Screen } from "@/components/landing/gift-story";
 import { appLinks } from "@/config/app-links";
 import { legalConfig } from "@/config/legal";
 import { platformConfig } from "@/config/platform";
@@ -20,7 +20,8 @@ import { siteOrigin } from "@/lib/request-origin";
 import { charityFaqs, donorFaqs, withoutCostQuestions } from "@/lib/seo/faq";
 import { organisationData } from "@/lib/seo/structured-data";
 
-// The home page (Yehuda, 17/11/2026: "I love it", then "everything connected and synced"). Planned from what a visitor
+// The home page (Yehuda, 17/11/2026: "I love it", then "everything connected and synced"). Redesigned 26/11/2026
+// (Yehuda: "Loving it"): the hero's phone is real to tap (TryAGift), two full-width doors, bolder sections. Planned from what a visitor
 // needs rather than from what we have: most visitors are donors ("what is this, can I trust it, how fast can I give?")
 // and don't care about a dashboard; charities want to see the dashboard once, properly, and click around in it. So
 // every section has one job and one picture, and nothing repeats:
@@ -78,10 +79,10 @@ const lineBtnDark = "inline-flex min-h-12 items-center gap-1.5 rounded-[1.125rem
 
 function Step({ n, title, body }: { n: string; title: string; body: string }) {
   return (
-    <li className="flex gap-4">
-      <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand font-display text-[1.0625rem] font-extrabold text-white">{n}</span>
+    <li className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-4 border-t-2 border-navy/10 pt-5">
+      <span aria-hidden className="font-display text-[3.5rem] font-extrabold leading-[0.8] tracking-[-0.05em] text-brand">{n}</span>
       <span className="flex flex-col gap-1">
-        <span className="font-display text-[1.25rem] font-bold leading-tight">{title}</span>
+        <span className="font-display text-[1.375rem] font-bold leading-tight">{title}</span>
         <span className="text-[16px] leading-relaxed text-muted">{body}</span>
       </span>
     </li>
@@ -102,7 +103,7 @@ const footerGroups: [string, [string, string][]][] = [
   [appName, [["/faq", "Questions"], ["/privacy", "Privacy"], ["/terms", "Terms"]]],
 ];
 
-export default function HomePreview() {
+export default function HomePage() {
   const contact = legalConfig.supportEmail;
   return (
     <div className="full-bleed overflow-x-clip">
@@ -119,9 +120,10 @@ export default function HomePreview() {
         </div>
       </header>
 
-      {/* 1. Hero: the promise, and one gift's story beside it. */}
-      <section className="hero-glow relative overflow-hidden bg-brand text-white">
-        <div className="mx-auto grid max-w-[80rem] items-center gap-10 px-4 pb-16 pt-12 sm:px-6 xl:min-h-[44rem] xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:gap-6 xl:py-20">
+      {/* 1. Hero: the promise on the left; on the right, one gift's story with a phone that is real to tap. */}
+      <section className="relative overflow-hidden bg-brand text-white">
+        <span aria-hidden className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full border-[40px] border-honey/20" />
+        <div className="relative mx-auto grid max-w-[80rem] items-center gap-12 px-4 pb-14 pt-12 sm:px-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:gap-8 lg:py-20">
           <div className="flex min-w-0 flex-col items-start gap-7">
             {appLinks.launchMonth ? (
               <p className="inline-flex items-center gap-2.5 rounded-full bg-white/12 px-4 py-2 text-[14px] font-semibold text-white ring-1 ring-white/20">
@@ -129,78 +131,52 @@ export default function HomePreview() {
                 Coming {appLinks.launchMonth}
               </p>
             ) : null}
-            <H as="h1" size="h1" dark>Giving, <Em dark>made easy.</Em></H>
-            <p className="max-w-[32rem] text-pretty text-[clamp(1.0625rem,1.5vw,1.25rem)] leading-relaxed text-white/85">
-              Find a charity you trust, give in a few taps, and never chase an s18A receipt again. For charities: every gift, every donor and every receipt in one place.
+            <h1 className="font-display text-[clamp(3.25rem,6.2vw,6rem)] font-extrabold! leading-[0.92] tracking-[-0.045em]! text-white!">
+              Giving,
+              <br />
+              <span className="whitespace-nowrap text-honey">made easy.</span>
+            </h1>
+            <p className="max-w-[30rem] text-pretty text-[clamp(1.0625rem,1.5vw,1.25rem)] leading-relaxed text-white/85">
+              Give to a charity a real person has checked, in a few taps. Every gift and every s18A receipt stays in one place, ready for tax time.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link href="/charities" className={orangeBtn}>Find a charity</Link>
               <Link href="#charities" className={lineBtnDark}>I run a charity<ArrowRight /></Link>
             </div>
           </div>
-
-          {/* One gift, in order: given on the phone, seen by the charity, thanked in the inbox, kept for tax time. */}
-          <figure className="relative mx-auto w-full max-w-[36rem]">
-            <figcaption className="sr-only">One gift with {appName}: a donor gives R250 from their phone; it shows on the charity&apos;s dashboard straight away; the donor gets a thank-you email; and the gift is on their s18A receipt at tax time. Made-up example.</figcaption>
-            <div aria-hidden className="relative grid items-start gap-6 sm:grid-cols-[15.5rem_minmax(0,1fr)]">
-              <span className="absolute -right-10 top-4 h-72 w-72 rounded-full border-[40px] border-honey/25" />
-              <div className="hero-rise relative mx-auto w-[15rem] sm:w-full" style={{ animationDelay: "120ms" }}>
-                <div className="bob-slow"><Where n={1}>You give</Where><GivePhone /></div>
-              </div>
-              <div className="relative flex flex-col gap-5">
-                <div className="hero-rise sm:mr-6" style={{ animationDelay: "380ms" }}>
-                  <div className="bob"><Where n={2}>They see it</Where><NewGift /></div>
-                </div>
-                <div className="hero-rise sm:ml-6" style={{ animationDelay: "620ms" }}>
-                  <div className="bob-slow"><Where n={3}>You&apos;re thanked</Where>
-                    <div className={`${card} overflow-hidden p-1.5`}><EmailPicture /></div>
-                  </div>
-                </div>
-                <div className="hero-rise sm:mr-10" style={{ animationDelay: "860ms" }}>
-                  <div className="bob"><Where n={4}>Tax time, sorted</Where><Receipt /></div>
-                </div>
-              </div>
-            </div>
-          </figure>
+          <TryAGift charity={charity} />
         </div>
-        <p className="mx-auto max-w-[80rem] px-4 pb-8 text-[13px] text-white/80 sm:px-6">Made-up example. {charity} and its donors are sample data from our dashboard demo.</p>
+        <p className="relative mx-auto max-w-[80rem] px-4 pb-8 text-[13px] text-white/80 sm:px-6">Made-up example. {charity} is sample data from our dashboard demo.</p>
       </section>
 
-      {/* 2. Two doors: each visitor picks their side. */}
-      <section className="bg-white">
-        <Reveal className="mx-auto max-w-[80rem] px-4 py-20 sm:px-6 md:py-28">
-          <div className="mx-auto flex max-w-[48rem] flex-col items-center gap-6 text-center">
-            <Eyebrow center>Two sides, one place</Eyebrow>
-            <H size="h2">Two sides of every gift, <Em>finally on the same page.</Em></H>
-          </div>
-          <ul className="mt-14 grid gap-5 lg:grid-cols-2">
-            {([
-              ["bg-honey-soft", "I give", "Every charity checked by a real person. Every gift and every s18A receipt in one account, ready when SARS asks.", "#donors", "How giving works", "/charities", "Find a charity", "loveIt", "hearts"],
-              ["bg-peach", "I run a charity", "Get found, get given to and keep your donors. The receipts, the reminders and the record-keeping, done with you.", "#charities", "See the dashboard", "/apply", "Apply to list your charity", "workingTogether", "stars"],
-            ] as const).map(([bg, title, body, more, moreLabel, href, cta, art, sparkle]) => (
-              <li key={title} className={`lift relative flex flex-col justify-between gap-8 overflow-hidden rounded-[2rem] p-8 md:p-10 lg:min-h-[22rem] ${bg}`}>
-                <Illustration name={art} sparkle={sparkle} className={`absolute right-5 top-6 sm:right-8 sm:top-8 ${art === "loveIt" ? "w-20 sm:w-32" : "w-28 sm:w-44"}`} />
-                <div className="relative flex flex-col gap-3 pr-24 sm:pr-48">
-                  <h3 className="font-display text-[clamp(2rem,3.4vw,2.75rem)] font-bold! leading-none tracking-[-0.03em]!">{title}</h3>
-                  <p className="text-[17px] leading-relaxed text-navy/80">{body}</p>
-                </div>
-                <div className="relative flex flex-wrap items-center gap-4">
-                  <Link href={href} className={inkBtn}>{cta}</Link>
-                  <Link href={more} className={arrowLink}>{moreLabel}<ArrowRight /></Link>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Reveal>
+      {/* 2. Two doors: the page splits in two, and each half is one big door. */}
+      <section aria-label="Who Givezy is for" className="grid lg:grid-cols-2">
+        {([
+          ["bg-honey-soft", "I give", "Find a charity you trust, give once or every month, and keep every s18A receipt in one account.", "/charities", "Find a charity", "loveIt", "hearts"],
+          ["bg-peach", "I run a charity", "Get found and given to, thank every donor, and let the receipts and the record-keeping take care of themselves.", "/for-charities", "What charities get", "workingTogether", "stars"],
+        ] as const).map(([bg, title, body, href, cta, art, sparkle]) => (
+          <Link key={title} href={href} className={`group relative flex min-h-[22rem] flex-col justify-between gap-10 overflow-hidden px-6 py-12 focus-visible:outline-3 focus-visible:-outline-offset-8 focus-visible:outline-brand sm:px-10 lg:min-h-[30rem] lg:px-14 lg:py-20 ${bg}`}>
+            <div className="flex max-w-[32rem] flex-col gap-4">
+              <span className="font-display text-[clamp(2.75rem,4.8vw,4.25rem)] font-extrabold leading-[0.95] tracking-[-0.04em] text-indigo">{title}</span>
+              <span className="text-[17px] leading-relaxed text-navy/80">{body}</span>
+            </div>
+            <div className="flex items-end justify-between gap-4">
+              <span className="inline-flex min-h-12 shrink-0 items-center gap-2 rounded-[1.125rem] bg-navy px-6 text-[16px] font-bold text-white transition-colors group-hover:bg-brand">
+                {cta}<ArrowRight />
+              </span>
+              <Illustration name={art} sparkle={sparkle} className="w-24 shrink sm:w-36 lg:w-44" />
+            </div>
+          </Link>
+        ))}
       </section>
 
       {/* 3. For donors: three steps, and the phone. */}
-      <section id="donors" className="scroll-mt-20 bg-honey-soft">
+      <section id="donors" className="scroll-mt-20 bg-white">
         <Reveal className="mx-auto grid max-w-[80rem] items-center gap-14 px-4 py-20 sm:px-6 md:grid-cols-2 md:gap-20 md:py-28">
           <div className="flex min-w-0 flex-col gap-8">
             <Eyebrow>For donors</Eyebrow>
             <H size="h2">Give in a few taps. <Em>Keep every receipt.</Em></H>
-            <ol className="flex flex-col gap-6">
+            <ol className="flex flex-col gap-7">
               <Step n="1" title="Find a charity you can trust" body="Search by name, cause or area. A person checks every charity before it can take a single rand." />
               <Step n="2" title="Give once or every month, and watch it grow" body={`In the ${appName} app, see how much you've given this tax year, set a giving goal if you like, and watch your ring fill up.`} />
               <Step n="3" title="Let tax time take care of itself" body="Sign in with the email you gave with: every gift is in one place, and your s18A receipt follows after the tax year ends." />
@@ -263,22 +239,23 @@ export default function HomePreview() {
         </div>
       </section>
 
-      {/* 5. Big facts, no invented numbers. */}
+      {/* 5. Big facts, no invented numbers: three colour blocks, each with a dot bleeding off its corner. */}
       <section className="bg-white">
         <Reveal className="mx-auto max-w-[80rem] px-4 py-20 sm:px-6 md:py-28">
           <div className="mx-auto flex max-w-[48rem] flex-col items-center gap-6 text-center">
             <Eyebrow center>Built to be trusted with money</Eyebrow>
             <H size="h2">Safe for donors. <Em>Simple for charities.</Em></H>
           </div>
-          <ul className="mt-14 grid gap-10 md:grid-cols-3 md:gap-8">
+          <ul className="mt-14 grid gap-5 md:grid-cols-3">
             {([
-              ["1", "s18A receipt a year from each charity that issues them, checked by the charity before it goes out."],
-              ["0", "rand of a gift passes through Givezy's bank account. Gifts go straight to the charity's own account."],
-              ["100%", "of charities are looked at by a person: registration documents and bank details are checked before they can take a gift."],
-            ] as [string, string][]).map(([big, text]) => (
-              <li key={big} className="flex flex-col gap-4 border-t-2 border-navy/15 pt-6">
-                <span className="font-display text-[clamp(4.5rem,9vw,7.5rem)] font-bold leading-[0.9] tracking-[-0.045em] text-brand">{big}</span>
-                <span className="max-w-[22rem] text-[17px] leading-relaxed text-muted">{text}</span>
+              ["0", "rand of a gift passes through Givezy's bank account. Gifts go straight to the charity's own account.", "bg-brand text-white", "text-white", "text-white/85", "bg-coral"],
+              ["1", "s18A receipt a year from each charity that issues them, checked by the charity before it goes out.", "bg-honey-soft text-navy", "text-brand", "text-navy/80", "bg-peach"],
+              ["100%", "of charities are looked at by a person: registration documents and bank details are checked before they can take a gift.", "bg-peach text-navy", "text-brand", "text-navy/80", "bg-honey"],
+            ] as [string, string, string, string, string, string][]).map(([big, text, ground, bigTone, textTone, dotTone]) => (
+              <li key={big} className={`relative flex flex-col justify-between gap-8 overflow-hidden rounded-[2rem] p-8 md:min-h-[20rem] md:p-9 ${ground}`}>
+                <span aria-hidden className={`absolute -right-5 -top-5 h-14 w-14 rounded-full ${dotTone}`} />
+                <span className={`relative font-display text-[clamp(5rem,9vw,8rem)] font-extrabold leading-[0.85] tracking-[-0.05em] ${bigTone}`}>{big}</span>
+                <span className={`relative max-w-[22rem] text-[17px] leading-relaxed ${textTone}`}>{text}</span>
               </li>
             ))}
           </ul>
@@ -325,13 +302,19 @@ export default function HomePreview() {
         width="max-w-[80rem]"
       />
 
-      {/* 8. The close. */}
-      <section className="hero-glow relative overflow-hidden bg-brand text-white">
-        <Reveal className="mx-auto flex max-w-[80rem] flex-col items-center gap-8 px-4 py-24 text-center sm:px-6 md:py-36">
-          <span className="flex h-28 w-28 items-center justify-center rounded-full bg-white shadow-[0_20px_50px_rgba(6,22,70,0.35)] md:h-32 md:w-32"><Splash className="w-16 md:w-20" /></span>
-          <H size="h1" dark className="max-w-[56rem]">January is close. <Em dark>Be there from day one.</Em></H>
-          <p className="max-w-[32rem] text-[clamp(1.0625rem,1.5vw,1.25rem)] leading-relaxed text-white/85">Find a charity you trust and give in a few taps, or list yours and let the receipts take care of themselves.</p>
-          <div className="flex flex-wrap justify-center gap-3">
+      {/* 8. The close: the hero's two-line headline, and the same two doors. */}
+      <section className="relative overflow-hidden bg-brand text-white">
+        <span aria-hidden className="absolute -right-24 -top-24 h-80 w-80 rounded-full border-[48px] border-honey/20" />
+        <span aria-hidden className="absolute -bottom-14 left-[12%] h-32 w-32 rounded-full bg-coral" />
+        <Reveal className="relative mx-auto flex max-w-[80rem] flex-col items-start gap-8 px-4 pb-32 pt-24 sm:px-6 md:pb-40 md:pt-32">
+          <span className="flex h-20 w-20 items-center justify-center rounded-full bg-white shadow-[0_20px_50px_rgba(6,22,70,0.35)] md:h-24 md:w-24"><Splash className="w-12 md:w-14" /></span>
+          <h2 className="font-display text-[clamp(3rem,6.6vw,6.25rem)] font-extrabold! leading-[0.92] tracking-[-0.045em]! text-white!">
+            January is close.
+            <br />
+            <span className="text-honey">Be there from day one.</span>
+          </h2>
+          <p className="max-w-[34rem] text-[clamp(1.0625rem,1.5vw,1.25rem)] leading-relaxed text-white/85">Find a charity you trust and give in a few taps, or list yours and let the receipts take care of themselves.</p>
+          <div className="flex flex-wrap gap-3">
             <Link href="/charities" className={orangeBtn}>Find a charity</Link>
             <Link href="/apply" className={lineBtnDark}>Apply to list your charity</Link>
           </div>
